@@ -86,9 +86,26 @@ process.on("exit", () => {
  * @param {Record<string, "off"|"warning"|"warn"|"error">=} opts.rules — `tsconfig.json` plugin rules map
  * @param {Record<string, unknown>=} opts.pluginConfig — full `@ttsc/lint` plugin config; defaults to `{ config: rules }`
  * @param {Record<string, string>=} opts.extraSources — relative-path → content for additional fixture files (paths are interpreted relative to the project root)
+ * @param {string[]=} opts.linkNodeModules — package names from this test project to expose in the fixture's node_modules
  * @returns {{ status: number, stderr: string, diagnostics: Array<{file:string,line:number,column:number,severity:"warn"|"error",rule:string}> }}
  */
-function runLint({ name, source, rules, pluginConfig, extraSources }) {
+function runLint(options) {
+  const project = createLintProject(options);
+  try {
+    return runLintProject(project.tmpdir);
+  } finally {
+    project.cleanup();
+  }
+}
+
+function createLintProject({
+  name,
+  source,
+  rules,
+  pluginConfig,
+  extraSources,
+  linkNodeModules,
+}) {
   const tmpdir = fs.mkdtempSync(
     path.join(os.tmpdir(), `ttsc-lint-case-${sanitizeForFsName(name)}-`),
   );
@@ -102,34 +119,46 @@ function runLint({ name, source, rules, pluginConfig, extraSources }) {
       }
     }
     seedNodeModulesLink(tmpdir);
-
-    const result = spawnSync(
-      process.execPath,
-      [ttscBin, "--cwd", tmpdir, "--noEmit"],
-      {
-        cwd: tmpdir,
-        env: {
-          ...process.env,
-          TTSC_CACHE_DIR: sharedCacheDir,
-          TTSC_TTSX_BINARY: ttsxBin,
-          TTSC_TSGO_BINARY: tsgoBinary,
-          PATH: prependGoToPath(),
-        },
-        encoding: "utf8",
-        maxBuffer: 1024 * 1024 * 32,
-        windowsHide: true,
-      },
-    );
-
-    const stderr = result.stderr ?? "";
+    if (linkNodeModules) {
+      for (const packageName of linkNodeModules) {
+        linkNodeModulePackage(tmpdir, packageName);
+      }
+    }
     return {
-      status: result.status ?? 1,
-      stderr,
-      diagnostics: parseDiagnostics(stderr),
+      tmpdir,
+      cleanup: () => fs.rmSync(tmpdir, { recursive: true, force: true }),
     };
-  } finally {
+  } catch (error) {
     fs.rmSync(tmpdir, { recursive: true, force: true });
+    throw error;
   }
+}
+
+function runLintProject(tmpdir) {
+  const result = spawnSync(
+    process.execPath,
+    [ttscBin, "--cwd", tmpdir, "--noEmit"],
+    {
+      cwd: tmpdir,
+      env: {
+        ...process.env,
+        TTSC_CACHE_DIR: sharedCacheDir,
+        TTSC_TTSX_BINARY: ttsxBin,
+        TTSC_TSGO_BINARY: tsgoBinary,
+        PATH: prependGoToPath(),
+      },
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 32,
+      windowsHide: true,
+    },
+  );
+
+  const stderr = result.stderr ?? "";
+  return {
+    status: result.status ?? 1,
+    stderr,
+    diagnostics: parseDiagnostics(stderr),
+  };
 }
 
 function writeFixtureProject(tmpdir, source, pluginConfig) {
@@ -172,9 +201,23 @@ function seedNodeModulesLink(tmpdir) {
   }
 }
 
+function linkNodeModulePackage(tmpdir, packageName) {
+  const packageJson = require.resolve(`${packageName}/package.json`, {
+    paths: [__dirname],
+  });
+  const source = path.dirname(packageJson);
+  const target = path.join(tmpdir, "node_modules", ...packageName.split("/"));
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  try {
+    fs.symlinkSync(source, target, "junction");
+  } catch (err) {
+    if (err.code !== "EEXIST") throw err;
+  }
+}
+
 const ansiPattern = /\x1b\[[0-9;]*[A-Za-z]/g;
 const bannerPattern =
-  /(?:^|[\s/])([^\s:]+\.ts):(\d+):(\d+)\s+-\s+(error|warning)\s+TS\d+:\s*\[([\w-]+)\]\s*(.*)$/;
+  /(?:^|[\s/])([^\s:]+\.ts):(\d+):(\d+)\s+-\s+(error|warning)\s+TS\d+:\s*\[([^\]]+)\]\s*(.*)$/;
 
 /**
  * Parse the renderer's stderr into structured records.
@@ -224,8 +267,7 @@ function parseExpectations(source) {
     let target = i + 1;
     while (
       target < lines.length &&
-      (/^\s*$/.test(lines[target]) ||
-        /^\s*\/\/\s*expect:/.test(lines[target]))
+      (/^\s*$/.test(lines[target]) || /^\s*\/\/\s*expect:/.test(lines[target]))
     ) {
       target++;
     }
@@ -261,6 +303,8 @@ function prependGoToPath() {
 
 module.exports = {
   runLint,
+  createLintProject,
+  runLintProject,
   parseExpectations,
   parseDiagnostics,
   rulesFromExpectations,

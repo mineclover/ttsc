@@ -92,6 +92,8 @@ type ParameterDeclaration = innerast.ParameterDeclaration
 type ParenthesizedTypeNode = innerast.ParenthesizedTypeNode
 
 const (
+  KindEndOfFile                     = innerast.KindEndOfFile
+  KindSingleLineCommentTrivia       = innerast.KindSingleLineCommentTrivia
   KindCallExpression                = innerast.KindCallExpression
   KindIdentifier                    = innerast.KindIdentifier
   KindMultiLineCommentTrivia        = innerast.KindMultiLineCommentTrivia

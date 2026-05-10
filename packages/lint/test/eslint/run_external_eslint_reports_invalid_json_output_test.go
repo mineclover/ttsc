@@ -1,9 +1,10 @@
 package main
 
 import (
-	"path/filepath"
-	"strings"
-	"testing"
+  "os"
+  "path/filepath"
+  "strings"
+  "testing"
 )
 
 // TestRunExternalESLintReportsInvalidJSONOutput verifies runtime output parsing errors.
@@ -19,19 +20,19 @@ import (
 // 2. Run the external ESLint bridge directly.
 // 3. Assert the error identifies ESLint output parsing.
 func TestRunExternalESLintReportsInvalidJSONOutput(t *testing.T) {
-	root := t.TempDir()
-	fakeNode := filepath.Join(root, "fake-node")
-	writeFile(t, fakeNode, "#!/bin/sh\nprintf 'not-json'\n")
-	if err := chmodExecutable(fakeNode); err != nil {
-		t.Fatalf("chmod fake node: %v", err)
-	}
-	t.Setenv("TTSC_NODE_BINARY", fakeNode)
+  root := t.TempDir()
+  fakeNode := filepath.Join(root, "fake-node")
+  writeFile(t, fakeNode, "#!/bin/sh\nprintf 'not-json'\n")
+  if err := os.Chmod(fakeNode, 0o755); err != nil {
+    t.Fatalf("chmod fake node: %v", err)
+  }
+  t.Setenv("TTSC_NODE_BINARY", fakeNode)
 
-	_, err := runExternalESLint(root, filepath.Join(root, "eslint.config.js"), "[]")
-	if err == nil {
-		t.Fatal("expected invalid ESLint JSON output to fail")
-	}
-	if !strings.Contains(err.Error(), "parse ESLint output") {
-		t.Fatalf("error should mention ESLint output parsing, got %v", err)
-	}
+  _, err := runExternalESLint(root, filepath.Join(root, "eslint.config.js"), "[]")
+  if err == nil {
+    t.Fatal("expected invalid ESLint JSON output to fail")
+  }
+  if !strings.Contains(err.Error(), "parse ESLint output") {
+    t.Fatalf("error should mention ESLint output parsing, got %v", err)
+  }
 }

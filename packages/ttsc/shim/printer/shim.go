@@ -8,9 +8,14 @@ import (
 type PrintHandlers = innerprinter.PrintHandlers
 type Printer = innerprinter.Printer
 type PrinterOptions = innerprinter.PrinterOptions
+type EmitContext = innerprinter.EmitContext
 
-func NewPrinter(options PrinterOptions, handlers PrintHandlers, emitContext *innerprinter.EmitContext) *Printer {
+func NewPrinter(options PrinterOptions, handlers PrintHandlers, emitContext *EmitContext) *Printer {
 	return innerprinter.NewPrinter(options, handlers, emitContext)
+}
+
+func NewEmitContext() *EmitContext {
+	return innerprinter.NewEmitContext()
 }
 
 func EmitSourceFile(p *Printer, sourceFile *ast.SourceFile) string {

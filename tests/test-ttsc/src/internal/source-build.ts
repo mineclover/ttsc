@@ -8,7 +8,10 @@ import {
   computeCacheKey,
 } from "../../../../packages/ttsc/lib/plugin/internal/buildSourcePlugin.js";
 
-function createFakeGoBinary(root: string): string {
+function createFakeGoBinary(
+  root: string,
+  opts: { executable?: boolean } = {},
+): string {
   const script = path.join(root, "fake-go.cjs");
   fs.writeFileSync(
     script,
@@ -18,6 +21,11 @@ function createFakeGoBinary(root: string): string {
       "const args = process.argv.slice(2);",
       'if (args[0] === "version") {',
       '  console.log("go version fake");',
+      "  process.exit(0);",
+      "}",
+      'if (args[0] === "mod" && args[1] === "edit" && args[2] === "-json") {',
+      '  const goMod = fs.readFileSync(path.join(process.cwd(), "go.mod"), "utf8");',
+      "  console.log(JSON.stringify(parseGoMod(goMod)));",
       "  process.exit(0);",
       "}",
       'if (args[0] !== "build") {',
@@ -47,6 +55,29 @@ function createFakeGoBinary(root: string): string {
       'fs.writeFileSync(out, "fake plugin binary\\n", "utf8");',
       "process.exit(0);",
       "",
+      "function parseGoMod(text) {",
+      "  const out = {};",
+      "  let block = null;",
+      "  for (const raw of text.split(/\\r?\\n/)) {",
+      "    const line = raw.replace(/\\/\\/.*$/, '').trim();",
+      "    if (!line) continue;",
+      "    if (line === ')') { block = null; continue; }",
+      "    if (line === 'replace (') { block = 'replace'; continue; }",
+      "    if (line.startsWith('module ')) out.Module = { Path: line.split(/\\s+/)[1] };",
+      "    else if (line.startsWith('replace ')) addReplace(out, line.slice('replace '.length));",
+      "    else if (block === 'replace') addReplace(out, line);",
+      "  }",
+      "  return out;",
+      "}",
+      "function addReplace(out, line) {",
+      "  const fields = line.trim().split(/\\s+/);",
+      "  const arrow = fields.indexOf('=>');",
+      "  if (arrow < 1 || fields.length <= arrow + 1) return;",
+      "  const old = { Path: fields[0] };",
+      "  if (fields[1] && fields[1] !== '=>') old.Version = fields[1];",
+      "  (out.Replace ??= []).push({ Old: old, New: { Path: fields[arrow + 1] } });",
+      "}",
+      "",
     ].join("\n"),
     "utf8",
   );
@@ -67,7 +98,7 @@ function createFakeGoBinary(root: string): string {
     `#!/bin/sh\nexec ${shellQuote(process.execPath)} ${shellQuote(script)} "$@"\n`,
     "utf8",
   );
-  fs.chmodSync(command, 0o755);
+  fs.chmodSync(command, opts.executable === false ? 0o644 : 0o755);
   return command;
 }
 

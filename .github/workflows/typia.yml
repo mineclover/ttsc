@@ -43,7 +43,7 @@ jobs:
       - name: Clone typia next
         run: |
           rm -rf experimental/typia
-          git clone --depth=1 --branch next https://github.com/samchon/typia experimental/typia
+          git clone --depth=1 https://github.com/samchon/typia experimental/typia
 
       - name: Use local ttsc tarballs
         working-directory: experimental/typia

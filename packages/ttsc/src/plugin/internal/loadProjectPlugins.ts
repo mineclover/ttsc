@@ -1,8 +1,9 @@
-import { createRequire } from "node:module";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 
 import { readProjectConfig } from "../../compiler/internal/project/readProjectConfig";
+import { FIRST_PARTY_UTILITY_PLUGIN_NAMES } from "../../compiler/internal/sharedHostHelpers";
 import type { ITtscPlugin } from "../../structures/ITtscPlugin";
 import type { ITtscPluginFactoryContext } from "../../structures/ITtscPluginFactoryContext";
 import type { ITtscProjectPluginConfig } from "../../structures/ITtscProjectPluginConfig";
@@ -10,7 +11,6 @@ import type { TtscPluginStage } from "../../structures/TtscPluginStage";
 import type { ITtscLoadedNativePlugin } from "../../structures/internal/ITtscLoadedNativePlugin";
 import type { ITtscParsedProjectConfig } from "../../structures/internal/ITtscParsedProjectConfig";
 import { buildSourcePlugin } from "./buildSourcePlugin";
-import { FIRST_PARTY_UTILITY_PLUGIN_NAMES } from "../../compiler/internal/sharedHostHelpers";
 
 type TtscPluginFactory<T = ITtscProjectPluginConfig> = (
   context: ITtscPluginFactoryContext<T>,
@@ -82,9 +82,11 @@ export function loadProjectPlugins(options: {
   plugins.forEach((plugin, index) => {
     const stage = resolvePluginStage(plugin);
     validatePluginSource(plugin);
+    const contributors = validatePluginContributors(plugin);
     const binary = buildSourcePlugin({
       baseDir: context.projectRoot,
       cacheDir: options.cacheDir,
+      contributors,
       pluginName: plugin.name,
       source: plugin.source,
       ttscVersion,
@@ -93,6 +95,7 @@ export function loadProjectPlugins(options: {
     nativePlugins.push({
       binary,
       config: entries[index]!.config,
+      contributors,
       name: plugin.name,
       source: plugin.source,
       stage,
@@ -179,12 +182,25 @@ function composePluginSources(
       );
     }
     const aggregate = matchingAggregates[0];
-    return aggregate === undefined
-      ? plugin
-      : {
-          ...plugin,
-          source: aggregate.plugin.source,
-        };
+    if (aggregate === undefined) {
+      return plugin;
+    }
+    // A composed plugin's source is rerouted to the aggregate's binary,
+    // so its own `contributors` would link into a different host than
+    // it was authored against. The "one binary" guarantee in the
+    // protocol doc holds only when the composed plugin defers entirely
+    // to the aggregate; reject early instead of silently producing two
+    // diverging binaries.
+    if (plugin.contributors && plugin.contributors.length > 0) {
+      throw new Error(
+        `ttsc: plugin "${plugin.name}" is composed by "${aggregate.plugin.name}" but declares its own "contributors"; ` +
+          `move the contributors onto the aggregate plugin or drop the composes redirect`,
+      );
+    }
+    return {
+      ...plugin,
+      source: aggregate.plugin.source,
+    };
   });
 }
 
@@ -511,8 +527,92 @@ function validatePluginSource(plugin: ITtscPlugin): void {
   }
 }
 
+const CONTRIBUTOR_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
+
+function validatePluginContributors(
+  plugin: ITtscPlugin,
+): readonly { name: string; source: string }[] | undefined {
+  const contributors = plugin.contributors;
+  if (contributors === undefined) return undefined;
+  if (!Array.isArray(contributors)) {
+    throw new Error(
+      `ttsc: plugin "${plugin.name}" "contributors" must be an array of { name, source } entries`,
+    );
+  }
+  if (contributors.length === 0) return undefined;
+  const seen = new Set<string>();
+  const out: { name: string; source: string }[] = [];
+  for (const [index, entry] of contributors.entries()) {
+    if (typeof entry !== "object" || entry === null) {
+      throw new Error(
+        `ttsc: plugin "${plugin.name}" contributors[${index}] must be an object`,
+      );
+    }
+    const { name, source } = entry as { name?: unknown; source?: unknown };
+    if (typeof name !== "string" || !CONTRIBUTOR_NAME_PATTERN.test(name)) {
+      throw new Error(
+        `ttsc: plugin "${plugin.name}" contributors[${index}].name must match /^[a-z][a-z0-9_]*$/; ` +
+          `got ${JSON.stringify(name)}`,
+      );
+    }
+    if (seen.has(name)) {
+      throw new Error(
+        `ttsc: plugin "${plugin.name}" contributors[${index}] duplicate name ${JSON.stringify(name)}`,
+      );
+    }
+    seen.add(name);
+    if (typeof source !== "string" || source.length === 0) {
+      throw new Error(
+        `ttsc: plugin "${plugin.name}" contributors[${index}].source must be a non-empty string`,
+      );
+    }
+    if (!path.isAbsolute(source)) {
+      throw new Error(
+        `ttsc: plugin "${plugin.name}" contributors[${index}].source must be an absolute path; ` +
+          `got ${JSON.stringify(source)}`,
+      );
+    }
+    if (!fs.existsSync(source) || !fs.statSync(source).isDirectory()) {
+      throw new Error(
+        `ttsc: plugin "${plugin.name}" contributors[${index}].source must be an existing directory: ${source}`,
+      );
+    }
+    // Pre-flight check that the directory actually carries a buildable
+    // contributor package. Without this, an accidentally-empty directory
+    // (or a directory containing only `_test.go` files, which `go build`
+    // silently skips) reaches the synthesized blank-import step and Go's
+    // compile error surfaces with a scratch-tempdir path that doesn't
+    // name the contributor entry. Catching it here lets us name the
+    // entry the user actually authored.
+    if (!hasBuildableGoSource(source)) {
+      throw new Error(
+        `ttsc: plugin "${plugin.name}" contributors[${index}].source must contain at least one non-test ".go" file: ${source}`,
+      );
+    }
+    out.push({ name, source: resolveRealPath(source) });
+  }
+  return out;
+}
+
 function isPluginStage(value: string): value is TtscPluginStage {
   return value === "transform" || value === "check";
+}
+
+function hasBuildableGoSource(dir: string): boolean {
+  // `go build` consumes `.go` files but silently ignores `_test.go`. A
+  // contributor whose source dir holds only test files would compile to
+  // an empty package and surface as an opaque scratch-tempdir error;
+  // require at least one production `.go` file so the validator can
+  // name the contributor entry instead.
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    return false;
+  }
+  return entries.some(
+    (name) => name.endsWith(".go") && !name.endsWith("_test.go"),
+  );
 }
 
 function resolvePluginRequest(specifier: string, projectRoot: string): string {

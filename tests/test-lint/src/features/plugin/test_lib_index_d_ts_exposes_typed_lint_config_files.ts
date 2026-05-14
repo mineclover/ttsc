@@ -7,8 +7,8 @@ import { TestLintPlugin } from "../../internal/TestLintPlugin";
 /**
  * Verifies lib/index.d.ts exposes typed lint config files.
  *
- * This lint plugin descriptor scenario is isolated as one exported TypeScript feature
- * so failures identify the exact package contract under test without a
+ * This lint plugin descriptor scenario is isolated as one exported TypeScript
+ * feature so failures identify the exact package contract under test without a
  * shared smoke wrapper or package-level switch statement.
  *
  * 1. Materialize the project fixture or module graph required by the case.
@@ -69,7 +69,11 @@ export const test_lib_index_d_ts_exposes_typed_lint_config_files = () => {
   assert.match(dts, /export \* from "\.\/structures\/index"/);
   assert.doesNotMatch(dts, /from "ttsc"/);
   assert.equal(manifest.exports["./config"], undefined);
-  assert.match(pluginConfigDts, /import type { TtscLintConfig }/);
+  // The legacy `config?: string | TtscLintRuleMap` field narrows to the
+  // rule-map shape (the new `rules` / `extends` fields cover the wider
+  // forms), so `ITtscLintPluginConfig` imports the map type — not the
+  // union `TtscLintConfig` — from `./TtscLintRuleMap`.
+  assert.match(pluginConfigDts, /import type { TtscLintRuleMap }/);
   assert.doesNotMatch(pluginConfigDts, /from "ttsc"/);
   assert.match(pluginConfigDts, /export interface ITtscLintPluginConfig/);
   assert.doesNotMatch(dts, /configFile/);
@@ -83,5 +87,9 @@ export const test_lib_index_d_ts_exposes_typed_lint_config_files = () => {
   assert.match(structuresIndexDts, /export \* from "\.\/TtscLintConfig"/);
   assert.match(ruleDts, /export type TtscLintRule/);
   assert.match(severityDts, /export type TtscLintSeverity/);
-  assert.doesNotMatch(dts, /defineConfig/);
+  // defineConfig is the const-narrowing helper exported from
+  // `@ttsc/lint`'s public surface so user `lint.config.ts` files can
+  // capture plugin objects' literal `rules` tuples for cross-namespace
+  // rule-name autocomplete.
+  assert.match(dts, /defineConfig/);
 };

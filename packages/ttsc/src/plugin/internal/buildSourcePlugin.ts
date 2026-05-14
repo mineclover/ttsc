@@ -12,12 +12,43 @@ const TSGO_GO_MODULE_PATH = "github.com/microsoft/typescript-go";
 const PRUNE_DIRS = new Set(["node_modules", ".git", ".ttsc"]);
 const GENERATED_WORKSPACE_FILES = new Set(["go.work", "go.work.sum"]);
 
+// Go env vars that change the produced binary. Hashed into the plugin
+// build cache key so cross-compile target / build tags / cgo toggle
+// don't collide with the native-platform key.
+const GO_BUILD_ENV_KEYS: readonly string[] = [
+  "GOOS",
+  "GOARCH",
+  "GOAMD64",
+  "GOARM",
+  "GO386",
+  "GOMIPS",
+  "GOMIPS64",
+  "GOPPC64",
+  "GORISCV64",
+  "GOWASM",
+  "GOFLAGS",
+  "GOEXPERIMENT",
+  "CGO_ENABLED",
+  "GOTOOLCHAIN",
+];
+const CONTRIBUTIONS_FILE_NAME = "ttsc_contributions.go";
+const CONTRIB_DIRNAME = "contrib";
+
+/** One contributor's resolved Go source plus its target sub-package name. */
+export interface ITtscBuildContributor {
+  /** Sub-package suffix: scratch lands at `<host>/contrib/<name>/`. */
+  name: string;
+  /** Absolute path to the contributor's source directory. */
+  source: string;
+}
+
 /** Build one Go source plugin into a cached executable. */
 export function buildSourcePlugin(opts: {
   source: string;
   pluginName: string;
   baseDir: string;
   cacheDir?: string;
+  contributors?: readonly ITtscBuildContributor[];
   label?: string;
   overlayDirs?: readonly string[];
   quiet?: boolean;
@@ -26,9 +57,11 @@ export function buildSourcePlugin(opts: {
 }): string {
   const { dir, entry, source } = resolveSourceBuildTarget(opts);
   const overlayDirs = opts.overlayDirs ?? findTtscOverlayDirs();
+  const contributors = opts.contributors ?? [];
   const goBinary = resolveGoCompiler();
   ensureExecutableGoToolchain(goBinary);
   const key = computeCacheKey({
+    contributors,
     dir,
     entry,
     goBinary,
@@ -46,8 +79,14 @@ export function buildSourcePlugin(opts: {
   fs.mkdirSync(cacheDir, { recursive: true });
   const label = opts.label ?? "source plugin";
   if (opts.quiet !== true) {
+    const extra =
+      contributors.length === 0
+        ? ""
+        : ` + ${contributors.length} contributor(s): ${contributors
+            .map((c) => c.name)
+            .join(", ")}`;
     process.stderr.write(
-      `ttsc: building ${label} "${opts.pluginName}" from ${source} (this runs once per cache key)\n`,
+      `ttsc: building ${label} "${opts.pluginName}" from ${source}${extra} (this runs once per cache key)\n`,
     );
   }
 
@@ -56,6 +95,16 @@ export function buildSourcePlugin(opts: {
   );
   try {
     materializeScratchDir(dir, scratchDir);
+    const goModReader = createGoModReader(goBinary, opts.pluginName);
+    if (contributors.length > 0) {
+      mergeContributors({
+        contributors,
+        entry,
+        goModReader,
+        pluginName: opts.pluginName,
+        scratchDir,
+      });
+    }
     writeGoWork(scratchDir, overlayDirs, goBinary, opts.pluginName);
     const scratchBinaryName =
       process.platform === "win32" ? ".ttsc-plugin.exe" : ".ttsc-plugin";
@@ -66,6 +115,128 @@ export function buildSourcePlugin(opts: {
   } finally {
     fs.rmSync(scratchDir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Copy every contributor's Go source into a sub-package of the host module and
+ * synthesize a blank-import file alongside the host's entry package so each
+ * contributor's `init()` runs before `main`.
+ *
+ * - Sources land at `<scratch>/<CONTRIB_DIRNAME>/<name>/` (recursive copy with
+ *   the same pruning rules used for the host source).
+ * - The entry directory receives `<CONTRIBUTIONS_FILE_NAME>` containing one
+ *   blank-import per contributor. The host's module path is read from the
+ *   materialized go.mod, so the import path is always correct for the host
+ *   plugin's actual module declaration.
+ * - Contributors that ship their own `go.mod` are rejected — the design relies on
+ *   the contributor living inside the host's module so that workspace overlay
+ *   rules and the host's `go.sum` cover transitive dependencies. This also
+ *   closes the supply-chain hole where a contributor could otherwise pull in
+ *   arbitrary Go modules.
+ */
+function mergeContributors(opts: {
+  contributors: readonly ITtscBuildContributor[];
+  entry: string;
+  goModReader: GoModReader;
+  pluginName: string;
+  scratchDir: string;
+}): void {
+  const hostModulePath = opts.goModReader.read(opts.scratchDir).modulePath;
+  if (hostModulePath === null || hostModulePath === "") {
+    throw new Error(
+      `ttsc: plugin "${opts.pluginName}" cannot accept contributors because its module ` +
+        `root has no resolvable go.mod module path`,
+    );
+  }
+  const contribRoot = path.join(opts.scratchDir, CONTRIB_DIRNAME);
+  // Refuse to merge when the host plugin's own source already owns a
+  // `contrib/` directory. We'd otherwise silently merge contributor
+  // files into a pre-populated host package and ship a hybrid binary
+  // whose contents nobody declared. Loud failure is the only safe
+  // option — the host plugin must rename its directory or the
+  // contributor system must use a different sub-package root.
+  if (fs.existsSync(contribRoot)) {
+    throw new Error(
+      `ttsc: plugin "${opts.pluginName}" already ships a ${CONTRIB_DIRNAME}/ directory in its source; ` +
+        `contributor merge would silently overwrite. Rename the host plugin's directory to a different name.`,
+    );
+  }
+  fs.mkdirSync(contribRoot, { recursive: true });
+  // Sort contributors by name so the synthesized `ttsc_contributions.go`
+  // emits blank imports in a deterministic order independent of
+  // declaration order. The cache key is already sort-stable
+  // (`computeCacheKey` sorts contributors by name), so without this
+  // matching sort the SAME cache key could correspond to two distinct
+  // binaries whose `init()` sequence across contributors differs by
+  // import order.
+  const sortedContributors = [...opts.contributors].sort((a, b) =>
+    a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+  );
+  const imports: string[] = [];
+  for (const contributor of sortedContributors) {
+    if (fs.existsSync(path.join(contributor.source, "go.mod"))) {
+      throw new Error(
+        `ttsc: plugin "${opts.pluginName}" contributor "${contributor.name}" must ship Go ` +
+          `source as a package, not a module (go.mod found at ${contributor.source}/go.mod). ` +
+          `Remove go.mod so the contributor compiles inside the host module's dependency graph.`,
+      );
+    }
+    const target = path.join(contribRoot, contributor.name);
+    if (fs.existsSync(target)) {
+      // Defensive: validatePluginContributors already rejects duplicate
+      // names, and the contribRoot-existence guard above blocks the
+      // host plugin from pre-shipping a `contrib/` directory. Reaching
+      // this branch implies an upstream contract break. Fail loud
+      // rather than overwrite.
+      throw new Error(
+        `ttsc: plugin "${opts.pluginName}" contributor "${contributor.name}" target ${target} already exists; ` +
+          `contributor names must be unique within one plugin build`,
+      );
+    }
+    fs.cpSync(contributor.source, target, {
+      recursive: true,
+      filter: (src) => {
+        const base = path.basename(src);
+        if (shouldPruneDirectory(base)) return false;
+        if (shouldOmitSourceFile(base)) return false;
+        return true;
+      },
+    });
+    imports.push(`${hostModulePath}/${CONTRIB_DIRNAME}/${contributor.name}`);
+  }
+  const entryDir = path.resolve(opts.scratchDir, opts.entry);
+  fs.mkdirSync(entryDir, { recursive: true });
+  const contributionsPath = path.join(entryDir, CONTRIBUTIONS_FILE_NAME);
+  // Same reasoning as the contribRoot guard: when entry resolves to the
+  // module root (`entry === "."`), entryDir == scratchDir and a
+  // pre-existing `ttsc_contributions.go` from the host plugin's own
+  // source would be silently overwritten by the generator below.
+  if (fs.existsSync(contributionsPath)) {
+    throw new Error(
+      `ttsc: plugin "${opts.pluginName}" already ships ${CONTRIBUTIONS_FILE_NAME} in its entry package; ` +
+        `that filename is reserved for the contributor blank-import generator. Rename the host's file.`,
+    );
+  }
+  writeContributionsFile(contributionsPath, imports);
+}
+
+function writeContributionsFile(filePath: string, imports: string[]): void {
+  const importLines = imports
+    .map((spec) => `\t_ ${JSON.stringify(spec)}`)
+    .join("\n");
+  const body = `// Code generated by ttsc — DO NOT EDIT.
+//
+// This file is synthesized by ttsc's plugin builder when the host plugin
+// descriptor declares "contributors". The blank imports below pull each
+// contributor sub-package into the build so its init() runs before main.
+
+package main
+
+import (
+${importLines}
+)
+`;
+  fs.writeFileSync(filePath, body, "utf8");
 }
 
 function publishBuiltBinary(builtBinary: string, binaryPath: string): void {
@@ -88,6 +259,30 @@ function publishBuiltBinary(builtBinary: string, binaryPath: string): void {
       return;
     }
     throw error;
+  } finally {
+    // Best-effort sweep of any leftover `.tmp` siblings from a prior
+    // crash between copyFileSync and renameSync. Same-directory pending
+    // names guarantee the rename stays a same-filesystem atomic op, so
+    // we accept the GC cost rather than move pending files to os.tmpdir.
+    pruneOrphanPendingBinaries(binaryPath);
+  }
+}
+
+function pruneOrphanPendingBinaries(binaryPath: string): void {
+  // Only sweep pending files owned by THIS process. Concurrent ttsc
+  // invocations (two `ttsc --watch` shells against the same project)
+  // may have their own `<binary>.<their-pid>.*.tmp` mid-flight, and
+  // deleting them would race their renameSync into ENOENT.
+  try {
+    const dir = path.dirname(binaryPath);
+    const prefix = `${path.basename(binaryPath)}.${process.pid}.`;
+    for (const name of fs.readdirSync(dir)) {
+      if (name.startsWith(prefix) && name.endsWith(".tmp")) {
+        fs.rmSync(path.join(dir, name), { force: true });
+      }
+    }
+  } catch {
+    // Best-effort; never mask the underlying publish outcome.
   }
 }
 
@@ -171,20 +366,12 @@ function writeGoWork(
   pluginName: string,
 ): void {
   const goModReader = createGoModReader(goBinary, pluginName);
-  validateSourceReplacements(
-    scratchDir,
-    useDirs,
-    goModReader,
-    pluginName,
-  );
+  validateSourceReplacements(scratchDir, useDirs, goModReader, pluginName);
   const useLines = ["\t."];
   for (const dir of useDirs) {
     useLines.push(`\t${dir.replace(/\\/g, "/")}`);
   }
-  const replaceLines = sourceBuildWorkspaceReplacements(
-    useDirs,
-    goModReader,
-  );
+  const replaceLines = sourceBuildWorkspaceReplacements(useDirs, goModReader);
   const replaceBlock =
     replaceLines.length === 0 ? "" : `\n\n${replaceLines.join("\n")}\n`;
   const goWork = `go 1.26\n\nuse (\n${useLines.join("\n")}\n)${replaceBlock}`;
@@ -582,6 +769,7 @@ function resolveGoCompiler(): string {
 }
 
 export function computeCacheKey(inputs: {
+  contributors?: readonly ITtscBuildContributor[];
   dir: string;
   entry: string;
   goBinary?: string;
@@ -597,9 +785,33 @@ export function computeCacheKey(inputs: {
   if (inputs.goBinary !== undefined) {
     hash.update(`go=${resolveGoCompilerIdentity(inputs.goBinary)}\n`);
   }
+  // Hash the Go env vars that change `go build`'s output (cross-compile
+  // target, build tags, cgo toggle, etc.). Without this, a user setting
+  // `GOOS=linux GOARCH=arm64` on a darwin host would write a Linux-arm64
+  // binary into the same cache slot as the native build, and the next
+  // native invocation would spawn an unrunnable artifact.
+  for (const key of GO_BUILD_ENV_KEYS) {
+    const value = process.env[key];
+    if (value !== undefined && value !== "") {
+      hash.update(`${key}=${value}\n`);
+    }
+  }
   hashSourceDirectory(hash, "plugin", inputs.dir);
   for (const [index, dir] of [...(inputs.overlayDirs ?? [])].sort().entries()) {
     hashSourceDirectory(hash, `overlay:${index}`, dir);
+  }
+  // Hash contributors in sorted-by-name order so two consumers with the
+  // same logical set produce the same key regardless of declaration order
+  // in the host's plugin descriptor.
+  const sortedContributors = [...(inputs.contributors ?? [])].sort((a, b) =>
+    a.name === b.name ? 0 : a.name < b.name ? -1 : 1,
+  );
+  for (const contributor of sortedContributors) {
+    hashSourceDirectory(
+      hash,
+      `contributor:${contributor.name}`,
+      contributor.source,
+    );
   }
   return hash.digest("hex").slice(0, 32);
 }
@@ -651,7 +863,14 @@ function shouldPruneDirectory(name: string): boolean {
 }
 
 function shouldOmitSourceFile(name: string): boolean {
-  return GENERATED_WORKSPACE_FILES.has(name);
+  if (GENERATED_WORKSPACE_FILES.has(name)) return true;
+  // npm-pack tarballs and macOS/Windows editor sidecars are local
+  // build artifacts that drift independently of the Go source. They
+  // would otherwise enter the cache key and bust the cached binary on
+  // every unrelated `npm pack` or editor save.
+  if (name.endsWith(".tgz") || name.endsWith(".tar.gz")) return true;
+  if (name === ".DS_Store" || name === "Thumbs.db") return true;
+  return false;
 }
 
 function isHashableFile(name: string): boolean {

@@ -12,14 +12,15 @@ const TSGO_GO_MODULE_PATH = "github.com/microsoft/typescript-go";
 const PRUNE_DIRS = new Set(["node_modules", ".git", ".ttsc"]);
 const GENERATED_WORKSPACE_FILES = new Set(["go.work", "go.work.sum"]);
 
-// Go env vars that change the produced binary. Hashed into the plugin
-// build cache key so cross-compile target / build tags / cgo toggle
-// don't collide with the native-platform key.
+// Go build environment values that can change the produced binary or decide
+// whether `go build` succeeds. Hashed into the plugin cache key so target,
+// build-tag, cgo, FIPS, and external-link variants never collide.
 const GO_BUILD_ENV_KEYS: readonly string[] = [
   "GOOS",
   "GOARCH",
   "GOAMD64",
   "GOARM",
+  "GOARM64",
   "GO386",
   "GOMIPS",
   "GOMIPS64",
@@ -28,11 +29,73 @@ const GO_BUILD_ENV_KEYS: readonly string[] = [
   "GOWASM",
   "GOFLAGS",
   "GOEXPERIMENT",
+  "GOFIPS140",
+  "GO_EXTLINK_ENABLED",
+  "GCCGO",
+  "GCCGOTOOLDIR",
   "CGO_ENABLED",
+  "AR",
+  "CC",
+  "CXX",
+  "FC",
+  "PKG_CONFIG",
+  "CGO_CFLAGS",
+  "CGO_CFLAGS_ALLOW",
+  "CGO_CFLAGS_DISALLOW",
+  "CGO_CPPFLAGS",
+  "CGO_CPPFLAGS_ALLOW",
+  "CGO_CPPFLAGS_DISALLOW",
+  "CGO_CXXFLAGS",
+  "CGO_CXXFLAGS_ALLOW",
+  "CGO_CXXFLAGS_DISALLOW",
+  "CGO_FFLAGS",
+  "CGO_FFLAGS_ALLOW",
+  "CGO_FFLAGS_DISALLOW",
+  "CGO_LDFLAGS",
+  "CGO_LDFLAGS_ALLOW",
+  "CGO_LDFLAGS_DISALLOW",
   "GOTOOLCHAIN",
+  "GOROOT",
+];
+const GO_BUILD_COMMAND_ENV_KEYS = new Set([
+  "AR",
+  "CC",
+  "CXX",
+  "FC",
+  "GCCGO",
+  "PKG_CONFIG",
+]);
+const EXTERNAL_GO_BUILD_ENV_KEYS: readonly string[] = [
+  "CPATH",
+  "C_INCLUDE_PATH",
+  "CPLUS_INCLUDE_PATH",
+  "DYLD_LIBRARY_PATH",
+  "INCLUDE",
+  "LD_LIBRARY_PATH",
+  "LIB",
+  "LIBRARY_PATH",
+  "LIBPATH",
+  "MACOSX_DEPLOYMENT_TARGET",
+  "OBJC_INCLUDE_PATH",
+  "PKG_CONFIG_ALLOW_SYSTEM_CFLAGS",
+  "PKG_CONFIG_ALLOW_SYSTEM_LIBS",
+  "PKG_CONFIG_LIBDIR",
+  "PKG_CONFIG_PATH",
+  "PKG_CONFIG_SYSROOT_DIR",
+  "PKG_CONFIG_TOP_BUILD_DIR",
+  "SDKROOT",
 ];
 const CONTRIBUTIONS_FILE_NAME = "ttsc_contributions.go";
 const CONTRIB_DIRNAME = "contrib";
+const GLOBAL_CACHE_DIRNAME = "ttsc";
+const PLUGIN_CACHE_DIRNAME = "plugins";
+const CACHE_LAST_USED_FILE = ".last-used";
+const CACHE_GC_MARKER_FILE = ".gc-last-run";
+const GLOBAL_CACHE_GC_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const GLOBAL_CACHE_ENTRY_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const GLOBAL_CACHE_MAX_BYTES = 2 * 1024 * 1024 * 1024;
+const GLOBAL_CACHE_TARGET_BYTES = Math.floor(GLOBAL_CACHE_MAX_BYTES * 0.8);
+const GLOBAL_CACHE_PROTECTED_AGE_MS = 60 * 60 * 1000;
 
 /** One contributor's resolved Go source plus its target sub-package name. */
 export interface ITtscBuildContributor {
@@ -56,7 +119,7 @@ export function buildSourcePlugin(opts: {
   tsgoVersion: string;
 }): string {
   const { dir, entry, source } = resolveSourceBuildTarget(opts);
-  const overlayDirs = opts.overlayDirs ?? findTtscOverlayDirs();
+  const overlayDirs = [...(opts.overlayDirs ?? findTtscOverlayDirs())].sort();
   const contributors = opts.contributors ?? [];
   const goBinary = resolveGoCompiler();
   ensureExecutableGoToolchain(goBinary);
@@ -74,6 +137,7 @@ export function buildSourcePlugin(opts: {
   const binaryName = process.platform === "win32" ? "plugin.exe" : "plugin";
   const binaryPath = path.join(cacheDir, binaryName);
   if (fs.existsSync(binaryPath)) {
+    touchCacheEntry(cacheDir);
     return binaryPath;
   }
   fs.mkdirSync(cacheDir, { recursive: true });
@@ -111,6 +175,7 @@ export function buildSourcePlugin(opts: {
     runGoBuild(scratchDir, entry, scratchBinaryName, opts.pluginName, goBinary);
     const builtBinary = path.join(scratchDir, scratchBinaryName);
     publishBuiltBinary(builtBinary, binaryPath);
+    touchCacheEntry(cacheDir);
     return binaryPath;
   } finally {
     fs.rmSync(scratchDir, { recursive: true, force: true });
@@ -612,6 +677,7 @@ function goToolchainNotFoundMessage(pluginName: string): string {
 
 function goBuildEnv(goBinary: string): NodeJS.ProcessEnv {
   const env = { ...process.env };
+  env.GOWORK = "auto";
   const goRoot = inferGoRoot(goBinary);
   if (goRoot && !env.GOROOT) {
     env.GOROOT = goRoot;
@@ -702,30 +768,63 @@ function walkForGoMod(dir: string, out: string[]): void {
   }
 }
 
-function resolvePluginCacheRoot(
+export function resolvePluginCacheRoot(
   projectRoot: string,
   cacheDir?: string,
 ): string {
   if (cacheDir) {
-    return path.resolve(projectRoot, cacheDir, "plugins");
+    return path.resolve(projectRoot, cacheDir, PLUGIN_CACHE_DIRNAME);
   }
   if (process.env.TTSC_CACHE_DIR) {
-    return path.resolve(process.env.TTSC_CACHE_DIR, "plugins");
+    return path.resolve(process.env.TTSC_CACHE_DIR, PLUGIN_CACHE_DIRNAME);
   }
-  const root = path.resolve(projectRoot);
-  const nodeModules = path.join(root, "node_modules");
-  if (isDirectory(nodeModules)) {
-    return path.join(nodeModules, ".ttsc", "plugins");
-  }
-  return path.join(root, ".ttsc", "plugins");
+  const root = resolveGlobalPluginCacheRoot();
+  maybePruneGlobalPluginCache(root);
+  return root;
 }
 
-function isDirectory(candidate: string): boolean {
-  try {
-    return fs.statSync(candidate).isDirectory();
-  } catch {
-    return false;
+export function resolveGlobalPluginCacheRoot(): string {
+  return path.join(
+    resolveUserCacheRoot(),
+    GLOBAL_CACHE_DIRNAME,
+    PLUGIN_CACHE_DIRNAME,
+  );
+}
+
+export function defaultPluginCacheCleanTargets(projectRoot: string): string[] {
+  return [
+    resolveGlobalPluginCacheRoot(),
+    path.join(projectRoot, "node_modules", ".ttsc"),
+    path.join(projectRoot, ".ttsc"),
+  ];
+}
+
+function resolveUserCacheRoot(): string {
+  const xdg = process.env.XDG_CACHE_HOME;
+  if (xdg && path.isAbsolute(xdg)) {
+    return xdg;
   }
+  if (process.platform === "win32") {
+    const local = process.env.LOCALAPPDATA;
+    if (local && path.isAbsolute(local)) {
+      return local;
+    }
+    const home = os.homedir();
+    if (home) {
+      return path.join(home, "AppData", "Local");
+    }
+  }
+  if (process.platform === "darwin") {
+    const home = os.homedir();
+    if (home) {
+      return path.join(home, "Library", "Caches");
+    }
+  }
+  const home = os.homedir();
+  if (home) {
+    return path.join(home, ".cache");
+  }
+  return path.join(os.tmpdir(), "ttsc-cache");
 }
 
 function resolveGoCompiler(): string {
@@ -796,17 +895,8 @@ export function computeCacheKey(inputs: {
   if (inputs.goBinary !== undefined) {
     hash.update(`go=${resolveGoCompilerIdentity(inputs.goBinary)}\n`);
   }
-  // Hash the Go env vars that change `go build`'s output (cross-compile
-  // target, build tags, cgo toggle, etc.). Without this, a user setting
-  // `GOOS=linux GOARCH=arm64` on a darwin host would write a Linux-arm64
-  // binary into the same cache slot as the native build, and the next
-  // native invocation would spawn an unrunnable artifact.
-  for (const key of GO_BUILD_ENV_KEYS) {
-    const value = process.env[key];
-    if (value !== undefined && value !== "") {
-      hash.update(`${key}=${value}\n`);
-    }
-  }
+  hashGoBuildEnvironment(hash, inputs.goBinary, inputs.dir);
+  hashExternalGoBuildEnvironment(hash);
   hashSourceDirectory(hash, "plugin", inputs.dir);
   for (const [index, dir] of [...(inputs.overlayDirs ?? [])].sort().entries()) {
     hashSourceDirectory(hash, `overlay:${index}`, dir);
@@ -890,22 +980,19 @@ function isHashableFile(name: string): boolean {
 
 function resolveGoCompilerIdentity(goBinary: string): string {
   const resolved = resolveExecutableIdentityPath(goBinary);
+  if (!fs.existsSync(resolved)) {
+    return "missing";
+  }
   const version = spawnSync(goBinary, ["version"], {
     encoding: "utf8",
     windowsHide: true,
   });
   const versionText =
     version.error !== undefined
-      ? version.error.message
+      ? ((version.error as NodeJS.ErrnoException).code ?? version.error.message)
       : `${version.status ?? 0}:${version.stdout}${version.stderr}`;
-  let statText = "";
-  try {
-    const stat = fs.statSync(resolved);
-    statText = `${stat.size}:${stat.mtimeMs}`;
-  } catch {
-    statText = "missing";
-  }
-  return `${goBinary}:${resolved}:${statText}:${versionText}`;
+  const binaryHash = hashFile(resolved);
+  return `sha256:${binaryHash}:${versionText}`;
 }
 
 function resolveExecutableIdentityPath(binary: string): string {
@@ -915,7 +1002,7 @@ function resolveExecutableIdentityPath(binary: string): string {
   if (binary.includes(path.sep)) {
     return resolveRealPath(path.resolve(binary));
   }
-  for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
+  for (const dir of readPathEnvironment().split(path.delimiter)) {
     if (dir.length === 0) continue;
     const candidate = path.join(dir, binary);
     if (fs.existsSync(candidate)) {
@@ -931,10 +1018,346 @@ function resolveExecutableIdentityPath(binary: string): string {
   return binary;
 }
 
+function readPathEnvironment(): string {
+  return process.env.PATH ?? process.env.Path ?? "";
+}
+
 function resolveRealPath(location: string): string {
   try {
     return fs.realpathSync(location);
   } catch {
     return location;
+  }
+}
+
+function hashFile(file: string): string {
+  const hash = crypto.createHash("sha256");
+  hash.update(fs.readFileSync(file));
+  return hash.digest("hex");
+}
+
+function hashGoBuildEnvironment(
+  hash: crypto.Hash,
+  goBinary: string | undefined,
+  cwd: string,
+): void {
+  const values = resolveGoBuildEnvironment(goBinary, cwd);
+  for (const key of GO_BUILD_ENV_KEYS) {
+    const value = values.get(key);
+    if (value !== undefined && value !== "") {
+      hash.update(`${key}=${value}\n`);
+    }
+  }
+}
+
+function resolveGoBuildEnvironment(
+  goBinary: string | undefined,
+  cwd: string,
+): Map<string, string> {
+  const values = new Map<string, string>();
+  if (goBinary !== undefined) {
+    const result = spawnSync(goBinary, ["env", "-json", ...GO_BUILD_ENV_KEYS], {
+      cwd,
+      encoding: "utf8",
+      env: goBuildEnv(goBinary),
+      maxBuffer: 1024 * 1024,
+      windowsHide: true,
+    });
+    if (result.error === undefined && result.status === 0) {
+      try {
+        const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
+        for (const key of GO_BUILD_ENV_KEYS) {
+          const raw = parsed[key];
+          if (typeof raw === "string" && raw !== "") {
+            values.set(key, normalizeGoBuildEnvValue(key, raw));
+          }
+        }
+      } catch {
+        // Fall back to process.env below; a cache key is still better than
+        // failing before `go build` can produce the actionable error.
+      }
+    }
+  }
+  for (const key of GO_BUILD_ENV_KEYS) {
+    if (values.has(key)) continue;
+    const value = process.env[key];
+    if (value !== undefined && value !== "") {
+      values.set(key, normalizeGoBuildEnvValue(key, value));
+    }
+  }
+  return values;
+}
+
+function normalizeGoBuildEnvValue(key: string, value: string): string {
+  if (key === "GOROOT") {
+    return resolveGoRootCacheIdentity(value);
+  }
+  if (GO_BUILD_COMMAND_ENV_KEYS.has(key)) {
+    return `${value}\0${resolveCommandCacheIdentity(value)}`;
+  }
+  return value;
+}
+
+function resolveCommandCacheIdentity(command: string): string {
+  const executable = firstCommandToken(command);
+  if (executable === null) {
+    return "command:empty";
+  }
+  const resolved = resolveExecutableIdentityPath(executable);
+  if (!fs.existsSync(resolved)) {
+    return `command:missing:${executable}`;
+  }
+  try {
+    return `command:sha256:${hashFile(resolved)}`;
+  } catch {
+    return `command:unreadable:${resolved}`;
+  }
+}
+
+function firstCommandToken(command: string): string | null {
+  const trimmed = command.trim();
+  if (trimmed === "") {
+    return null;
+  }
+  const quote = trimmed[0];
+  if (quote === "'" || quote === '"') {
+    const end = trimmed.indexOf(quote, 1);
+    return end === -1 ? trimmed.slice(1) : trimmed.slice(1, end);
+  }
+  return trimmed.split(/\s+/)[0] ?? null;
+}
+
+function hashExternalGoBuildEnvironment(hash: crypto.Hash): void {
+  for (const key of EXTERNAL_GO_BUILD_ENV_KEYS) {
+    const value = process.env[key];
+    if (value !== undefined && value !== "") {
+      hash.update(`${key}=${value}\n`);
+    }
+  }
+}
+
+function resolveGoRootCacheIdentity(goRoot: string): string {
+  const resolved = resolveRealPath(goRoot);
+  if (!fs.existsSync(resolved)) {
+    return `missing:${goRoot}`;
+  }
+  const hash = crypto.createHash("sha256");
+  for (const file of collectGoRootIdentityFiles(resolved)) {
+    const relative = path.relative(resolved, file).replace(/\\/g, "/");
+    hash.update(`f=${relative}\n`);
+    hash.update(fs.readFileSync(file));
+    hash.update("\n");
+  }
+  return `sha256:${hash.digest("hex")}`;
+}
+
+function collectGoRootIdentityFiles(root: string): string[] {
+  const out: string[] = [];
+  walkGoRootIdentity(root, root, out);
+  out.sort();
+  return out;
+}
+
+function walkGoRootIdentity(root: string, dir: string, out: string[]): void {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const file = path.join(dir, entry.name);
+    const rel = path.relative(root, file).replace(/\\/g, "/");
+    if (entry.isDirectory()) {
+      if (shouldHashGoRootPath(rel, true)) {
+        walkGoRootIdentity(root, file, out);
+      }
+    } else if (entry.isFile() && shouldHashGoRootPath(rel, false)) {
+      out.push(file);
+    }
+  }
+}
+
+function shouldHashGoRootPath(rel: string, isDir: boolean): boolean {
+  if (rel === "") return true;
+  const parts = rel.split("/");
+  if (parts.includes(".git") || parts.includes("testdata")) return false;
+  if (!isDir && rel.endsWith("_test.go")) return false;
+
+  const first = parts[0]!;
+  if (parts.length === 1) {
+    if (isDir) return ["bin", "pkg", "src", "lib"].includes(first);
+    return ["VERSION", "go.env"].includes(first);
+  }
+  if (first === "bin") {
+    if (isDir) return true;
+    const base = path.basename(rel);
+    return (
+      base === "go" ||
+      base === "go.exe" ||
+      base === "gofmt" ||
+      base === "gofmt.exe"
+    );
+  }
+  if (first === "pkg") {
+    const second = parts[1]!;
+    return second === "tool" || second === "include";
+  }
+  if (first === "src") {
+    if (!isDir && parts.length === 2) {
+      return ["go.mod", "go.sum"].includes(parts[1]!);
+    }
+    return parts[1] !== "cmd";
+  }
+  if (first === "lib") {
+    return parts[1] === "time";
+  }
+  return false;
+}
+
+function touchCacheEntry(cacheDir: string): void {
+  try {
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(cacheDir, CACHE_LAST_USED_FILE),
+      `${Date.now()}\n`,
+    );
+  } catch {
+    // Cache hits must not fail because metadata touch failed.
+  }
+}
+
+function maybePruneGlobalPluginCache(root: string): void {
+  try {
+    fs.mkdirSync(root, { recursive: true });
+    const marker = path.join(root, CACHE_GC_MARKER_FILE);
+    const now = Date.now();
+    const lastRun = readTimestamp(marker);
+    if (lastRun !== null && now - lastRun < GLOBAL_CACHE_GC_INTERVAL_MS) {
+      return;
+    }
+    fs.writeFileSync(marker, `${now}\n`);
+    pruneGlobalPluginCache(root, now);
+  } catch {
+    // Global cache GC is opportunistic; builds still proceed when it fails.
+  }
+}
+
+function pruneGlobalPluginCache(root: string, now: number): void {
+  const entries = collectGlobalCacheEntries(root, now);
+  for (const entry of entries) {
+    if (now - entry.lastUsedAt <= GLOBAL_CACHE_ENTRY_MAX_AGE_MS) {
+      continue;
+    }
+    removeCacheEntry(entry);
+  }
+
+  const remaining = collectGlobalCacheEntries(root, now);
+  let total = remaining.reduce((sum, entry) => sum + entry.size, 0);
+  if (total <= GLOBAL_CACHE_MAX_BYTES) {
+    return;
+  }
+  for (const entry of remaining.sort((a, b) => a.lastUsedAt - b.lastUsedAt)) {
+    if (total <= GLOBAL_CACHE_TARGET_BYTES) {
+      return;
+    }
+    if (now - entry.lastUsedAt <= GLOBAL_CACHE_PROTECTED_AGE_MS) {
+      continue;
+    }
+    removeCacheEntry(entry);
+    total -= entry.size;
+  }
+}
+
+interface GlobalCacheEntry {
+  dir: string;
+  lastUsedAt: number;
+  size: number;
+}
+
+function collectGlobalCacheEntries(
+  root: string,
+  now: number,
+): GlobalCacheEntry[] {
+  const entries: GlobalCacheEntry[] = [];
+  let dirents: fs.Dirent[];
+  try {
+    dirents = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return entries;
+  }
+  for (const dirent of dirents) {
+    if (!dirent.isDirectory()) {
+      continue;
+    }
+    const dir = path.join(root, dirent.name);
+    const lastUsedAt = readCacheEntryLastUsedAt(dir, now);
+    entries.push({
+      dir,
+      lastUsedAt,
+      size: directorySize(dir),
+    });
+  }
+  return entries;
+}
+
+function readCacheEntryLastUsedAt(dir: string, now: number): number {
+  const touched = readTimestamp(path.join(dir, CACHE_LAST_USED_FILE));
+  if (touched !== null) {
+    return touched;
+  }
+  for (const name of ["plugin", "plugin.exe"]) {
+    try {
+      return fs.statSync(path.join(dir, name)).mtimeMs;
+    } catch {}
+  }
+  try {
+    return fs.statSync(dir).mtimeMs;
+  } catch {
+    return now;
+  }
+}
+
+function readTimestamp(file: string): number | null {
+  try {
+    const text = fs.readFileSync(file, "utf8").trim();
+    const value = Number(text);
+    if (Number.isFinite(value)) {
+      return value;
+    }
+  } catch {}
+  try {
+    return fs.statSync(file).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+function directorySize(dir: string): number {
+  let total = 0;
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return total;
+  }
+  for (const entry of entries) {
+    const file = path.join(dir, entry.name);
+    try {
+      if (entry.isDirectory()) {
+        total += directorySize(file);
+      } else if (entry.isFile()) {
+        total += fs.statSync(file).size;
+      }
+    } catch {}
+  }
+  return total;
+}
+
+function removeCacheEntry(entry: GlobalCacheEntry): void {
+  try {
+    fs.rmSync(entry.dir, { recursive: true, force: true });
+  } catch {
+    // Windows may reject removal while a plugin binary is still running.
   }
 }

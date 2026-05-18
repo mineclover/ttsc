@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   buildSourcePlugin,
   computeCacheKey,
+  resolvePluginCacheRoot,
 } from "../../../../packages/ttsc/lib/plugin/internal/buildSourcePlugin.js";
 
 function createFakeGoBinary(
@@ -21,6 +22,16 @@ function createFakeGoBinary(
       "const args = process.argv.slice(2);",
       'if (args[0] === "version") {',
       '  console.log("go version fake");',
+      "  process.exit(0);",
+      "}",
+      'if (args[0] === "env" && args[1] === "-json") {',
+      "  const out = {};",
+      "  for (const key of args.slice(2)) {",
+      "    const fake = process.env[`FAKE_GO_ENV_${key}`];",
+      "    const value = fake === undefined ? process.env[key] : fake;",
+      "    if (value !== undefined) out[key] = value;",
+      "  }",
+      "  console.log(JSON.stringify(out));",
       "  process.exit(0);",
       "}",
       'if (args[0] === "mod" && args[1] === "edit" && args[2] === "-json") {',
@@ -114,5 +125,6 @@ export {
   fs,
   os,
   path,
+  resolvePluginCacheRoot,
   shellQuote,
 };

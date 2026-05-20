@@ -2,9 +2,10 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
+import { findNearestGoMod } from "../../compiler/internal/paths";
 import { readProjectConfig } from "../../compiler/internal/project/readProjectConfig";
-import type { ITtscPluginContributor } from "../../structures/ITtscPluginContributor";
 import type { ITtscPlugin } from "../../structures/ITtscPlugin";
+import type { ITtscPluginContributor } from "../../structures/ITtscPluginContributor";
 import type { ITtscPluginFactoryContext } from "../../structures/ITtscPluginFactoryContext";
 import type { ITtscProjectPluginConfig } from "../../structures/ITtscProjectPluginConfig";
 import type { TtscPluginStage } from "../../structures/TtscPluginStage";
@@ -30,6 +31,24 @@ type PackageManifest = {
   ttsc?: unknown;
 };
 
+/**
+ * Resolve, load, and build all native plugin sidecars for a TypeScript project.
+ *
+ * Reads the project config, discovers plugin entries (from tsconfig and package
+ * auto-discovery), validates and composes their descriptors, then invokes
+ * `buildSourcePlugin` to compile each Go source package into a cached binary.
+ * Returns the ordered set of loaded native plugins alongside the parsed project
+ * config.
+ *
+ * @param options.binary - Absolute path to the ttsc native helper binary.
+ * @param options.cacheDir - Override the plugin binary cache directory.
+ * @param options.cwd - Working directory for resolving relative paths.
+ * @param options.entries - Explicit plugin entries; `false` disables all
+ *   plugins (skips both tsconfig entries and package auto-discovery).
+ * @param options.file - Path to the tsconfig/jsconfig file.
+ * @param options.projectRoot - Override the project root directory.
+ * @param options.tsconfig - Alias for `file`.
+ */
 export function loadProjectPlugins(options: {
   binary: string;
   cacheDir?: string;
@@ -85,14 +104,21 @@ export function loadProjectPlugins(options: {
     validatePluginSource(plugin);
     const contributors = validatePluginContributors(plugin);
     const source = resolvePluginSource(plugin.source, context.projectRoot);
-    const kind = resolveNativeSourceKind(source, plugin, entries[index]!.config, index);
+    const kind = resolveNativeSourceKind(
+      source,
+      plugin,
+      entries[index]!.config,
+      index,
+    );
     if (kind === "linked" && stage !== "transform") {
       throw new Error(
         `ttsc: plugin "${pluginLabel(plugin, entries[index]!.config, index)}" source is a linked Go package, but only transform-stage plugins can be linked into a compiler host`,
       );
     }
     const linkedContributorName =
-      kind === "linked" ? `linked_${String(index).padStart(6, "0")}` : undefined;
+      kind === "linked"
+        ? `linked_${String(index).padStart(6, "0")}`
+        : undefined;
     return {
       contributors,
       config: entries[index]!.config,
@@ -261,6 +287,7 @@ function composePluginSources(
     return {
       ...plugin,
       source: aggregate.plugin.source,
+      contributors: aggregate.plugin.contributors,
     };
   });
 }
@@ -276,6 +303,14 @@ function matchesPluginAlias(
   );
 }
 
+/**
+ * Return `true` when the project has at least one enabled plugin entry.
+ *
+ * Used by callers that need to skip plugin-specific work when no plugins are
+ * configured, without paying the full cost of `loadProjectPlugins`.
+ *
+ * @param entries - Explicit entries; `false` always returns `false`.
+ */
 export function hasProjectPluginEntries(
   project: ITtscParsedProjectConfig,
   entries?: readonly ITtscProjectPluginConfig[] | false,
@@ -610,7 +645,10 @@ function resolveNativeSourceKind(
   config: ITtscProjectPluginConfig,
   index: number,
 ): "executable" | "linked" {
-  const packageDir = resolveGoPackageDir(source, pluginLabel(plugin, config, index));
+  const packageDir = resolveGoPackageDir(
+    source,
+    pluginLabel(plugin, config, index),
+  );
   if (findNearestGoMod(packageDir, GO_MOD_SEARCH_MAX_DEPTH) === null) {
     throw new Error(
       `ttsc: plugin "${pluginLabel(plugin, config, index)}" source must be inside a Go module with go.mod within ${GO_MOD_SEARCH_MAX_DEPTH} parent directories: ${source}`,
@@ -623,20 +661,6 @@ function resolveNativeSourceKind(
     );
   }
   return packageName === "main" ? "executable" : "linked";
-}
-
-function findNearestGoMod(from: string, maxDepth: number): string | null {
-  let current = path.resolve(from);
-  let depth = 0;
-  while (true) {
-    const candidate = path.join(current, "go.mod");
-    if (fs.existsSync(candidate)) return candidate;
-    if (depth >= maxDepth) return null;
-    const parent = path.dirname(current);
-    if (parent === current) return null;
-    current = parent;
-    depth += 1;
-  }
 }
 
 function resolveGoPackageDir(source: string, label: string): string {

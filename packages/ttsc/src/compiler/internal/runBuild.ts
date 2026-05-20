@@ -1,6 +1,3 @@
-import { spawnSync } from "node:child_process";
-import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 import { loadProjectPlugins } from "../../plugin/internal/loadProjectPlugins";
@@ -17,8 +14,13 @@ import {
   linkedTransformPlugins,
   selectSharedHostPlugin,
 } from "./sharedHostHelpers";
+import { outputText, spawnNative } from "./spawnNative";
 
-/** Merge spawn env without clobbering unrelated vars. */
+/**
+ * Merge extra environment variables over `process.env`, always injecting
+ * `TTSC_NODE_BINARY` so child processes can re-invoke the same Node.js binary
+ * without searching `PATH`.
+ */
 function mergeEnv(extra?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const base = {
     ...process.env,
@@ -28,6 +30,12 @@ function mergeEnv(extra?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return { ...base, ...extra };
 }
 
+/**
+ * Build the environment for a native plugin spawn. Injects `TTSC_TSGO_BINARY`
+ * and `TTSC_TTSX_BINARY` alongside the base env from `mergeEnv`. For
+ * transform-stage plugins, also passes `TTSC_LINKED_PLUGINS_JSON` containing
+ * any linked sources so they run inside the same process as the host plugin.
+ */
 function nativePluginEnv(
   extra: NodeJS.ProcessEnv | undefined,
   execution: ReturnType<typeof resolveExecutionContext>,
@@ -47,54 +55,6 @@ function nativePluginEnv(
     }
   }
   return env;
-}
-
-function spawnBinary(
-  binary: string,
-  args: readonly string[],
-  options: {
-    cwd?: string;
-    env?: NodeJS.ProcessEnv;
-    encoding?: BufferEncoding;
-  },
-) {
-  const viaNode = /\.(?:[cm]?js|ts)$/i.test(binary);
-  if (!viaNode) {
-    ensureExecutable(binary);
-  }
-  return spawnSync(
-    viaNode ? process.execPath : binary,
-    viaNode ? [binary, ...args] : [...args],
-    {
-      cwd: options.cwd,
-      env: options.env,
-      encoding: options.encoding,
-      maxBuffer: 1024 * 1024 * 256,
-      windowsHide: true,
-    },
-  );
-}
-
-function ensureExecutable(binary: string): void {
-  if (process.platform === "win32") {
-    return;
-  }
-  try {
-    const mode = fs.statSync(binary).mode & 0o777;
-    if ((mode & 0o111) !== 0) {
-      return;
-    }
-    fs.chmodSync(binary, mode | 0o755);
-  } catch {
-    /* keep the original spawn error path */
-  }
-}
-
-function outputText(value: string | Buffer | null | undefined): string {
-  if (value == null) {
-    return "";
-  }
-  return typeof value === "string" ? value : value.toString("utf8");
 }
 
 /**
@@ -199,6 +159,11 @@ export function runBuild(
   return runTsgoBuild(execution, options, args);
 }
 
+/**
+ * Dispatch a build through the shared-host native plugin. The host plugin is
+ * the one that owns the process (non-linked); all other transform plugins ride
+ * inside it via the `--plugins-json` flag.
+ */
 function buildWithNativeCompilerPlugins(
   options: TtscBuildOptions,
   execution: ReturnType<typeof resolveExecutionContext>,
@@ -214,12 +179,16 @@ function buildWithNativeCompilerPlugins(
   );
 }
 
+/**
+ * Run `tsgo -p <tsconfig> [extraArgs]` and return the normalized result. Used
+ * for the no-emit type-check pass that precedes file emission.
+ */
 function runTsgo(
   execution: ReturnType<typeof resolveExecutionContext>,
   extraArgs: readonly string[],
   options: NonNullable<Parameters<typeof runBuild>[0]>,
 ): TtscBuildResult {
-  const res = spawnBinary(
+  const res = spawnNative(
     execution.tsgo.binary,
     [
       "-p",
@@ -251,12 +220,17 @@ function runTsgo(
   );
 }
 
+/**
+ * Run `tsgo` with the full emit arguments and parse `TSFILE:` lines from stdout
+ * into `emittedFiles`. The TSFILE lines are stripped before the result is
+ * returned so they do not appear in the user-facing output.
+ */
 function runTsgoBuild(
   execution: ReturnType<typeof resolveExecutionContext>,
   options: NonNullable<Parameters<typeof runBuild>[0]>,
   args: readonly string[],
 ): TtscBuildResult {
-  const res = spawnBinary(execution.tsgo.binary, args, {
+  const res = spawnNative(execution.tsgo.binary, args, {
     cwd: execution.projectRoot,
     env: mergeEnv(options.env),
     encoding: "utf8",
@@ -284,6 +258,7 @@ function runTsgoBuild(
   );
 }
 
+/** Build the argument list for a direct `tsgo` build invocation. */
 function createTsgoBuildArgs(
   execution: ReturnType<typeof resolveExecutionContext>,
   options: NonNullable<Parameters<typeof runBuild>[0]>,
@@ -305,10 +280,15 @@ function createTsgoBuildArgs(
   return args;
 }
 
+/**
+ * Return `["--pretty", "false"]` when structured diagnostics are requested so
+ * that the output can be parsed line-by-line, or an empty array otherwise.
+ */
 function createTsgoDiagnosticArgs(options: TtscCommonOptions): string[] {
   return options.structuredDiagnostics === true ? ["--pretty", "false"] : [];
 }
 
+/** Build the argument list for a native plugin `build`/`check` invocation. */
 function createNativeBuildArgs(
   execution: ReturnType<typeof resolveExecutionContext>,
   options: TtscBuildOptions,
@@ -336,6 +316,7 @@ function createNativeBuildArgs(
   return args;
 }
 
+/** Build the argument list for a native plugin check/fix/format invocation. */
 function createNativeCheckArgs(
   execution: ReturnType<typeof resolveExecutionContext>,
   options: TtscBuildOptions,
@@ -369,6 +350,10 @@ function nativeCheckSubcommand(options: TtscBuildOptions): string {
   return "check";
 }
 
+/**
+ * Serialize the plugin list to a compact JSON string for `--plugins-json=`.
+ * Only the fields the native binary protocol requires are included.
+ */
 function serializeNativePlugins(
   plugins: readonly ITtscLoadedNativePlugin[],
 ): string {
@@ -381,6 +366,10 @@ function serializeNativePlugins(
   );
 }
 
+/**
+ * Run every check-stage plugin in order, short-circuiting on the first non-zero
+ * exit. Aggregates diagnostics and output across all check plugins.
+ */
 function runNativeCheckPlugins(
   options: TtscBuildOptions,
   execution: ReturnType<typeof resolveExecutionContext>,
@@ -409,6 +398,11 @@ function runNativeCheckPlugins(
   return out;
 }
 
+/**
+ * Spawn a single native plugin binary with the given args and return the
+ * normalized build result. `label` is used in the thrown error message so the
+ * caller's context (e.g. `"ttsc.check"` or `"ttsc.build"`) is preserved.
+ */
 function runNativePluginCommand(
   plugin: ITtscLoadedNativePlugin,
   args: readonly string[],
@@ -416,7 +410,7 @@ function runNativePluginCommand(
   execution: ReturnType<typeof resolveExecutionContext>,
   label: string,
 ): TtscBuildResult {
-  const res = spawnBinary(plugin.binary, args, {
+  const res = spawnNative(plugin.binary, args, {
     cwd: execution.projectRoot,
     env: nativePluginEnv(options.env, execution, plugin),
     encoding: "utf8",
@@ -436,6 +430,14 @@ function runNativePluginCommand(
   );
 }
 
+/**
+ * Merge two `TtscBuildResult` values into one.
+ *
+ * - `status`: the right status wins unless it is 0 (failure propagates).
+ * - `diagnostics`: concatenated left then right.
+ * - `emittedFiles`: right wins when present, otherwise left is kept.
+ * - `stdout`/`stderr`: concatenated left then right.
+ */
 export function appendBuildOutput(
   left: TtscBuildResult,
   right: TtscBuildResult,
@@ -450,6 +452,11 @@ export function appendBuildOutput(
   });
 }
 
+/**
+ * Resolve all runtime context needed for a build: cwd, tsconfig path, project
+ * root, tsgo binary location, and the loaded native plugin list. Centralised
+ * here so every code path in `runBuild` shares the same resolution logic.
+ */
 function resolveExecutionContext(
   options: TtscCommonOptions & { tsconfig?: string },
 ) {
@@ -480,6 +487,10 @@ function resolveExecutionContext(
   };
 }
 
+/**
+ * Extract `TSFILE: <path>` lines from tsgo stdout and return the absolute
+ * paths. tsgo emits these when `--listEmittedFiles` is passed.
+ */
 function parseEmittedFiles(stdout: string): string[] {
   const out: string[] = [];
   for (const line of stdout.split(/\r?\n/)) {
@@ -491,6 +502,10 @@ function parseEmittedFiles(stdout: string): string[] {
   return out;
 }
 
+/**
+ * Remove `TSFILE:` lines from tsgo stdout so they do not appear in the
+ * user-facing output after they have been parsed into `emittedFiles`.
+ */
 function stripEmittedFileLines(stdout: string): string {
   return stdout
     .split(/\r?\n/)
@@ -499,10 +514,21 @@ function stripEmittedFileLines(stdout: string): string {
     .replace(/\n+$/, "");
 }
 
+/**
+ * `TtscBuildResult` with `diagnostics` made optional. Used internally when
+ * diagnostics are parsed lazily from stdout/stderr by `normalizeBuildOutput`.
+ */
 type PartialBuildResult = Omit<TtscBuildResult, "diagnostics"> & {
   diagnostics?: ITtscCompilerDiagnostic[];
 };
 
+/**
+ * Normalise a raw spawn result into a `TtscBuildResult`.
+ *
+ * When `diagnostics` is absent they are parsed from the text output. When the
+ * process exited non-zero but stderr is empty and stdout is non-empty, stdout
+ * is moved to stderr so the error is visible to callers who only check stderr.
+ */
 export function normalizeBuildOutput(
   result: PartialBuildResult,
   cwd?: string,
@@ -524,6 +550,11 @@ export function normalizeBuildOutput(
   };
 }
 
+/**
+ * Parse structured diagnostics from the combined stderr+stdout text when the
+ * caller did not supply pre-parsed diagnostics. ANSI escape codes are stripped
+ * and `TSFILE:` / `Found N errors` summary lines are skipped.
+ */
 function parseCompilerDiagnostics(
   result: Pick<TtscBuildResult, "stderr" | "stdout">,
   cwd: string | undefined,
@@ -553,6 +584,16 @@ function parseCompilerDiagnostics(
   return out;
 }
 
+/**
+ * Try to parse a single line as a TypeScript compiler diagnostic in one of
+ * three formats:
+ *
+ * - `file:line:col - category TSxxxx: message` (colon-separated, tsgo style)
+ * - `file(line,col): category TSxxxx: message` (paren style, classic tsc)
+ * - `category TSxxxx: message` (global, no file)
+ *
+ * Returns `null` when the line does not match any format.
+ */
 function parseDiagnosticLine(
   line: string,
   cwd: string | undefined,
@@ -599,6 +640,10 @@ function parseDiagnosticLine(
   };
 }
 
+/**
+ * Return an absolute file path. When `file` is already absolute it is returned
+ * unchanged; relative paths are resolved against `cwd` when available.
+ */
 function normalizeDiagnosticFile(
   file: string,
   cwd: string | undefined,
@@ -609,6 +654,11 @@ function normalizeDiagnosticFile(
   return path.resolve(cwd, file);
 }
 
+/**
+ * Map a raw category string (`"error"`, `"warning"`, `"suggestion"`,
+ * `"message"`) to the canonical `ITtscCompilerDiagnostic.Category`. Any
+ * unrecognised value is coerced to `"error"`.
+ */
 function normalizeDiagnosticCategory(
   value: string,
 ): ITtscCompilerDiagnostic.Category {
@@ -620,10 +670,15 @@ function normalizeDiagnosticCategory(
     : "error";
 }
 
+/**
+ * Parse a diagnostic code as a number when it is all digits (TS numeric codes
+ * like `2322`), or keep it as a string for plugin-defined alphanumeric codes.
+ */
 function normalizeDiagnosticCode(value: string): number | string {
   return /^\d+$/.test(value) ? Number(value) : value;
 }
 
+/** Strip ANSI escape sequences from `text` for line-by-line diagnostic parsing. */
 function stripAnsi(text: string): string {
   return text.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
 }

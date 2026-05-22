@@ -1,13 +1,15 @@
 import path from "node:path";
 
-import { loadProjectPlugins } from "../../plugin/internal/loadProjectPlugins";
+import {
+  hasProjectPluginEntries,
+  loadProjectPlugins,
+} from "../../plugin/internal/loadProjectPlugins";
 import type { ITtscCompilerDiagnostic } from "../../structures/ITtscCompilerDiagnostic";
 import type { ITtscLoadedNativePlugin } from "../../structures/internal/ITtscLoadedNativePlugin";
 import type { TtscBuildOptions } from "../../structures/internal/TtscBuildOptions";
 import type { TtscBuildResult } from "../../structures/internal/TtscBuildResult";
 import type { TtscCommonOptions } from "../../structures/internal/TtscCommonOptions";
 import { readProjectConfig } from "./project/readProjectConfig";
-import { resolveProjectConfig } from "./project/resolveProjectConfig";
 import { resolveBinary } from "./resolveBinary";
 import { resolveTsgo } from "./resolveTsgo";
 import {
@@ -16,6 +18,11 @@ import {
   selectSharedHostPlugin,
 } from "./sharedHostHelpers";
 import { outputText, spawnNative } from "./spawnNative";
+
+type RunBuildOptions = TtscBuildOptions & {
+  skipDiagnosticsCheck?: boolean;
+  forceListEmittedFiles?: boolean;
+};
 
 /**
  * Merge extra environment variables over `process.env`, always injecting
@@ -62,24 +69,20 @@ function nativePluginEnv(
  * Run `ttsc` against a tsconfig. Returns once the binary exits so the CLI can
  * decide how to surface diagnostics. Does not throw on non-zero exit.
  */
-export function runBuild(
-  options: TtscBuildOptions & {
-    skipDiagnosticsCheck?: boolean;
-    forceListEmittedFiles?: boolean;
-  } = {},
-): TtscBuildResult {
+export function runBuild(options: RunBuildOptions = {}): TtscBuildResult {
   const execution = resolveExecutionContext(options);
+  const buildOptions = applyProjectNoEmit(options, execution);
   if (execution.nativePlugins.length > 0) {
     const compilers = execution.nativePlugins.filter(
       (plugin) => plugin.stage === "transform",
     );
-    const checked = runNativeCheckPlugins(options, execution);
+    const checked = runNativeCheckPlugins(buildOptions, execution);
     if (checked.status !== 0) {
       return checked;
     }
 
-    if (options.emit === false) {
-      if (options.format === true) {
+    if (buildOptions.emit === false) {
+      if (buildOptions.format === true) {
         // Format mode is write-only by contract: the lint sidecar
         // already rewrote source files and reported nothing. Running
         // tsgo --noEmit OR a transform compiler afterwards would either
@@ -98,12 +101,15 @@ export function runBuild(
         assertSharedHostCompatibility(compilers, "emit");
         return appendBuildOutput(
           checked,
-          buildWithNativeCompilerPlugins(options, execution, compilers),
+          buildWithNativeCompilerPlugins(buildOptions, execution, compilers),
         );
+      }
+      if (checkPluginsReportTypeScriptDiagnostics(execution.nativePlugins)) {
+        return checked;
       }
       return appendBuildOutput(
         checked,
-        runTsgo(execution, ["--noEmit"], options),
+        runTsgo(execution, ["--noEmit"], buildOptions),
       );
     }
 
@@ -112,29 +118,30 @@ export function runBuild(
       assertSharedHostCompatibility(compilers, "emit");
       result = appendBuildOutput(
         checked,
-        buildWithNativeCompilerPlugins(options, execution, compilers),
+        buildWithNativeCompilerPlugins(buildOptions, execution, compilers),
       );
     } else {
       if (
-        options.skipDiagnosticsCheck !== true &&
-        !forwardsTerminalTsgoFlag(options)
+        buildOptions.skipDiagnosticsCheck !== true &&
+        !checkPluginsReportTypeScriptDiagnostics(execution.nativePlugins) &&
+        !forwardsTerminalTsgoFlag(buildOptions)
       ) {
-        const tsgoChecked = runTsgo(execution, ["--noEmit"], options);
+        const tsgoChecked = runTsgo(execution, ["--noEmit"], buildOptions);
         if (tsgoChecked.status !== 0) {
           return appendBuildOutput(checked, tsgoChecked);
         }
       }
-      const args = createTsgoBuildArgs(execution, options, {
-        listEmittedFiles: options.forceListEmittedFiles === true,
+      const args = createTsgoBuildArgs(execution, buildOptions, {
+        listEmittedFiles: buildOptions.forceListEmittedFiles === true,
       });
-      const emitted = runTsgoBuild(execution, options, args);
+      const emitted = runTsgoBuild(execution, buildOptions, args);
       result = appendBuildOutput(checked, emitted);
     }
 
     return result;
   }
 
-  if (options.format === true) {
+  if (buildOptions.format === true) {
     // Format mode is write-only by contract — see the matching
     // short-circuit in the with-native-plugins branch above. When no
     // native plugin is loaded there is nothing for `ttsc format` to
@@ -149,30 +156,49 @@ export function runBuild(
     };
   }
 
-  if (
-    options.emit !== false &&
-    options.skipDiagnosticsCheck !== true &&
-    !forwardsTerminalTsgoFlag(options)
-  ) {
-    const checked = runTsgo(execution, ["--noEmit"], options);
-    if (checked.status !== 0) {
-      return checked;
-    }
-  }
-
-  const args = createTsgoBuildArgs(execution, options, {
+  const args = createTsgoBuildArgs(execution, buildOptions, {
     listEmittedFiles:
-      options.emit !== false && options.forceListEmittedFiles === true,
+      buildOptions.emit !== false &&
+      buildOptions.forceListEmittedFiles === true,
+    noEmitOnError:
+      buildOptions.emit !== false &&
+      buildOptions.skipDiagnosticsCheck !== true &&
+      !forwardsTerminalTsgoFlag(buildOptions),
   });
-  return runTsgoBuild(execution, options, args);
+  return runTsgoBuild(execution, buildOptions, args);
+}
+
+/**
+ * A tsconfig-level `noEmit: true` is an analysis-only build unless the user
+ * explicitly asks `ttsc --emit` to override it. Treat it like CLI `--noEmit`
+ * before composing tsgo/native-host arguments so ttsc does not add emit-only
+ * guards around projects that cannot emit.
+ */
+function applyProjectNoEmit(
+  options: RunBuildOptions,
+  execution: ReturnType<typeof resolveExecutionContext>,
+): RunBuildOptions {
+  if (options.emit !== undefined || execution.projectNoEmit !== true) {
+    return options;
+  }
+  return { ...options, emit: false };
+}
+
+function checkPluginsReportTypeScriptDiagnostics(
+  plugins: readonly ITtscLoadedNativePlugin[],
+): boolean {
+  return plugins.some(
+    (plugin) =>
+      plugin.stage === "check" &&
+      plugin.reportsTypeScriptDiagnostics === true,
+  );
 }
 
 /**
  * Tsgo CLI flags that make `tsgo` print something and exit instead of building
- * (`--showConfig`, `--listFilesOnly`, `--help`, …). ttsc normally runs a
- * `--noEmit` type-check pass before the emit pass; when one of these is
- * forwarded, both passes would run `tsgo` and the output would print twice, so
- * the pre-check is skipped and only one `tsgo` invocation remains.
+ * (`--showConfig`, `--listFilesOnly`, `--help`, …). ttsc must not add
+ * build-only guard flags around these because the forwarded flag asks tsgo to
+ * print something and exit instead of compiling the project.
  */
 const TERMINAL_TSGO_FLAGS: ReadonlySet<string> = new Set([
   "--help",
@@ -187,8 +213,8 @@ const TERMINAL_TSGO_FLAGS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Report whether the caller forwarded a print-and-exit tsgo flag, so the
- * pre-emit type-check pass can be skipped to avoid running it twice.
+ * Report whether the caller forwarded a print-and-exit tsgo flag, so ttsc can
+ * avoid adding compile-only flags to a command that is not going to compile.
  */
 function forwardsTerminalTsgoFlag(options: TtscCommonOptions): boolean {
   return (
@@ -223,7 +249,7 @@ function buildWithNativeCompilerPlugins(
 function runTsgo(
   execution: ReturnType<typeof resolveExecutionContext>,
   extraArgs: readonly string[],
-  options: NonNullable<Parameters<typeof runBuild>[0]>,
+  options: RunBuildOptions,
 ): TtscBuildResult {
   const res = spawnNative(
     execution.tsgo.binary,
@@ -266,7 +292,7 @@ function runTsgo(
  */
 function runTsgoBuild(
   execution: ReturnType<typeof resolveExecutionContext>,
-  options: NonNullable<Parameters<typeof runBuild>[0]>,
+  options: RunBuildOptions,
   args: readonly string[],
 ): TtscBuildResult {
   const res = spawnNative(execution.tsgo.binary, args, {
@@ -306,8 +332,8 @@ function runTsgoBuild(
 /** Build the argument list for a direct `tsgo` build invocation. */
 function createTsgoBuildArgs(
   execution: ReturnType<typeof resolveExecutionContext>,
-  options: NonNullable<Parameters<typeof runBuild>[0]>,
-  flags: { listEmittedFiles: boolean },
+  options: RunBuildOptions,
+  flags: { listEmittedFiles: boolean; noEmitOnError?: boolean },
 ): string[] {
   const args = ["-p", execution.tsconfig];
   if (options.emit === true) {
@@ -327,6 +353,9 @@ function createTsgoBuildArgs(
   args.push(...createTsgoDiagnosticArgs(options));
   args.push(...createTsgoThreadingArgs(options));
   args.push(...(options.passthrough ?? []));
+  if (flags.noEmitOnError === true) {
+    args.push("--noEmitOnError");
+  }
   return args;
 }
 
@@ -369,18 +398,20 @@ function createNativeBuildArgs(
   ];
   if (options.emit === true) {
     args.push("--emit");
-  } else if (options.emit === false) {
-    args.push("--noEmit");
   }
   if (options.outDir) {
     args.push("--outDir=" + path.resolve(execution.cwd, options.outDir));
   }
-  if (options.quiet === false) {
-    args.push("--verbose");
-  } else if (options.quiet === true) {
-    args.push("--quiet");
+  // Third-party transform hosts already treat the `check` subcommand as a
+  // quiet no-emit pass. Keep ttsc-owned build modifiers off that lane so older
+  // strict hosts do not reject unknown optional flags before analysis starts.
+  if (options.emit !== false) {
+    if (options.quiet === false) {
+      args.push("--verbose");
+    } else if (options.quiet === true) {
+      args.push("--quiet");
+    }
   }
-  args.push(...createNativeThreadingArgs(options));
   args.push(...createNativeTsgoArgs(options));
   return args;
 }
@@ -404,27 +435,26 @@ function createNativeCheckArgs(
   } else if (options.quiet === true) {
     args.push("--quiet");
   }
-  args.push(...createNativeThreadingArgs(options));
   args.push(...createNativeTsgoArgs(options));
   return args;
 }
 
-/**
- * Forward the `--singleThreaded` / `--checkers` knobs to a native sidecar
- * (`@ttsc/lint`, transform plugins). Their Go flag sets accept the same two
- * flags, which `driver.LoadProgram` maps onto `CompilerOptions` so the in-
- * process program matches what `tsgo` would do on the no-plugin lane.
- */
-function createNativeThreadingArgs(options: TtscCommonOptions): string[] {
-  const args: string[] = [];
-  if (options.singleThreaded === true) {
-    args.push("--singleThreaded");
-  }
-  if (options.checkers !== undefined) {
-    args.push("--checkers=" + String(options.checkers));
-  }
-  return args;
-}
+// `--singleThreaded` / `--checkers` are intentionally NOT forwarded to native
+// plugin hosts.
+//
+// They were forwarded as bare CLI flags in #113, but a native host built
+// before that release has no `singleThreaded`/`checkers` flag in its
+// `flag.FlagSet`, and a host that parses with `flag.ContinueOnError` exits 2
+// on the unknown flag instead of ignoring it — `ttsc --singleThreaded` then
+// fails deterministically on any project with a third-party transform plugin
+// (typia, nestia). The plugin protocol only promises that new optional flags
+// are *accept-and-ignored* by hosts that adopted `filterHostArgs`; ttsc cannot
+// know whether the host it is about to spawn did, so it must not emit a flag
+// whose rejection is fatal. The threading knobs still take full effect on the
+// no-plugin `tsgo` lane (`createTsgoThreadingArgs`), and `CreateProgramFromConfig`
+// already pins every native-host program to a single checker via
+// `forceSingleChecker`, so the in-process determinism `--singleThreaded`
+// targets is preserved on the plugin lane regardless.
 
 /**
  * Forward the tsgo flags ttsc did not recognize to a native sidecar as one
@@ -564,41 +594,33 @@ function resolveExecutionContext(
   options: TtscCommonOptions & { emit?: boolean; tsconfig?: string },
 ) {
   const cwd = path.resolve(options.cwd ?? process.cwd());
-  const tsconfig = resolveProjectConfig({
+  const project = readProjectConfig({
     cwd,
+    projectRoot: options.projectRoot,
     tsconfig: options.tsconfig,
   });
-  const projectRoot = options.projectRoot
-    ? path.resolve(cwd, options.projectRoot)
-    : path.dirname(tsconfig);
-  let emitProject;
-  if (options.emit === true) {
-    try {
-      emitProject = readProjectConfig({
-        cwd,
-        projectRoot: options.projectRoot,
-        tsconfig,
-      });
-    } catch {
-      emitProject = undefined;
-    }
-  }
+  const tsconfig = project.path;
+  const projectRoot = project.root;
   const tsgo = resolveTsgo({ ...options, cwd: projectRoot });
-  const fallbackBinary = resolveBinary(options);
-  const loaded = loadProjectPlugins({
-    binary: fallbackBinary ?? "",
-    cacheDir: options.cacheDir ?? options.env?.TTSC_CACHE_DIR,
-    cwd,
-    entries: options.plugins,
-    projectRoot,
-    tsconfig,
-  });
+  const hasPlugins = hasProjectPluginEntries(project, options.plugins);
+  const loaded = hasPlugins
+    ? loadProjectPlugins({
+        binary: resolveBinary(options) ?? "",
+        cacheDir: options.cacheDir ?? options.env?.TTSC_CACHE_DIR,
+        cwd,
+        entries: options.plugins,
+        projectRoot,
+        tsconfig,
+      })
+    : { nativePlugins: [] };
   return {
     cwd,
     nativePlugins: loaded.nativePlugins,
+    projectNoEmit: project.compilerOptions.noEmit === true,
     projectRoot,
     rewriteRelativeImportExtensionsForEmit:
-      emitProject?.compilerOptions.allowImportingTsExtensions === true,
+      options.emit === true &&
+      project.compilerOptions.allowImportingTsExtensions === true,
     tsgo,
     tsconfig,
   };

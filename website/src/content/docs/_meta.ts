@@ -14,6 +14,7 @@ const meta: MetaRecord = {
   wasm: "WASM Module",
 
   "-- appendix": { type: "separator", title: "🔗 Appendix" },
+  benchmark: "Benchmark",
   faq: "FAQ",
 };
 export default meta;

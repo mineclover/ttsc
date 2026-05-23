@@ -2,6 +2,12 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+import {
+  getBoolean,
+  getNumber,
+  getString,
+  parseFlags,
+} from "../../flags/parser";
 import { getCompilerVersionText } from "./getCompilerVersionText";
 import { prepareExecution } from "./prepareExecution";
 import { resolveCacheDir } from "./resolveCacheDir";
@@ -74,107 +80,96 @@ function formatError(error: unknown): string {
 }
 
 function parseCLI(argv: readonly string[]) {
-  const preload: string[] = [];
-  const passthroughIndex = argv.indexOf("--");
-  const head =
-    passthroughIndex === -1 ? [...argv] : [...argv.slice(0, passthroughIndex)];
-  const passthrough =
-    passthroughIndex === -1 ? [] : [...argv.slice(passthroughIndex + 1)];
-
-  let binary: string | undefined;
-  let cacheDir: string | undefined;
-  let checkers: number | undefined;
-  let cwd: string | undefined;
-  let entry: string | undefined;
-  let noPlugins = false;
-  let project: string | undefined;
-  let singleThreaded = false;
-  const tsgoFlags: string[] = [];
-
-  while (head.length !== 0) {
-    const current = head.shift()!;
-    if (entry) {
-      passthrough.push(current, ...head);
-      break;
-    }
-    switch (current) {
-      case "-h":
-      case "--help":
-        return "help";
-      case "-v":
-      case "--version":
-        return "version";
-      case "-P":
-      case "--project":
-        project = takeValue(current, head);
-        break;
-      case "--cwd":
-        cwd = takeValue(current, head);
-        break;
-      case "--cache-dir":
-        cacheDir = takeValue(current, head);
-        break;
-      case "-r":
-      case "--require":
-        preload.push(takeValue(current, head));
-        break;
-      case "--binary":
-        binary = takeValue(current, head);
-        break;
-      case "--no-plugins":
-        noPlugins = true;
-        break;
-      case "--singleThreaded":
-        singleThreaded = true;
-        break;
-      case "--checkers":
-        checkers = parseCheckersValue(takeValue(current, head));
-        break;
-      default:
-        if (current.startsWith("--project=")) {
-          project = current.slice("--project=".length);
-        } else if (current.startsWith("--cwd=")) {
-          cwd = current.slice("--cwd=".length);
-        } else if (current.startsWith("--cache-dir=")) {
-          cacheDir = current.slice("--cache-dir=".length);
-        } else if (current.startsWith("--binary=")) {
-          binary = current.slice("--binary=".length);
-        } else if (current.startsWith("--checkers=")) {
-          checkers = parseCheckersValue(current.slice("--checkers=".length));
-        } else if (current.startsWith("--singleThreaded=")) {
-          singleThreaded =
-            current.slice("--singleThreaded=".length) !== "false";
-        } else if (current.startsWith("-")) {
-          // Not a ttsx-owned flag: forward it to tsgo's project type-check,
-          // just like the `ttsc` launcher does for the build lane.
-          tsgoFlags.push(current);
-        } else if (looksLikeEntryFile(current)) {
-          entry = current;
-        } else {
-          // A bare non-file token before the entry — e.g. the `es2020` in
-          // `--target es2020` — is a forwarded flag's value.
-          tsgoFlags.push(current);
-        }
-        break;
-    }
+  // ttsx accepts ttsc-style flags plus its own `--no-plugins` / `--require`.
+  // The shared schema engine recognises both; the engine returns positional
+  // tokens (entry file + flag values that aren't `.ts`) and a passthrough
+  // list mirroring the pre-schema behaviour.
+  //
+  // Order pin: ttsx accepts `-P` as an alias for `--project`. The schema
+  // declares `-p` for ttsc; ttsx's lowercase shape would collide on `-p`
+  // → `--tsconfig`, so the legacy `-P` (uppercase) is treated as `--project`
+  // via a manual rewrite before the engine sees argv. We preserve the
+  // historical behaviour and emit a structural error otherwise.
+  const rewritten = argv.map((token) =>
+    token === "-P"
+      ? "--project"
+      : token.startsWith("-P=")
+        ? `--project=${token.slice("-P=".length)}`
+        : token,
+  );
+  // Terminal flags (--help / --version) short-circuit before parsing so
+  // ttsx prints help text even when the entry file is missing.
+  for (const token of rewritten) {
+    if (token === "-h" || token === "--help") return "help" as const;
+    if (token === "-v" || token === "--version") return "version" as const;
   }
+  const result = parseFlags({
+    argv: rewritten,
+    errorPrefix: "ttsx:",
+    forwardAfterFirstPositional: true,
+    honorDoubleDashSeparator: true,
+    subcommand: "ttsx",
+  });
 
-  if (!entry) {
+  const entry = result.positional.find(looksLikeEntryFile);
+  if (entry === undefined) {
     throw new Error("ttsx: entry file is required");
+  }
+  // With `forwardAfterFirstPositional: true` the parser reports
+  // `result.positional` as just the entry, `result.passthrough` as flags
+  // arriving BEFORE the entry (tsgo-forwarded), and `result.tail` as every
+  // token AFTER the entry — those are the user program's argv (e.g. the
+  // `generate --input src/input` tail of `ttsx typia.ts generate
+  // --input src/input`) and MUST NOT reach tsgo. Anything in positional
+  // that is not the entry is a pre-entry flag value (e.g. `--target es2020`)
+  // that the parser stored positionally; forward those to tsgo with the
+  // rest of `passthrough`.
+  const preEntryValues: string[] = result.positional.filter(
+    (token) => token !== entry && !looksLikeEntryFile(token),
+  );
+  const postEntryArgs: string[] = [...result.tail];
+
+  const preload: string[] = [];
+  // `--require` accepts repeated values; the schema engine writes the
+  // LAST one into `values`, so reconstruct the full list by scanning the
+  // raw argv. Mirrors the legacy parser's `preload.push(takeValue(...))`
+  // behaviour.
+  //
+  // Stop the rescue scan at the first token that begins tail mode —
+  // either the entry file or the `--` separator. Without this guard,
+  // `ttsx entry.ts -r preload.cjs` would BOTH preload `preload.cjs` AND
+  // forward `-r preload.cjs` to the entry's argv, double-effecting the
+  // module load. The schema engine already routes post-entry tokens to
+  // `result.tail`; the rescue scan must respect the same boundary.
+  const scanEnd = rewritten.findIndex(
+    (token) => looksLikeEntryFile(token) || token === "--",
+  );
+  const scanLimit = scanEnd === -1 ? rewritten.length : scanEnd;
+  for (let i = 0; i < scanLimit; i += 1) {
+    const token = rewritten[i]!;
+    if (token === "-r" || token === "--require") {
+      const value = rewritten[i + 1];
+      if (value !== undefined && !value.startsWith("-")) {
+        preload.push(value);
+        i += 1;
+      }
+    } else if (token.startsWith("--require=")) {
+      preload.push(token.slice("--require=".length));
+    }
   }
 
   return {
-    binary,
-    cacheDir,
-    checkers,
-    cwd,
+    binary: getString(result, "--binary"),
+    cacheDir: getString(result, "--cache-dir"),
+    checkers: getNumber(result, "--checkers"),
+    cwd: getString(result, "--cwd"),
     entry,
-    noPlugins,
-    passthrough,
+    noPlugins: getBoolean(result, "--no-plugins") === true,
+    passthrough: postEntryArgs,
     preload,
-    project,
-    singleThreaded,
-    tsgoFlags,
+    project: getString(result, "--tsconfig"),
+    singleThreaded: getBoolean(result, "--singleThreaded") === true,
+    tsgoFlags: [...result.passthrough, ...preEntryValues],
   };
 }
 
@@ -185,21 +180,6 @@ function parseCLI(argv: readonly string[]) {
  */
 function looksLikeEntryFile(token: string): boolean {
   return [".ts", ".tsx", ".mts", ".cts"].some((ext) => token.endsWith(ext));
-}
-
-/**
- * Parse the `--checkers` value into a positive integer. tsgo rejects a
- * non-positive checker count (`minValue: 1`); ttsx mirrors that so a typo fails
- * loudly instead of silently running with the default pool.
- */
-function parseCheckersValue(raw: string): number {
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 1) {
-    throw new Error(
-      `ttsx: --checkers expects a positive integer, got ${JSON.stringify(raw)}`,
-    );
-  }
-  return value;
 }
 
 function printHelp(): void {
@@ -249,14 +229,6 @@ function isRelativeSpecifier(specifier: string): boolean {
     specifier.startsWith(".\\") ||
     specifier.startsWith("..\\")
   );
-}
-
-function takeValue(flag: string, rest: string[]): string {
-  const value = rest.shift();
-  if (!value) {
-    throw new Error(`ttsx: ${flag} requires a value`);
-  }
-  return value;
 }
 
 function runPreparedEntry(

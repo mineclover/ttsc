@@ -120,6 +120,7 @@ export function loadProjectPlugins(options: {
         ? `linked_${String(index).padStart(6, "0")}`
         : undefined;
     return {
+      capabilities: plugin.capabilities,
       contributors,
       config: entries[index]!.config,
       kind,
@@ -198,6 +199,7 @@ export function loadProjectPlugins(options: {
     }
     return {
       binary,
+      capabilities: record.capabilities,
       config: record.config,
       contributors: record.contributors,
       kind: record.kind,
@@ -291,6 +293,14 @@ function composePluginSources(
       ...plugin,
       source: aggregate.plugin.source,
       contributors: aggregate.plugin.contributors,
+      // The composed plugin's runtime BINARY is the aggregate's binary,
+      // so the CLI surface (which flags the sidecar parses) is the
+      // aggregate's. Inherit `capabilities` from the aggregate so a
+      // capability the aggregate declares — e.g. threadingArgs — does
+      // not get silently dropped just because the composed entry's own
+      // descriptor omitted it. If the aggregate did not set capabilities
+      // we keep the composed plugin's own as a fallback.
+      capabilities: aggregate.plugin.capabilities ?? plugin.capabilities,
     };
   });
 }

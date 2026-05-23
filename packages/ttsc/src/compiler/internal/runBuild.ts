@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { INTERNAL_SHADOW_FLAGS, TERMINAL_FLAGS } from "../../flags/schema";
 import {
   hasProjectPluginEntries,
   loadProjectPlugins,
@@ -189,8 +190,7 @@ function checkPluginsReportTypeScriptDiagnostics(
 ): boolean {
   return plugins.some(
     (plugin) =>
-      plugin.stage === "check" &&
-      plugin.reportsTypeScriptDiagnostics === true,
+      plugin.stage === "check" && plugin.reportsTypeScriptDiagnostics === true,
   );
 }
 
@@ -199,18 +199,19 @@ function checkPluginsReportTypeScriptDiagnostics(
  * (`--showConfig`, `--listFilesOnly`, `--help`, …). ttsc must not add
  * build-only guard flags around these because the forwarded flag asks tsgo to
  * print something and exit instead of compiling the project.
+ *
+ * Schema-derived: the set is computed from `FLAG_SCHEMA[*].terminal === true`,
+ * not hand-maintained next to runBuild. Adding a new terminal flag now means
+ * editing `schema.ts` and re-running `pnpm format` — every layer learns about
+ * it automatically.
  */
-const TERMINAL_TSGO_FLAGS: ReadonlySet<string> = new Set([
-  "--help",
-  "-h",
-  "-?",
-  "--version",
-  "-v",
-  "--all",
-  "--showConfig",
-  "--init",
-  "--listFilesOnly",
-]);
+const TERMINAL_TSGO_FLAGS: ReadonlySet<string> = (() => {
+  // Mirror the legacy hand-list: schema's terminal flags ∪ the `-?` alias
+  // tsgo accepts (kept here because it is a tsgo synonym, not a ttsc flag).
+  const out = new Set<string>(TERMINAL_FLAGS);
+  out.add("-?");
+  return out;
+})();
 
 /**
  * Report whether the caller forwarded a print-and-exit tsgo flag, so ttsc can
@@ -219,6 +220,36 @@ const TERMINAL_TSGO_FLAGS: ReadonlySet<string> = new Set([
 function forwardsTerminalTsgoFlag(options: TtscCommonOptions): boolean {
   return (
     options.passthrough?.some((flag) => TERMINAL_TSGO_FLAGS.has(flag)) ?? false
+  );
+}
+
+/**
+ * Report whether the caller forwarded a flag ttsc adds to tsgo internally —
+ * e.g. `--listEmittedFiles` (ttsc adds it to learn emitted paths) or
+ * `--noEmit` (ttsc adds it for the pre-emit type-check). When the user
+ * also forwards the same flag, post-processing must keep the user-visible
+ * effect intact instead of stripping it as ttsc-internal noise.
+ *
+ * Schema-derived: `FLAG_SCHEMA[*].internalShadow === true`. RC-2 from the
+ * RCA (RCA section 3, `--listEmittedFiles` / `--showConfig` swallowed):
+ * the per-flag `passthrough.includes("…")` check is now one structural
+ * lookup against the schema, not one bespoke `if` per shadow flag.
+ */
+function forwardsInternalShadowFlag(
+  options: TtscCommonOptions,
+  flag: string,
+): boolean {
+  if (!INTERNAL_SHADOW_FLAGS.has(flag)) return false;
+  const passthrough = options.passthrough;
+  if (passthrough === undefined) return false;
+  // Match both the bare form (`--pretty`) and the inline-value form
+  // (`--pretty=true`). The launcher's parser preserves these shapes
+  // verbatim, so a tolerant prefix compare is what we want — `passthrough`
+  // never holds a stray substring that happens to start with the flag
+  // because parser positional/passthrough sinks split on whitespace.
+  const inlinePrefix = `${flag}=`;
+  return passthrough.some(
+    (token) => token === flag || token.startsWith(inlinePrefix),
   );
 }
 
@@ -318,8 +349,13 @@ function runTsgoBuild(
   // flag internally to learn the emitted paths and strips the lines back out
   // as noise — but when the user themselves forwarded `--listEmittedFiles`,
   // the listing is what they asked for, so it must survive to stdout.
-  const userListedEmitted =
-    options.passthrough?.includes("--listEmittedFiles") ?? false;
+  // The lookup is schema-driven (FLAG_SCHEMA marks `--listEmittedFiles` with
+  // `internalShadow: true`); see `forwardsInternalShadowFlag` for the RC-2
+  // background.
+  const userListedEmitted = forwardsInternalShadowFlag(
+    options,
+    "--listEmittedFiles",
+  );
   if (emittedFiles.length !== 0 && !userListedEmitted) {
     result.stdout = stripEmittedFileLines(result.stdout);
   }
@@ -362,9 +398,21 @@ function createTsgoBuildArgs(
 /**
  * Return `["--pretty", "false"]` when structured diagnostics are requested so
  * that the output can be parsed line-by-line, or an empty array otherwise.
+ *
+ * When the user explicitly forwarded `--pretty` (any value), the internal
+ * `--pretty false` shadow is dropped so the user wins on the surface. ttsc's
+ * own diagnostic parser will then see pretty-formatted output and fall back
+ * to surfacing it verbatim — the RC-2 contract that `--pretty`'s
+ * `internalShadow: true` flag in `FLAG_SCHEMA` declares. Without this guard
+ * the order in `runTsgo` (internal flags first, passthrough last) would
+ * still let the user's `--pretty true` override at the tsgo level, but ttsc
+ * would have already committed to a structured-diagnostics post-process
+ * that no longer matches the actual output.
  */
 function createTsgoDiagnosticArgs(options: TtscCommonOptions): string[] {
-  return options.structuredDiagnostics === true ? ["--pretty", "false"] : [];
+  if (options.structuredDiagnostics !== true) return [];
+  if (forwardsInternalShadowFlag(options, "--pretty")) return [];
+  return ["--pretty", "false"];
 }
 
 /**
@@ -420,6 +468,7 @@ function createNativeBuildArgs(
 function createNativeCheckArgs(
   execution: ReturnType<typeof resolveExecutionContext>,
   options: TtscBuildOptions,
+  plugin: ITtscLoadedNativePlugin,
 ): string[] {
   const args = [
     nativeCheckSubcommand(options),
@@ -435,26 +484,69 @@ function createNativeCheckArgs(
   } else if (options.quiet === true) {
     args.push("--quiet");
   }
+  args.push(...createNativeCheckThreadingArgs(options, plugin));
   args.push(...createNativeTsgoArgs(options));
   return args;
 }
 
-// `--singleThreaded` / `--checkers` are intentionally NOT forwarded to native
-// plugin hosts.
+// `--singleThreaded` / `--checkers` are forwarded to native check-stage hosts
+// only when the host is one ttsc itself owns (currently `@ttsc/lint`). #113
+// forwarded both flags as bare CLI tokens to every native sidecar, then
+// commit ad3443a reverted that across the board because a third-party host
+// built before #113 has no `singleThreaded` / `checkers` flag in its
+// `flag.FlagSet` and would exit 2 on the unknown flag — so
+// `ttsc --singleThreaded` failed deterministically on every typia/nestia
+// transform-plugin project.
 //
-// They were forwarded as bare CLI flags in #113, but a native host built
-// before that release has no `singleThreaded`/`checkers` flag in its
-// `flag.FlagSet`, and a host that parses with `flag.ContinueOnError` exits 2
-// on the unknown flag instead of ignoring it — `ttsc --singleThreaded` then
-// fails deterministically on any project with a third-party transform plugin
-// (typia, nestia). The plugin protocol only promises that new optional flags
-// are *accept-and-ignored* by hosts that adopted `filterHostArgs`; ttsc cannot
-// know whether the host it is about to spawn did, so it must not emit a flag
-// whose rejection is fatal. The threading knobs still take full effect on the
-// no-plugin `tsgo` lane (`createTsgoThreadingArgs`), and `CreateProgramFromConfig`
-// already pins every native-host program to a single checker via
-// `forceSingleChecker`, so the in-process determinism `--singleThreaded`
-// targets is preserved on the plugin lane regardless.
+// The performance ceiling that caused, though, is real: format/check passes
+// through the lint sidecar are dominated by parallel parse + parallel rule
+// walk, and with the threading knob silently dropped, MT and ST runs of
+// `ttsc format` produced identical wall-clock numbers — the benchmark cell
+// became a non-measurement. The lint sidecar is built and shipped from this
+// repo, accepts both flags via `parseSubcommandFlags`, and threads them down
+// to `loadProgram` (parse phase) and `engine.SetSerial` (rule walk). The host
+// is identified by name (`@ttsc/lint`) so a third-party check-stage plugin
+// keeps the strict-host behavior from ad3443a; only the host we control gets
+// the bare flag. Transform-stage hosts are never reached by this path
+// (they go through `createNativeBuildArgs`), so the typia/nestia regression
+// remains pinned by `test_plugin_corpus_single_threaded_flag_does_not_break_a_native_plugin_build`.
+function createNativeCheckThreadingArgs(
+  options: TtscCommonOptions,
+  plugin: ITtscLoadedNativePlugin,
+): string[] {
+  if (!nativeHostAcceptsThreadingArgs(plugin)) return [];
+  const args: string[] = [];
+  if (options.singleThreaded === true) {
+    args.push("--singleThreaded");
+  }
+  if (options.checkers !== undefined) {
+    args.push("--checkers=" + String(options.checkers));
+  }
+  return args;
+}
+
+/**
+ * Return true when the loaded native check-stage host has declared
+ * `capabilities.threadingArgs` in its plugin descriptor.
+ *
+ * The lint sidecar (`packages/lint/src/index.ts::createTtscPlugin`) opts in
+ * because its `parseSubcommandFlags` handler accepts `--singleThreaded` and
+ * `--checkers` directly and threads them into `loadProgram` (parse phase)
+ * and `engine.SetSerial` (rule walk). Any other check-stage host that has
+ * not declared the capability is treated as a third-party binary whose flag
+ * set is unknown, matching the conservative default from commit ad3443a.
+ *
+ * The capability flag replaces the prior `plugin.name === "@ttsc/lint"`
+ * string check: routing on a descriptor field instead of the plugin name
+ * lets the next first-party check-stage plugin opt in without ttsc needing
+ * to learn its name. See `ITtscPluginCapabilities` and issue #125 for the
+ * broader CLI-parser cleanup this is the quick-win step of.
+ */
+function nativeHostAcceptsThreadingArgs(
+  plugin: ITtscLoadedNativePlugin,
+): boolean {
+  return plugin.capabilities?.threadingArgs === true;
+}
 
 /**
  * Forward the tsgo flags ttsc did not recognize to a native sidecar as one
@@ -518,7 +610,7 @@ function runNativeCheckPlugins(
   )) {
     const result = runNativePluginCommand(
       plugin,
-      createNativeCheckArgs(execution, options),
+      createNativeCheckArgs(execution, options, plugin),
       options,
       execution,
       "ttsc.check",

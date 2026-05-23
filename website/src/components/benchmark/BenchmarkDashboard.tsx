@@ -110,7 +110,7 @@ export default function BenchmarkDashboard() {
           report={report}
           op="build"
           title="Build"
-          description="Each project groups tsc (legacy) and ttsc ST/MT in one chart."
+          description="Each project groups tsc (legacy), ttsc ST/MT, and optional tsgo ST/MT in one chart."
         />
       ) : null}
       {activeTab === "check" ? (
@@ -118,7 +118,7 @@ export default function BenchmarkDashboard() {
           report={report}
           op="noEmit"
           title="Type-check"
-          description="Each project groups tsc (legacy) and ttsc ST/MT in one noEmit chart."
+          description="Each project groups tsc (legacy), ttsc ST/MT, and optional tsgo ST/MT in one noEmit chart."
         />
       ) : null}
       {activeTab === "lint" ? <LintTab report={report} /> : null}
@@ -422,6 +422,7 @@ function ProjectLintRows({
               row.baseline ? undefined : lintRatioParts(baseline.totalMs, row)
             }
             baseline={row.baseline}
+            estimated={row.estimated}
             segments={row.segments}
           />
         ))}
@@ -513,6 +514,7 @@ function StackedDurationBar({
   ratio,
   lintRatio,
   baseline,
+  estimated,
   segments,
 }: {
   label: string;
@@ -521,16 +523,20 @@ function StackedDurationBar({
   ratio?: string;
   lintRatio?: LintRatioParts;
   baseline?: boolean;
+  estimated?: boolean;
   segments: { label: string; ms: number; color: string }[];
 }) {
   const widthPct = Math.max(4, (totalMs / maxMs) * 100);
+  const labelTooltip = estimated
+    ? `${label} — estimated from MT ratio; ST lint overhead measured below the noise floor`
+    : label;
 
   return (
     <div className="py-1.5">
       <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p
           className="min-w-0 flex-1 break-all font-mono text-[11px] text-neutral-400"
-          title={label}
+          title={labelTooltip}
         >
           {label}
         </p>
@@ -631,6 +637,7 @@ interface LintRow {
   eslintMs?: number;
   lintOverheadMs?: number;
   lintFactor?: number;
+  estimated?: boolean;
 }
 
 interface LintRatioParts {
@@ -680,6 +687,21 @@ function operationRows(
       });
   }
 
+  for (const threading of ["single", "multi"] as const) {
+    const measurement = findMeasured(measurements, {
+      branch: "ttsc",
+      tool: "tsgo",
+      op,
+      threading,
+    });
+    if (measurement)
+      rows.push({
+        label: compilerCliLabel("tsgo", op, threading),
+        measurement,
+        color: threading === "single" ? "bg-violet-600" : "bg-violet-400",
+      });
+  }
+
   return rows;
 }
 
@@ -712,6 +734,14 @@ function lintRowsForProject(
       ],
     });
 
+  // Snapshot the raw per-threading numbers so we can back-fill the ST row's
+  // lint overhead from the MT ratio when the ST measurement lands below the
+  // noise floor (lint <= ttsc plain). Without the back-fill, the ST row
+  // collapses to a 0 ms overhead and downstream factor math produces
+  // `Infinity`/`NaN` in the chart.
+  const ttscByThreading: Partial<
+    Record<Threading, { plainMs: number; totalMs: number; rawOverhead: number }>
+  > = {};
   for (const threading of ["multi", "single"] as const) {
     const total = findTtscLintTotal(measurements, op, threading);
     const plainTtsc = findMeasured(measurements, {
@@ -721,27 +751,57 @@ function lintRowsForProject(
       threading,
     });
     if (!total || !plainTtsc) continue;
+    ttscByThreading[threading] = {
+      plainMs: plainTtsc.medianMs,
+      totalMs: total.medianMs,
+      rawOverhead: total.medianMs - plainTtsc.medianMs,
+    };
+  }
 
-    const rawLintOverheadMs = total.medianMs - plainTtsc.medianMs;
-    const ttscMs = Math.min(plainTtsc.medianMs, total.medianMs);
-    const lintOverheadMs = Math.max(0, rawLintOverheadMs);
+  for (const threading of ["multi", "single"] as const) {
+    const current = ttscByThreading[threading];
+    if (!current) continue;
+
+    const { plainMs, totalMs, rawOverhead } = current;
+    let lintOverheadMs = Math.max(0, rawOverhead);
+    let estimated = false;
+
+    // ST back-fill: when the single-threaded lint cost cannot be observed
+    // (overhead <= 0 in raw timings) but the multi-threaded run for the same
+    // project did record positive overhead, synthesize the ST overhead from
+    // the MT ratio:
+    //   ST_synthetic = round(ST_plain * (MT_overhead / MT_plain))
+    // The synthetic row is tagged `estimated` so the renderer can mark it
+    // as a derived figure rather than a measurement.
+    if (threading === "single" && rawOverhead <= 0) {
+      const mt = ttscByThreading.multi;
+      if (mt && mt.plainMs > 0 && mt.rawOverhead > 0) {
+        lintOverheadMs = Math.round(plainMs * (mt.rawOverhead / mt.plainMs));
+        estimated = lintOverheadMs > 0;
+      }
+    }
+
+    const ttscMs = estimated ? plainMs : Math.min(plainMs, totalMs);
+    const adjustedTotalMs = estimated ? ttscMs + lintOverheadMs : totalMs;
+    const label = estimated
+      ? "ttsc + @ttsc/lint (ST, est.)"
+      : threading === "single"
+        ? "ttsc + @ttsc/lint (ST)"
+        : "ttsc + @ttsc/lint (MT)";
+
     rows.push({
       project,
       op,
       threading,
-      label:
-        threading === "single"
-          ? "ttsc + @ttsc/lint (ST)"
-          : "ttsc + @ttsc/lint (MT)",
-      totalMs: total.medianMs,
+      label,
+      totalMs: adjustedTotalMs,
       eslintMs: eslint?.medianMs,
       lintOverheadMs,
       lintFactor:
-        eslint && rawLintOverheadMs <= 0
-          ? Infinity
-          : eslint && lintOverheadMs > 0
-            ? eslint.medianMs / lintOverheadMs
-            : undefined,
+        eslint && lintOverheadMs > 0
+          ? eslint.medianMs / lintOverheadMs
+          : undefined,
+      estimated,
       segments: [
         { label: "ttsc", ms: ttscMs, color: "bg-cyan-500" },
         {
@@ -1005,7 +1065,7 @@ function findTtscLintTotal(
 }
 
 function compilerCliLabel(
-  tool: "tsc" | "ttsc",
+  tool: "tsc" | "ttsc" | "tsgo",
   op: Operation,
   threading: Threading,
 ) {

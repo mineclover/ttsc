@@ -64,10 +64,20 @@ function hasEnabledPassthroughFlag(
   options: TtscCommonOptions,
   flag: string,
 ): boolean {
-  for (const token of options.passthrough ?? []) {
-    if (token === flag) return true;
+  const passthrough = options.passthrough ?? [];
+  for (let i = 0; i < passthrough.length; i++) {
+    const token = passthrough[i]!;
     if (token.startsWith(`${flag}=`)) {
       return token.slice(flag.length + 1).toLowerCase() !== "false";
+    }
+    if (token === flag) {
+      if (
+        i + 1 < passthrough.length &&
+        isBooleanLiteral(passthrough[i + 1]!)
+      ) {
+        return passthrough[i + 1]!.toLowerCase() !== "false";
+      }
+      return true;
     }
   }
   return false;

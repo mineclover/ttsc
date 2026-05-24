@@ -356,6 +356,9 @@ const PACKAGE_CONFIGS = {
         cmd: "pnpm run build:prisma",
         env: { TS_NODE_TRANSPILE_ONLY: "1" },
       },
+      {
+        cmd: 'pnpm exec prettier --write --ignore-path /dev/null "src/prisma/**/*.ts"',
+      },
     ]),
     cleanExcludes: [".env", "src/prisma", "src/prisma/**"],
     commands: {

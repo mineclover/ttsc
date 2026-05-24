@@ -84,6 +84,16 @@ export interface BenchmarkMeasurement {
   /** Raw per-run `@ttsc/lint` sidecar samples in milliseconds. */
   lintSamples?: number[];
   /**
+   * Median third-party transform-host wall-clock time parsed from
+   * `ttsc --diagnostics`. Present when a `ttsc-lint` check/build cell also runs
+   * source transform plugins such as typia or nestia.
+   */
+  transformHostMedianMs?: number;
+  /** Fastest measured transform-host run in milliseconds. */
+  transformHostMinMs?: number;
+  /** Raw per-run transform-host samples in milliseconds. */
+  transformHostSamples?: number[];
+  /**
    * Count of runs that hit the intermittent parallel-emit data race and were
    * retried. Absent or `0` means the cell measured cleanly.
    */
@@ -99,6 +109,10 @@ export interface BenchmarkProject {
   repo?: string;
   files: number;
   kind: string;
+  /** Installed TypeScript version in the fixture's legacy clone. */
+  typescript?: string;
+  /** Installed @typescript/native-preview version in the fixture's ttsc clone. */
+  tsgo?: string;
   measurements: BenchmarkMeasurement[];
 }
 

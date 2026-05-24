@@ -496,6 +496,11 @@ function ProjectLabel({
       <p className="mt-1 text-[11px] text-neutral-500">
         {project.files.toLocaleString()} files
       </p>
+      {project.typescript ? (
+        <p className="mt-1 break-all font-mono text-[10px] text-neutral-500">
+          legacy TS {project.typescript}
+        </p>
+      ) : null}
       <p className="mt-2 font-mono text-[11px] text-neutral-400">
         baseline: {formatDuration(baselineMs)}
       </p>
@@ -696,6 +701,7 @@ interface LintRow {
   baseline?: boolean;
   eslintMs?: number;
   lintOverheadMs?: number;
+  transformHostMs?: number;
   lintFactor?: number;
   estimated?: boolean;
   directLintTiming?: boolean;
@@ -795,10 +801,10 @@ function lintRowsForProject(
       ],
     });
 
-  // Newer runs record the @ttsc/lint sidecar's own wall-clock timing from
-  // `ttsc --diagnostics`. Older snapshots only have total ttsc-lint wall
-  // time, so keep the previous total-minus-plain fallback until the published
-  // dataset is refreshed.
+  // Newer runs record the @ttsc/lint sidecar and transform-host wall-clock
+  // timings from `ttsc --diagnostics`. Older snapshots only have total
+  // ttsc-lint wall time, so keep the previous total-minus-plain fallback until
+  // the published dataset is refreshed.
   const ttscByThreading: Partial<
     Record<
       Threading,
@@ -806,6 +812,7 @@ function lintRowsForProject(
         directLintTiming: boolean;
         lintMs: number;
         plainMs: number;
+        transformHostMs: number;
         totalMs: number;
         rawOverhead: number;
       }
@@ -828,6 +835,7 @@ function lintRowsForProject(
       directLintTiming: directLintMs !== undefined,
       lintMs: directLintMs ?? total.medianMs - plainTtsc.medianMs,
       plainMs: plainTtsc.medianMs,
+      transformHostMs: Math.max(0, total.transformHostMedianMs ?? 0),
       totalMs: total.medianMs,
       rawOverhead: total.medianMs - plainTtsc.medianMs,
     };
@@ -837,7 +845,13 @@ function lintRowsForProject(
     const current = ttscByThreading[threading];
     if (!current) continue;
 
-    const { directLintTiming, plainMs, totalMs, rawOverhead } = current;
+    const {
+      directLintTiming,
+      plainMs,
+      totalMs,
+      rawOverhead,
+      transformHostMs,
+    } = current;
     let lintOverheadMs = directLintTiming
       ? Math.max(0, current.lintMs)
       : Math.max(0, rawOverhead);
@@ -867,8 +881,11 @@ function lintRowsForProject(
       }
     }
 
+    const boundedTransformHostMs = directLintTiming
+      ? Math.min(transformHostMs, Math.max(0, totalMs - lintOverheadMs))
+      : 0;
     const ttscMs = directLintTiming
-      ? Math.max(0, totalMs - lintOverheadMs)
+      ? Math.max(0, totalMs - lintOverheadMs - boundedTransformHostMs)
       : plainMs;
     const adjustedTotalMs = directLintTiming
       ? totalMs
@@ -893,6 +910,7 @@ function lintRowsForProject(
         eslint && lintOverheadMs > 0
           ? eslint.medianMs / lintOverheadMs
           : undefined,
+      transformHostMs: boundedTransformHostMs || undefined,
       directLintTiming,
       estimated,
       segments: [
@@ -902,7 +920,14 @@ function lintRowsForProject(
           ms: lintOverheadMs,
           color: "bg-emerald-400",
         },
-      ],
+        boundedTransformHostMs > 0
+          ? {
+              label: "transform host",
+              ms: boundedTransformHostMs,
+              color: "bg-blue-500",
+            }
+          : undefined,
+      ].filter((segment): segment is LintSegment => segment !== undefined),
     });
   }
 

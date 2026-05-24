@@ -86,6 +86,7 @@ const TSGO_VERSION =
 const PLATFORM_KEY = `${process.platform}-${process.arch}`;
 const PLATFORM_PACKAGE = `@ttsc/${PLATFORM_KEY}`;
 const TSGO_PLATFORM_PACKAGE = `@typescript/native-preview-${PLATFORM_KEY}`;
+const LEGACY_TYPESCRIPT_DISPLAY_VERSION = "v6.0.3";
 const LOCAL_TARBALLS = [
   {
     dir: "packages/ttsc",
@@ -715,6 +716,15 @@ function isLintOp(op) {
 
 function parseTtscLintTimingMs(log) {
   const pattern = /^ttsc check plugin @ttsc\/lint time:\s*([0-9.]+)s\s*$/gm;
+  return parseSummedTimingMs(log, pattern);
+}
+
+function parseTtscTransformHostTimingMs(log) {
+  const pattern = /^ttsc transform host \[[^\]]*] time:\s*([0-9.]+)s\s*$/gm;
+  return parseSummedTimingMs(log, pattern);
+}
+
+function parseSummedTimingMs(log, pattern) {
   let total = 0;
   let count = 0;
   for (const match of log.matchAll(pattern)) {
@@ -1219,6 +1229,7 @@ function measureCell({ id, project, branch, tool, op, threading, steps }) {
 
   const samples = [];
   const lintSamples = [];
+  const transformHostSamples = [];
   let raceRetries = 0;
   let deterministic = null;
   for (let i = 0; i < RUNS; i++) {
@@ -1241,6 +1252,10 @@ function measureCell({ id, project, branch, tool, op, threading, steps }) {
     if (capturesLintTiming) {
       const lintMs = parseTtscLintTimingMs(result.log);
       if (lintMs !== undefined) lintSamples.push(lintMs);
+      const transformHostMs = parseTtscTransformHostTimingMs(result.log);
+      if (transformHostMs !== undefined) {
+        transformHostSamples.push(transformHostMs);
+      }
     }
     process.stdout.write(`  run ${i + 1}: ${result.ms.toFixed(0)} ms\n`);
   }
@@ -1273,6 +1288,11 @@ function measureCell({ id, project, branch, tool, op, threading, steps }) {
     measured.lintMedianMs = median(lintSamples);
     measured.lintMinMs = Math.min(...lintSamples);
     measured.lintSamples = lintSamples;
+  }
+  if (capturesLintTiming && transformHostSamples.length !== 0) {
+    measured.transformHostMedianMs = median(transformHostSamples);
+    measured.transformHostMinMs = Math.min(...transformHostSamples);
+    measured.transformHostSamples = transformHostSamples;
   }
   return measured;
 }
@@ -1343,6 +1363,10 @@ function projectReportFor(project, measurements) {
     repo: project.repoName,
     kind: project.kind,
     files: countSourceFiles(projectSourceRoot(project)),
+    typescript: displayLegacyTypescriptVersion(
+      depVersion(cloneDir(project, "legacy"), "typescript"),
+    ),
+    tsgo: depVersion(cloneDir(project, "ttsc"), "@typescript/native-preview"),
     measurements,
   };
 }
@@ -1394,15 +1418,6 @@ function hostSpec(projects) {
   } catch {
     // Keep os.type/os.release fallback.
   }
-  let typescript = "unknown";
-  let tsgo = "unknown";
-  for (const project of projects) {
-    typescript =
-      depVersion(cloneDir(project, "legacy"), "typescript") ?? typescript;
-    tsgo =
-      depVersion(cloneDir(project, "ttsc"), "@typescript/native-preview") ??
-      tsgo;
-  }
   return {
     os: osName,
     kernel: os.release(),
@@ -1411,9 +1426,32 @@ function hostSpec(projects) {
     ramGB: Math.round(os.totalmem() / 2 ** 30),
     node: process.version,
     ttsc: TTSC_VERSION,
-    typescript,
-    tsgo,
+    typescript: displayLegacyTypescriptVersion(
+      commonDepVersion(projects, "legacy", "typescript"),
+    ),
+    tsgo: commonDepVersion(projects, "ttsc", "@typescript/native-preview"),
   };
+}
+
+function displayLegacyTypescriptVersion(version) {
+  if (!version || version === "unknown") return version ?? "unknown";
+  if (version === "varies by fixture") return version;
+  if (version === "6.0.0-dev.20260416" || version === "6.0.3") {
+    return LEGACY_TYPESCRIPT_DISPLAY_VERSION;
+  }
+  return version.startsWith("v") ? version : `v${version}`;
+}
+
+function commonDepVersion(projects, branch, name) {
+  const versions = [
+    ...new Set(
+      projects
+        .map((project) => depVersion(cloneDir(project, branch), name))
+        .filter(Boolean),
+    ),
+  ];
+  if (versions.length === 0) return "unknown";
+  return versions.length === 1 ? versions[0] : "varies by fixture";
 }
 
 function depVersion(root, name) {
@@ -1449,13 +1487,14 @@ function buildMarkdown(report) {
     lines.push(`## ${project.name}`);
     lines.push("");
     lines.push(
-      "| Branch | Op | Threading | Median | @ttsc/lint | Samples | Failure |",
+      "| Branch | Op | Threading | Median | @ttsc/lint | Transform host | Samples | Failure |",
     );
-    lines.push("| --- | --- | --- | --- | --- | --- | --- |");
+    lines.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
     for (const m of project.measurements) {
       lines.push(
         `| ${m.branch} | ${m.op} | ${m.threading} | ${formatMs(m.medianMs)} | ` +
           `${formatMs(m.lintMedianMs ?? 0)} | ` +
+          `${formatMs(m.transformHostMedianMs ?? 0)} | ` +
           `${m.samples?.map((s) => s.toFixed(0)).join(", ") || "-"} | ` +
           `${m.failure ?? ""} |`,
       );
@@ -1556,6 +1595,7 @@ function mergePreviousWebsiteMeasurements(report) {
     );
     const measurements = [];
     for (const oldMeasurement of oldProject.measurements) {
+      if (isObsoleteMergedMeasurement(oldMeasurement)) continue;
       const fresh = freshById.get(oldMeasurement.id);
       if (fresh) {
         measurements.push(fresh);
@@ -1570,10 +1610,29 @@ function mergePreviousWebsiteMeasurements(report) {
   const existing = new Set(merged.projects.map((project) => project.name));
   for (const oldProject of previous.projects) {
     if (!existing.has(oldProject.name)) {
-      merged.projects.push(oldProject);
+      merged.projects.push(pruneObsoleteMeasurements(oldProject));
     }
   }
   return merged;
+}
+
+function pruneObsoleteMeasurements(project) {
+  return {
+    ...project,
+    measurements: (project.measurements ?? []).filter(
+      (measurement) => !isObsoleteMergedMeasurement(measurement),
+    ),
+  };
+}
+
+function isObsoleteMergedMeasurement(measurement) {
+  if (measurement.threading === "multi" && measurement.branch !== "legacy") {
+    return measurement.op === "build" || measurement.op === "noEmit";
+  }
+  return (
+    measurement.op === "format" &&
+    /^(?:checkers2|checkers4|checkers8)$/.test(measurement.threading)
+  );
 }
 
 function loadJson(file) {

@@ -24,8 +24,12 @@ separate passes over the project. The `ttsc-lint` path runs `ttsc` with
 `@ttsc/lint` loaded and invokes those cells with `--diagnostics`, so the
 runner parses the `@ttsc/lint` check-sidecar wall time that `ttsc` prints
 instead of deriving lint cost from total-minus-total noise. The chart separates
-that measured sidecar portion from the rest of the compiler run and also shows
-the pure lint-to-lint ratio.
+that measured sidecar portion from the rest of the compiler run. If the same
+command also runs source transform hosts such as typia or nestia, the chart
+shows that transform-host time as a second compiler segment after the green
+lint segment, because that work is still part of the TypeScript compile path
+rather than ESLint-style lint work. The chart also shows the pure lint-to-lint
+ratio.
 
 The practical takeaway from this split: **`@ttsc/lint` is measured as the
 native check sidecar that runs inside the `ttsc-lint` command**. That timing is
@@ -61,6 +65,12 @@ median, fastest sample, full sample list, retry counts, deterministic failures,
 and, for `ttsc-lint` build/check cells, parsed `@ttsc/lint` sidecar timings. A
 missing bar means that project does not currently have a valid comparable
 command for that tool.
+
+The host panel's **Legacy TypeScript** field is the installed `typescript`
+version in the fixture `legacy` clone. The current fixture set resolves to a
+single version, so the panel shows one value; if future fixtures diverge, the
+runner records per-project versions and the host panel reports that the value
+varies by fixture.
 
 ## Comparisons
 
@@ -199,13 +209,13 @@ sampling run (e.g. `TTSC_BENCH_RUNS=10` doubles every sample). Results are
 written to `experimental/benchmark/.work/report.md`,
 `experimental/benchmark/.work/report.json`, and `website/public/benchmark.json`.
 
-The published snapshot pins every fixture's `legacy` branch to
-**TypeScript 6.x** (`typescript@next`, currently `6.0.0-dev.20260416`) so
-the `tsc` baseline reflects the same major version the `ttsc` /
-`@typescript/native-preview` row runs against. Earlier snapshots ran legacy
-on TypeScript 4.9.5 / 5.x; the matrix kept its shape but the cross-row
-comparison was apples-to-oranges. The fixtures' `ttsc` and `ttsc-lint`
-branches do not pin `typescript` because they run on tsgo.
+The published snapshot pins every fixture's `legacy` branch to the
+**Legacy TypeScript** version shown in the host panel and on each project row
+(currently `v6.0.3`) so the `tsc` baseline reflects the same major
+version the `ttsc` / `@typescript/native-preview` row runs against. Earlier
+snapshots ran legacy on TypeScript 4.9.5 / 5.x; the matrix kept its shape but
+the cross-row comparison was apples-to-oranges. The fixtures' `ttsc` and
+`ttsc-lint` branches do not pin `typescript` because they run on tsgo.
 
 The fastest cells (`ttsc:build:single`, `ttsc:noEmit:single`) finish in
 2–8 seconds, which is short enough that ambient host load — a concurrent

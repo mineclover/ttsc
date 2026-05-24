@@ -662,11 +662,48 @@ function transformHostTimingLabel(
  * single token so the sidecars' unknown-flag filters keep it intact.
  */
 function createNativeTsgoArgs(options: TtscCommonOptions): string[] {
-  const passthrough = options.passthrough;
+  const passthrough = nativeTsgoPassthroughArgs(options);
   if (passthrough === undefined || passthrough.length === 0) {
     return [];
   }
   return ["--tsgo-args=" + JSON.stringify(passthrough)];
+}
+
+function nativeTsgoPassthroughArgs(
+  options: TtscCommonOptions,
+): readonly string[] | undefined {
+  const passthrough = options.passthrough;
+  if (passthrough === undefined) return undefined;
+  const out: string[] = [];
+  for (let i = 0; i < passthrough.length; i++) {
+    const token = passthrough[i]!;
+    if (isDiagnosticsPassthroughFlag(token)) {
+      if (
+        !token.includes("=") &&
+        i + 1 < passthrough.length &&
+        isBooleanLiteral(passthrough[i + 1]!)
+      ) {
+        i++;
+      }
+      continue;
+    }
+    out.push(token);
+  }
+  return out;
+}
+
+function isDiagnosticsPassthroughFlag(token: string): boolean {
+  return (
+    token === "--diagnostics" ||
+    token.startsWith("--diagnostics=") ||
+    token === "--extendedDiagnostics" ||
+    token.startsWith("--extendedDiagnostics=")
+  );
+}
+
+function isBooleanLiteral(token: string): boolean {
+  const normalized = token.toLowerCase();
+  return normalized === "true" || normalized === "false";
 }
 
 /**

@@ -37,8 +37,10 @@ A **cell** is one `(project, branch, tool, op, threading)` measurement.
   - `ttsc-lint` — `ttsc` with `@ttsc/lint` folded into the compile pass
 - **Ops**: `build` (emit), `noEmit` (type-check only), `eslint` (legacy only),
   `format` (legacy `prettier --check` vs `ttsc format`).
-- **Threading**: `multi` (ttsc default) and `single` (`--singleThreaded`).
-  Legacy cells and `eslint` cells are `multi` only.
+- **Threading**: compiler and lint cells use `single` (`--singleThreaded`)
+  plus `checkers2` / `checkers4` / `checkers8` (`--checkers N`). Legacy cells
+  and `eslint` cells are `multi` only. Format keeps `single` plus the bare
+  default `multi` row because `--checkers N` does not control formatter work.
 - **Tool resolution** (set per cell, recorded in the report):
   - legacy → `tsc`, `eslint`, or `prettier` depending on op
   - ttsc → `ttsc`; raw `@typescript/native-preview` is also measured as a
@@ -108,8 +110,10 @@ Per-project commands, install/prepare overrides, and prerequisites live in
   Go runtime warmup) then `RUNS` measured passes. The **median** is the
   reported time; `min` and the full sample list are kept in JSON.
 - `ttsc-lint` build/check cells add `--diagnostics` and parse
-  `ttsc check plugin @ttsc/lint time` from stdout, so the dashboard can show the
-  lint sidecar's own wall-clock cost instead of subtracting plain `ttsc` totals.
+  `ttsc check plugin @ttsc/lint time` plus any
+  `ttsc transform host [...] time` lines from stdout. The dashboard can then
+  show the lint sidecar's own wall-clock cost and plugin-heavy transform-host
+  cost instead of subtracting plain `ttsc` totals.
 - Plugin binaries are built by `ttsc prepare` during setup, never during a
   measured run, so compiler timings do not include plugin build time.
 - Non-zero exits are classified from captured output. A `race` (TypeScript-Go

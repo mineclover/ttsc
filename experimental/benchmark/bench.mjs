@@ -382,12 +382,31 @@ const PACKAGE_CONFIGS = {
   },
 };
 
+// Display fixtures by upstream GitHub stars (checked 2026-05-24), so the
+// dashboard starts with the projects readers are most likely to recognize.
+const PROJECT_ORDER_BY_STARS = [
+  "vscode",
+  "nestjs",
+  "vue",
+  "zod",
+  "typeorm",
+  "rxjs",
+  "type-fest",
+  "shopping-backend",
+];
+
 const PROJECTS = Object.entries(PACKAGE_CONFIGS)
   .filter(([, config]) => !config.disabled)
   .map(([name, config]) => ({
     name,
     ...config,
-  }));
+  }))
+  .sort((a, b) => projectSortRank(a.name) - projectSortRank(b.name));
+
+function projectSortRank(name) {
+  const index = PROJECT_ORDER_BY_STARS.indexOf(name);
+  return index === -1 ? PROJECT_ORDER_BY_STARS.length : index;
+}
 
 const projectSelection = [...projectArgs, ...positional];
 const wantedProjects = projectSelection.length
@@ -940,13 +959,10 @@ function installIfNeeded(project, dir, branch) {
         `Reusing installed node_modules in ${path.basename(dir)}\n`,
       );
     }
-    if (
-      branch === "ttsc" &&
-      hasTsgoCells(project) &&
-      !hasTsgoExperimentDeps(dir)
-    )
-      installTsgoExperimentDeps(project, dir);
     if (mustRefreshTarballs) installLocalTarballs(project, dir, branch);
+    if (mustRefreshTarballs && !hasPinnedTsgoRuntimeDeps(dir)) {
+      installPinnedTsgoRuntimeDeps(project, dir);
+    }
   });
 }
 
@@ -1213,7 +1229,7 @@ function hasTsgoCells(project) {
   );
 }
 
-function installTsgoExperimentDeps(project, dir) {
+function installPinnedTsgoRuntimeDeps(project, dir) {
   const specs = [
     `@typescript/native-preview@${TSGO_VERSION}`,
     `${TSGO_PLATFORM_PACKAGE}@${TSGO_VERSION}`,
@@ -1234,16 +1250,17 @@ function installTsgoExperimentDeps(project, dir) {
         ? `YARN_CACHE_FOLDER=.yarn-cache yarn add --dev --force --update-checksums --ignore-engines --ignore-workspace-root-check ${specs}`
         : `npm install --legacy-peer-deps --ignore-scripts --save-dev ${specs}`;
   process.stdout.write(
-    `Installing tsgo experiment deps into ${path.basename(dir)}: ` +
-      `@typescript/native-preview, ${TSGO_PLATFORM_PACKAGE}\n`,
+    `Installing pinned tsgo runtime deps into ${path.basename(dir)}: ` +
+      `@typescript/native-preview@${TSGO_VERSION}, ` +
+      `${TSGO_PLATFORM_PACKAGE}@${TSGO_VERSION}\n`,
   );
   withDependencyFileSnapshot(dir, () => sh(cmd, dir));
 }
 
-function hasTsgoExperimentDeps(dir) {
+function hasPinnedTsgoRuntimeDeps(dir) {
   return (
-    depVersion(dir, "@typescript/native-preview") !== undefined &&
-    depVersion(dir, TSGO_PLATFORM_PACKAGE) !== undefined
+    depVersion(dir, "@typescript/native-preview") === TSGO_VERSION &&
+    depVersion(dir, TSGO_PLATFORM_PACKAGE) === TSGO_VERSION
   );
 }
 

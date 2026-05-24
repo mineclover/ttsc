@@ -17,8 +17,10 @@ npx ttsx src/index.ts
 Type errors stop execution. So do `@ttsc/lint` errors (warnings don't).
 
 Projects that enable `allowImportingTsExtensions` are supported. During the
-cached runtime emit, `ttsx` rewrites relative `.ts`, `.mts`, and `.cts` import
+runtime emit, `ttsx` rewrites relative `.ts`, `.mts`, and `.cts` import
 specifiers to the matching JavaScript extensions so Node can execute the output.
+The emitted JavaScript lives in a per-run cache directory and is removed after
+the script exits.
 
 ## Pass arguments to the script
 
@@ -91,7 +93,10 @@ If you currently use `tsx`: switching is one command; ergonomics are the same.
 
 `ttsx` uses the same `tsconfig.json` and plugins as `ttsc`. If a lint or check plugin reports an error, the script never runs. Transform plugins rewrite the code before it executes.
 
-Compiled JavaScript is cached so the second run of the same script is fast. Use `--cache-dir` to override the location, or `npx ttsc clean` to wipe the cache.
+Compiled JavaScript is temporary and cleaned after the script exits. Source
+plugin binaries still use the shared ttsc plugin cache, so repeated runs do not
+rebuild unchanged Go sidecars. Use `--cache-dir` to override the cache root, or
+`npx ttsc clean` to wipe cached plugin binaries.
 
 ## See also
 

@@ -24,8 +24,9 @@ import {
  *
  * 1. Copy `go-source-plugin` and create a separate `driverCwd`.
  * 2. Run ttsx from `driverCwd` with `--cwd <root> --cache-dir .ttsx-cache`.
- * 3. Assert zero exit, stdout `"PLUGIN"`, cache under `<root>/.ttsx-cache/`, and
- *    no cache under `<driverCwd>/.ttsx-cache/`.
+ * 3. Assert zero exit, stdout `"PLUGIN"`, plugin cache under
+ *    `<root>/.ttsx-cache/`, cleaned project output, and no cache under
+ *    `<driverCwd>/.ttsx-cache/`.
  */
 export const test_plugin_corpus_ttsx_relative_cache_dir_builds_source_plugin_under_cwd_option =
   () => {
@@ -44,7 +45,9 @@ export const test_plugin_corpus_ttsx_relative_cache_dir_builds_source_plugin_und
 
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout.trim(), "PLUGIN");
-    assert.equal(fs.existsSync(path.join(root, cacheDir, "project")), true);
+    const projectCache = path.join(root, cacheDir, "project");
+    assert.equal(fs.existsSync(projectCache), true);
+    assert.deepEqual(fs.readdirSync(projectCache), []);
     assert.equal(fs.existsSync(path.join(root, cacheDir, "plugins")), true);
     assert.equal(
       fs.existsSync(path.join(driverCwd, cacheDir, "project")),

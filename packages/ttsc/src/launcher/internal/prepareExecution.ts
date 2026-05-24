@@ -25,6 +25,7 @@ export function prepareExecution(
     project?: string;
   } = {},
 ): {
+  cleanupDir: string;
   emitDir: string;
   entryFile: string;
   moduleKind: "cjs" | "esm";
@@ -46,6 +47,7 @@ export function prepareExecution(
   }
   const output = fs.readFileSync(emittedEntry, "utf8");
   return {
+    cleanupDir: context.processDir,
     emitDir: context.emitDir,
     entryFile: emittedEntry,
     moduleKind: looksLikeESM(output) ? "esm" : "cjs",

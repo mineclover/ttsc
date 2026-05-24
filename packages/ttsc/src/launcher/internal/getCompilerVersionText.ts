@@ -1,8 +1,8 @@
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
 import { resolveTsgo } from "../../compiler/internal/resolveTsgo";
+import { outputText, spawnNative } from "../../compiler/internal/spawnNative";
 import type { TtscCommonOptions } from "../../structures/internal/TtscCommonOptions";
 
 /** Format the CLI version banner from the wrapper package and resolved tsgo. */
@@ -10,10 +10,9 @@ export function getCompilerVersionText(
   options: TtscCommonOptions = {},
 ): string {
   const tsgo = resolveTsgo(options);
-  const res = spawnSync(tsgo.binary, ["--version"], {
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 16,
-    windowsHide: true,
+  const res = spawnNative(tsgo.binary, ["--version"], {
+    cwd: options.cwd,
+    env: { ...process.env, ...options.env },
   });
   if (res.error || res.status !== 0) {
     throw new Error(
@@ -21,14 +20,6 @@ export function getCompilerVersionText(
     );
   }
   return `ttsc ${readOwnPackageVersion()} (${outputText(res.stdout).trim()})`;
-}
-
-/** Coerce a spawnSync stdio field (string | Buffer | null) to a plain string. */
-function outputText(value: string | Buffer | null | undefined): string {
-  if (value == null) {
-    return "";
-  }
-  return typeof value === "string" ? value : value.toString("utf8");
 }
 
 /**

@@ -35,6 +35,11 @@ var ErrFrameTooLarge = errors.New("lsp: frame body exceeds maximum size")
 // editor traffic while still capping attacker-supplied lengths.
 const MaxFrameBytes = 64 << 20
 
+// MaxHeaderBytes caps the LSP header block to 64 KiB. Real LSP traffic carries
+// only Content-Length plus occasional Content-Type, so anything larger is a
+// malformed peer rather than useful protocol data.
+const MaxHeaderBytes = 64 << 10
+
 // FrameReader decodes Content-Length-framed JSON-RPC messages from r. It
 // is intentionally permissive about extra headers (we forward whatever the
 // peer sent) and strict about the Content-Length value because tsgo's
@@ -56,13 +61,27 @@ func (fr *FrameReader) Read() (headers string, body []byte, err error) {
   var headerBuf strings.Builder
   contentLength := -1
   for {
-    line, lineErr := fr.br.ReadString('\n')
-    if lineErr != nil {
-      if lineErr == io.EOF && headerBuf.Len() == 0 && line == "" {
+    var lineBuf strings.Builder
+    for {
+      chunk, lineErr := fr.br.ReadSlice('\n')
+      if len(chunk) != 0 {
+        if headerBuf.Len()+lineBuf.Len()+len(chunk) > MaxHeaderBytes {
+          return "", nil, fmt.Errorf("%w (header got more than %d bytes)", ErrFrameTooLarge, MaxHeaderBytes)
+        }
+        lineBuf.Write(chunk)
+      }
+      if lineErr == nil {
+        break
+      }
+      if errors.Is(lineErr, bufio.ErrBufferFull) {
+        continue
+      }
+      if lineErr == io.EOF && headerBuf.Len() == 0 && lineBuf.Len() == 0 {
         return "", nil, ErrFrameClosed
       }
       return "", nil, fmt.Errorf("lsp: header read: %w", lineErr)
     }
+    line := lineBuf.String()
     trimmed := strings.TrimRight(line, "\r\n")
     if trimmed == "" {
       break

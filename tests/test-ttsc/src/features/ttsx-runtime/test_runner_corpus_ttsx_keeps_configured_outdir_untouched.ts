@@ -14,7 +14,7 @@ import path from "node:path";
  * 1. Create a project with an existing `dist/keep.txt` and a custom cache dir.
  * 2. Run ttsx with `--cache-dir`.
  * 3. Assert `dist/keep.txt` is unchanged, no `.js` or `package.json` appeared in
- *    `dist/`, and the cache directory was created.
+ *    `dist/`, and the per-run cache output was cleaned.
  */
 export const test_runner_corpus_ttsx_keeps_configured_outdir_untouched = () => {
   const root = TestProject.createProject({
@@ -49,5 +49,7 @@ export const test_runner_corpus_ttsx_keeps_configured_outdir_untouched = () => {
   );
   assert.equal(fs.existsSync(path.join(root, "dist", "main.js")), false);
   assert.equal(fs.existsSync(path.join(root, "dist", "package.json")), false);
-  assert.equal(fs.existsSync(path.join(cacheDir, "project")), true);
+  const projectCache = path.join(cacheDir, "project");
+  assert.equal(fs.existsSync(projectCache), true);
+  assert.deepEqual(fs.readdirSync(projectCache), []);
 };

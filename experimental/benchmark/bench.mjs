@@ -877,12 +877,19 @@ function installLocalTarballs(project, dir, branch) {
       .map((target) => quote(path.join(TGZ, target.file)))
       .join(" ");
     const pm = project.packageManager;
+    // `--config.minimumReleaseAge=0` keeps the just-bumped ttsc release from
+    // tripping a fixture's npm-hygiene policy. The vue workspace pins
+    // `minimumReleaseAge: 1440` (24 h) in its `pnpm-workspace.yaml`; without
+    // the override pnpm refuses to resolve `optionalDependencies` like
+    // `@ttsc/win32-x64@0.13.0` for ~24 h after publish and the local tarball
+    // install fails. The bench is the publisher's own canonical signal, so
+    // the policy carries no value here.
     const cmd =
       project.installTarballsCommand?.(specs) ??
       (pm === "pnpm"
         ? ownsPnpmWorkspace(dir)
-          ? `pnpm add -w -D ${specs}`
-          : `pnpm add --ignore-workspace -D ${specs}`
+          ? `pnpm add -w -D --config.minimumReleaseAge=0 ${specs}`
+          : `pnpm add --ignore-workspace -D --config.minimumReleaseAge=0 ${specs}`
         : pm === "yarn"
           ? `YARN_CACHE_FOLDER=.yarn-cache yarn add --dev --force --update-checksums --ignore-engines --ignore-workspace-root-check ${specs}`
           : `npm install --legacy-peer-deps --save-dev ${specs}`);
@@ -971,9 +978,19 @@ function rewritePackageJsonTarballs(file, specs) {
 function rewriteTextTarballs(file, targets) {
   let text = fs.readFileSync(file, "utf8");
   let changed = false;
+  // Match any historical ttsc tarball reference for this target — not just
+  // the current `{stem}-{TTSC_VERSION}.tgz` file name. After a version bump
+  // (e.g. 0.12.4 -> 0.13.0) the pack pid changes and the new tarball ships
+  // under a new file name, so a stale `pnpm-workspace.yaml` override left
+  // by an earlier prepared clone (the vue fixture pins
+  // `'@ttsc/linux-x64'` through `overrides`) would otherwise survive the
+  // scrub and pnpm would fail to open the now-deleted `/tmp/ttsc-tgz-OLD/`
+  // path with ENOENT (exit 254). Pin the stem so `ttsc-` and
+  // `ttsc-linux-x64-` do not cross-rewrite.
   for (const target of targets) {
+    const stem = target.file.replace(/-\d+\.\d+\.\d+\.tgz$/, "");
     const pattern = new RegExp(
-      `(?:file:)?[^\\s'",}]*ttsc-tgz[^\\s'",}]*/${escapeRegExp(target.file)}`,
+      `(?:file:)?[^\\s'",}]*ttsc-tgz[^\\s'",}]*/${escapeRegExp(stem)}-\\d+\\.\\d+\\.\\d+\\.tgz`,
       "g",
     );
     const next = text.replace(pattern, `file:${path.join(TGZ, target.file)}`);
@@ -1044,11 +1061,15 @@ function installTsgoExperimentDeps(project, dir) {
     .map(quote)
     .join(" ");
   const pm = project.packageManager;
+  // Mirror `installLocalTarballs` and bypass any fixture-side
+  // `minimumReleaseAge` policy. tsgo dev tags publish on a daily-ish cadence
+  // and the bench should always pin to whatever ttsc's workspace resolves,
+  // not what an old enough mirror happens to expose.
   const cmd =
     pm === "pnpm"
       ? ownsPnpmWorkspace(dir)
-        ? `pnpm add -w -D ${specs}`
-        : `pnpm add --ignore-workspace --virtual-store-dir node_modules/.pnpm -D ${specs}`
+        ? `pnpm add -w -D --config.minimumReleaseAge=0 ${specs}`
+        : `pnpm add --ignore-workspace --virtual-store-dir node_modules/.pnpm -D --config.minimumReleaseAge=0 ${specs}`
       : pm === "yarn"
         ? `YARN_CACHE_FOLDER=.yarn-cache yarn add --dev --force --update-checksums --ignore-engines --ignore-workspace-root-check ${specs}`
         : `npm install --legacy-peer-deps --ignore-scripts --save-dev ${specs}`;
@@ -1084,6 +1105,45 @@ function singleThreadedSteps(steps) {
     }
     return { ...step, cmd: `${step.cmd} --singleThreaded` };
   });
+}
+
+/**
+ * Append `--checkers N` to every ttsc/tsgo step in the cell. Used to sweep
+ * the checker-pool size axis (2 / 4 / 8) replacing the previous binary
+ * single/multi axis. Parse and the lint engine still run with the host's
+ * full CPU count; only the type-checker pool is capped.
+ */
+function checkersSteps(steps, n) {
+  return steps.map((step) => {
+    if (
+      !/\b(?:ttsc|tsgo)\b/.test(step.cmd) ||
+      /--checkers\b/.test(step.cmd)
+    ) {
+      return step;
+    }
+    return { ...step, cmd: `${step.cmd} --checkers ${n}` };
+  });
+}
+
+/**
+ * Threading variants the bench measures for every ttsc / ttsc-lint /
+ * ttsc:tsgo cell. Order is the spec the user asked for: serial baseline
+ * first, then the 2/4/8 checker-pool sweep, so the dashboard rows read
+ * left-to-right as `single → checkers2 → checkers4 → checkers8`.
+ *
+ * Returned by a function rather than a top-level `const` so the call
+ * sites (`projectCells`, invoked from `main()` near the top of the
+ * file) hit a defined value — top-level statements run top-to-bottom,
+ * and `main();` is at line ~414 while the variant helpers below sit
+ * past line 1000.
+ */
+function threadingVariants() {
+  return [
+    { name: "single", apply: (steps) => singleThreadedSteps(steps) },
+    { name: "checkers2", apply: (steps) => checkersSteps(steps, 2) },
+    { name: "checkers4", apply: (steps) => checkersSteps(steps, 4) },
+    { name: "checkers8", apply: (steps) => checkersSteps(steps, 8) },
+  ];
 }
 
 function measureCell({ id, project, branch, tool, op, threading, steps }) {
@@ -1616,6 +1676,11 @@ function projectCells(project) {
       const baseSteps = branchCommands[op];
       if (!baseSteps?.length) continue;
       if (branch === "legacy" || op === "eslint") {
+        // Legacy compilers and the ESLint pass do not vary by ttsc's
+        // threading axis. Keep the cell at `threading: "multi"` (its
+        // natural default — uncapped CPU use) so the dashboard's legacy
+        // baseline lookups (`branch: "legacy", threading: "multi"`) keep
+        // resolving without a separate schema-cutover step.
         cells.push({
           id: `${project.name}:${branch}:${op}:multi`,
           project,
@@ -1625,45 +1690,32 @@ function projectCells(project) {
           steps: baseSteps,
         });
       } else {
-        cells.push({
-          id: `${project.name}:${branch}:${op}:multi`,
-          project,
-          branch,
-          op,
-          threading: "multi",
-          steps: baseSteps,
-        });
-        cells.push({
-          id: `${project.name}:${branch}:${op}:single`,
-          project,
-          branch,
-          op,
-          threading: "single",
-          steps: singleThreadedSteps(baseSteps),
-        });
+        for (const variant of threadingVariants()) {
+          cells.push({
+            id: `${project.name}:${branch}:${op}:${variant.name}`,
+            project,
+            branch,
+            op,
+            threading: variant.name,
+            steps: variant.apply(baseSteps),
+          });
+        }
       }
       if (branch === "ttsc" && (op === "build" || op === "noEmit")) {
         const tsgoSteps =
           branchCommands[op === "build" ? "tsgoBuild" : "tsgoNoEmit"];
         if (tsgoSteps?.length) {
-          cells.push({
-            id: `${project.name}:${branch}:tsgo:${op}:multi`,
-            project,
-            branch,
-            tool: "tsgo",
-            op,
-            threading: "multi",
-            steps: tsgoSteps,
-          });
-          cells.push({
-            id: `${project.name}:${branch}:tsgo:${op}:single`,
-            project,
-            branch,
-            tool: "tsgo",
-            op,
-            threading: "single",
-            steps: singleThreadedSteps(tsgoSteps),
-          });
+          for (const variant of threadingVariants()) {
+            cells.push({
+              id: `${project.name}:${branch}:tsgo:${op}:${variant.name}`,
+              project,
+              branch,
+              tool: "tsgo",
+              op,
+              threading: variant.name,
+              steps: variant.apply(tsgoSteps),
+            });
+          }
         }
       }
     }

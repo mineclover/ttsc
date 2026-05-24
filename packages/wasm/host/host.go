@@ -13,6 +13,7 @@ import (
   "fmt"
   "os"
   "runtime"
+  "sync"
   "sync/atomic"
   "syscall/js"
   "time"
@@ -294,6 +295,9 @@ func stringProp(obj js.Value, key string) string {
 // supported on the wasm target. The temp-file approach works because the
 // MemFS shim implements file open/write/read.
 func runWithCapturedIO(task func() int) APIResult {
+  captureMu.Lock()
+  defer captureMu.Unlock()
+
   prevOut, prevErr := os.Stdout, os.Stderr
   // The defer is a safety net: if an early return skips the explicit restore
   // below, os.Stdout/os.Stderr are still restored. The explicit restore that
@@ -329,6 +333,12 @@ func runWithCapturedIO(task func() int) APIResult {
     }
     return APIResult{Code: task()}
   }
+  defer func() {
+    _ = outFile.Close()
+    _ = errFile.Close()
+    _ = os.Remove(stdoutPath)
+    _ = os.Remove(stderrPath)
+  }()
 
   os.Stdout = outFile
   os.Stderr = errFile
@@ -361,3 +371,8 @@ func runWithCapturedIO(task func() int) APIResult {
 // overlap (multiple goroutines could be in runWithCapturedIO concurrently
 // from independent JS callers).
 var captureCounter atomic.Uint64
+
+// captureMu serializes temporary replacement of package-global stdout/stderr.
+// The temp filenames are unique, but os.Stdout/os.Stderr themselves are shared
+// process state in the wasm runtime.
+var captureMu sync.Mutex

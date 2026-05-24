@@ -64,7 +64,6 @@ func newRewriter(prog *driver.Program) *rewriter {
   for _, file := range files {
     name := normalizePath(file.FileName())
     out.sourceFiles[name] = name
-    out.sourceFiles[stripKnownSourceExtension(name)] = name
   }
   if options.Paths != nil {
     for key, targets := range options.Paths.Entries() {
@@ -200,16 +199,13 @@ func (r *rewriter) resolveSource(specifier string) (string, bool) {
 }
 
 // lookupSource checks whether candidate (a normalized path, possibly without
-// extension) corresponds to a known source file. It tries the exact path, the
-// extension-stripped stem, stem with each TS extension, and index files.
+// extension) corresponds to a known source file. It tries the exact path, stem
+// with each TS extension, and index files.
 func (r *rewriter) lookupSource(candidate string) (string, bool) {
   if source, ok := r.sourceFiles[normalizePath(candidate)]; ok {
     return source, true
   }
   stem := stripKnownSourceExtension(normalizePath(candidate))
-  if source, ok := r.sourceFiles[stem]; ok {
-    return source, true
-  }
   for _, ext := range []string{".ts", ".tsx", ".mts", ".cts"} {
     if source, ok := r.sourceFiles[stem+ext]; ok {
       return source, true

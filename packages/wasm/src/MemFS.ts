@@ -231,6 +231,10 @@ function errnoForCode(code: string): number {
       return -20;
     case "EISDIR":
       return -21;
+    case "EINVAL":
+      return -22;
+    case "ESPIPE":
+      return -29;
     default:
       return -1;
   }
@@ -402,14 +406,15 @@ export function createMemFS(): IMemFSHost {
   function writeFile(p: string, data: string | Uint8Array): void {
     const norm = normalize(p);
     ensureParentDirs(norm);
-    const bytes = typeof data === "string" ? encoder.encode(data) : data;
+    const bytes =
+      typeof data === "string" ? encoder.encode(data) : new Uint8Array(data);
     nodes.set(norm, { kind: "file", data: bytes, mtimeMs: Date.now() });
   }
 
   function readFile(p: string): Uint8Array | null {
     const node = nodes.get(normalize(p));
     if (!node || node.kind !== "file") return null;
-    return node.data;
+    return new Uint8Array(node.data);
   }
 
   function readFileText(p: string): string | null {

@@ -47,11 +47,9 @@ func TestRewriterHelpersCoverResolutionEdges(t *testing.T) {
       src + "/main.ts":           src + "/main.ts",
       src + "/extra.ts":          src + "/extra.ts",
       src + "/lib/message.ts":    src + "/lib/message.ts",
-      src + "/lib/message":       src + "/lib/message.ts",
       src + "/exact.ts":          src + "/exact.ts",
       src + "/pkg/tool/index.ts": src + "/pkg/tool/index.ts",
       root + "/outside.ts":       root + "/outside.ts",
-      root + "/outside":          root + "/outside.ts",
     },
   }
 

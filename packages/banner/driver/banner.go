@@ -2,15 +2,23 @@ package banner
 
 import (
   "bytes"
+  "context"
   "encoding/json"
   "fmt"
   "os"
   "os/exec"
   "path/filepath"
+  "runtime"
   "strings"
+  "time"
 
   "github.com/samchon/ttsc/packages/ttsc/driver"
 )
+
+// configLoaderTimeout caps subprocesses that evaluate user-supplied banner
+// config files. This matches the strip/lint loaders so a hanging config does
+// not block the compiler indefinitely.
+const configLoaderTimeout = 60 * time.Second
 
 func init() {
   driver.RegisterPlugin(plugin{})
@@ -296,8 +304,18 @@ const { pathToFileURL } = require("node:url");
 
 (async () => {
   const mod = await import(pathToFileURL(process.argv[1]).href);
-  const candidate = Object.prototype.hasOwnProperty.call(mod, "default") ? mod.default : mod;
-  const value = typeof candidate === "function" ? await candidate() : candidate;
+  let current = Object.prototype.hasOwnProperty.call(mod, "default") ? mod.default : mod;
+  for (let i = 0; i < 8; i++) {
+    if (current !== null && typeof current === "object" && typeof current.text === "string") {
+      break;
+    }
+    if (current !== null && typeof current === "object" && Object.prototype.hasOwnProperty.call(current, "default")) {
+      current = current.default;
+      continue;
+    }
+    break;
+  }
+  const value = typeof current === "function" ? await current() : current;
   process.stdout.write(JSON.stringify(toSerializableBanner(value)));
 })().catch((error) => {
   process.stderr.write(error && error.stack ? error.stack : String(error));
@@ -315,10 +333,15 @@ function toSerializableBanner(value) {
   if node == "" {
     node = "node"
   }
-  cmd := exec.Command(node, "-e", script, location)
+  ctx, cancel := context.WithTimeout(context.Background(), configLoaderTimeout)
+  defer cancel()
+  cmd := exec.CommandContext(ctx, node, "-e", script, location)
   cmd.Env = nodeConfigLoaderEnv(location)
   output, err := cmd.Output()
   if err != nil {
+    if ctx.Err() == context.DeadlineExceeded {
+      return nil, fmt.Errorf("@ttsc/banner: load config file %s: timed out after %s", location, configLoaderTimeout)
+    }
     stderr := ""
     if exit, ok := err.(*exec.ExitError); ok {
       stderr = strings.TrimSpace(string(exit.Stderr))
@@ -376,10 +399,15 @@ func loadBannerTypeScriptConfigFile(location string) (any, error) {
   }
   args = append(args, loader)
 
-  cmd := ttsxCommand(args...)
+  ctx, cancel := context.WithTimeout(context.Background(), configLoaderTimeout)
+  defer cancel()
+  cmd := ttsxCommandContext(ctx, args...)
   cmd.Env = nodeConfigLoaderEnv(location)
   output, err := cmd.Output()
   if err != nil {
+    if ctx.Err() == context.DeadlineExceeded {
+      return nil, fmt.Errorf("@ttsc/banner: load TypeScript config file %s: timed out after %s", location, configLoaderTimeout)
+    }
     stderr := ""
     if exit, ok := err.(*exec.ExitError); ok {
       stderr = strings.TrimSpace(string(exit.Stderr))
@@ -431,8 +459,11 @@ try {
 }
 
 async function resolveConfig(value: unknown): Promise<unknown> {
-  let current = value;
+  let current = isObject(value) && hasOwn(value, "default") ? value.default : value;
   for (let i = 0; i < 8; i++) {
+    if (isBannerObject(current)) {
+      break;
+    }
     if (isObject(current) && hasOwn(current, "default")) {
       current = current.default;
       continue;
@@ -447,6 +478,10 @@ async function resolveConfig(value: unknown): Promise<unknown> {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
+}
+
+function isBannerObject(value: unknown): value is { text: string } {
+  return isObject(value) && typeof value.text === "string";
 }
 
 function hasOwn(value: Record<string, unknown>, key: string): boolean {
@@ -490,6 +525,11 @@ func typeScriptConfigLoaderTsconfig(loader, location, outDir string) string {
 // When TTSC_TTSX_BINARY has a script extension (.js, .ts, …) the binary is
 // invoked via the Node runtime so it is executed correctly on all platforms.
 func ttsxCommand(args ...string) *exec.Cmd {
+  return ttsxCommandContext(context.Background(), args...)
+}
+
+// ttsxCommandContext is the timeout-aware variant used by config loaders.
+func ttsxCommandContext(ctx context.Context, args ...string) *exec.Cmd {
   ttsx := os.Getenv("TTSC_TTSX_BINARY")
   if ttsx == "" {
     ttsx = "ttsx"
@@ -499,9 +539,9 @@ func ttsxCommand(args ...string) *exec.Cmd {
     if node == "" {
       node = "node"
     }
-    return exec.Command(node, append([]string{ttsx}, args...)...)
+    return exec.CommandContext(ctx, node, append([]string{ttsx}, args...)...)
   }
-  return exec.Command(ttsx, args...)
+  return exec.CommandContext(ctx, ttsx, args...)
 }
 
 // shouldRunTtsxThroughNode reports whether binary has a script file extension
@@ -541,8 +581,25 @@ func linkNearestNodeModules(tempDir, sourceDir string) error {
     return nil
   }
   link := filepath.Join(tempDir, "node_modules")
-  if err := os.Symlink(nodeModules, link); err != nil {
-    return fmt.Errorf("@ttsc/banner: link config node_modules %s: %w", nodeModules, err)
+  err := os.Symlink(nodeModules, link)
+  if err == nil {
+    return nil
+  }
+  if runtime.GOOS == "windows" {
+    jerr := createWindowsJunction(link, nodeModules)
+    if jerr == nil {
+      return nil
+    }
+    err = fmt.Errorf("%w (junction fallback: %v)", err, jerr)
+  }
+  return fmt.Errorf("@ttsc/banner: link config node_modules %s: %w", nodeModules, err)
+}
+
+// createWindowsJunction creates a directory junction on Windows.
+func createWindowsJunction(link, target string) error {
+  cmd := exec.Command("cmd", "/c", "mklink", "/J", link, target)
+  if out, err := cmd.CombinedOutput(); err != nil {
+    return fmt.Errorf("mklink /J failed: %v: %s", err, strings.TrimSpace(string(out)))
   }
   return nil
 }

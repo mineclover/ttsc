@@ -107,6 +107,9 @@ Per-project commands, install/prepare overrides, and prerequisites live in
 - Each cell runs `WARMUP` unmeasured passes (absorbs cold filesystem cache and
   Go runtime warmup) then `RUNS` measured passes. The **median** is the
   reported time; `min` and the full sample list are kept in JSON.
+- `ttsc-lint` build/check cells add `--diagnostics` and parse
+  `ttsc check plugin @ttsc/lint time` from stdout, so the dashboard can show the
+  lint sidecar's own wall-clock cost instead of subtracting plain `ttsc` totals.
 - Plugin binaries are built by `ttsc prepare` during setup, never during a
   measured run, so compiler timings do not include plugin build time.
 - Non-zero exits are classified from captured output. A `race` (TypeScript-Go

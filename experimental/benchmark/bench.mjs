@@ -709,6 +709,24 @@ function classifyFailure(log) {
     : "error";
 }
 
+function isLintOp(op) {
+  return op === "build" || op === "noEmit";
+}
+
+function parseTtscLintTimingMs(log) {
+  const pattern = /^ttsc check plugin @ttsc\/lint time:\s*([0-9.]+)s\s*$/gm;
+  let total = 0;
+  let count = 0;
+  for (const match of log.matchAll(pattern)) {
+    const seconds = Number(match[1]);
+    if (Number.isFinite(seconds)) {
+      total += seconds * 1000;
+      count++;
+    }
+  }
+  return count === 0 ? undefined : total;
+}
+
 function packTarballs() {
   if (flags.has("--no-pack") || process.env.TTSC_BENCH_SKIP_PACK === "1") {
     process.stdout.write(`Skipping tarball pack; using ${TGZ}\n`);
@@ -1125,6 +1143,18 @@ function checkersSteps(steps, n) {
   });
 }
 
+function diagnosticsSteps(steps) {
+  return steps.map((step) => {
+    if (
+      !/\bttsc\b/.test(step.cmd) ||
+      /--(?:extendedDiagnostics|diagnostics)\b/.test(step.cmd)
+    ) {
+      return step;
+    }
+    return { ...step, cmd: `${step.cmd} --diagnostics` };
+  });
+}
+
 /**
  * Threading variants the bench measures for every ttsc / ttsc-lint /
  * ttsc:tsgo cell. Order is the spec the user asked for: serial baseline
@@ -1146,11 +1176,25 @@ function threadingVariants() {
   ];
 }
 
+/**
+ * Format does not consume the TypeScript-Go checker pool, so the checker sweep
+ * would only repeat the same `ttsc format` workload under misleading labels.
+ * Keep the meaningful formatter axis: serial execution vs the normal bare
+ * command.
+ */
+function formatThreadingVariants() {
+  return [
+    { name: "single", apply: (steps) => singleThreadedSteps(steps) },
+    { name: "multi", apply: (steps) => steps },
+  ];
+}
+
 function measureCell({ id, project, branch, tool, op, threading, steps }) {
   const root = cloneDir(project, branch);
   process.stdout.write(`\n[${id}] ${RUNS} runs\n`);
 
   const run = () => runSteps(steps, root);
+  const capturesLintTiming = branch === "ttsc-lint" && isLintOp(op);
 
   for (let i = 0; i < WARMUP; i++) {
     const result = run();
@@ -1174,6 +1218,7 @@ function measureCell({ id, project, branch, tool, op, threading, steps }) {
   }
 
   const samples = [];
+  const lintSamples = [];
   let raceRetries = 0;
   let deterministic = null;
   for (let i = 0; i < RUNS; i++) {
@@ -1193,6 +1238,10 @@ function measureCell({ id, project, branch, tool, op, threading, steps }) {
       break;
     }
     samples.push(result.ms);
+    if (capturesLintTiming) {
+      const lintMs = parseTtscLintTimingMs(result.log);
+      if (lintMs !== undefined) lintSamples.push(lintMs);
+    }
     process.stdout.write(`  run ${i + 1}: ${result.ms.toFixed(0)} ms\n`);
   }
 
@@ -1209,7 +1258,7 @@ function measureCell({ id, project, branch, tool, op, threading, steps }) {
     );
   }
 
-  return {
+  const measured = {
     id,
     branch,
     tool: toolFor(branch, op, tool),
@@ -1220,6 +1269,12 @@ function measureCell({ id, project, branch, tool, op, threading, steps }) {
     samples,
     raceRetries: raceRetries || undefined,
   };
+  if (capturesLintTiming && lintSamples.length !== 0) {
+    measured.lintMedianMs = median(lintSamples);
+    measured.lintMinMs = Math.min(...lintSamples);
+    measured.lintSamples = lintSamples;
+  }
+  return measured;
 }
 
 function failedMeasurement(
@@ -1393,11 +1448,14 @@ function buildMarkdown(report) {
   for (const project of report.projects) {
     lines.push(`## ${project.name}`);
     lines.push("");
-    lines.push("| Branch | Op | Threading | Median | Samples | Failure |");
-    lines.push("| --- | --- | --- | --- | --- | --- |");
+    lines.push(
+      "| Branch | Op | Threading | Median | @ttsc/lint | Samples | Failure |",
+    );
+    lines.push("| --- | --- | --- | --- | --- | --- | --- |");
     for (const m of project.measurements) {
       lines.push(
         `| ${m.branch} | ${m.op} | ${m.threading} | ${formatMs(m.medianMs)} | ` +
+          `${formatMs(m.lintMedianMs ?? 0)} | ` +
           `${m.samples?.map((s) => s.toFixed(0)).join(", ") || "-"} | ` +
           `${m.failure ?? ""} |`,
       );
@@ -1675,6 +1733,10 @@ function projectCells(project) {
     for (const op of ["build", "noEmit", "eslint", "format"]) {
       const baseSteps = branchCommands[op];
       if (!baseSteps?.length) continue;
+      const measuredSteps =
+        branch === "ttsc-lint" && isLintOp(op)
+          ? diagnosticsSteps(baseSteps)
+          : baseSteps;
       if (branch === "legacy" || op === "eslint") {
         // Legacy compilers and the ESLint pass do not vary by ttsc's
         // threading axis. Keep the cell at `threading: "multi"` (its
@@ -1687,17 +1749,19 @@ function projectCells(project) {
           branch,
           op,
           threading: "multi",
-          steps: baseSteps,
+          steps: measuredSteps,
         });
       } else {
-        for (const variant of threadingVariants()) {
+        const variants =
+          op === "format" ? formatThreadingVariants() : threadingVariants();
+        for (const variant of variants) {
           cells.push({
             id: `${project.name}:${branch}:${op}:${variant.name}`,
             project,
             branch,
             op,
             threading: variant.name,
-            steps: variant.apply(baseSteps),
+            steps: variant.apply(measuredSteps),
           });
         }
       }

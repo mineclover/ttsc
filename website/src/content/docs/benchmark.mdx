@@ -21,29 +21,31 @@ single-threaded and default multi-threaded modes.
 
 Lint is intentionally split out. The legacy path is `tsc + eslint`, two
 separate passes over the project. The `ttsc-lint` path runs `ttsc` with
-`@ttsc/lint` loaded, so the chart separates the compile portion from the extra
-lint overhead and also shows the pure lint-to-lint ratio.
+`@ttsc/lint` loaded and invokes those cells with `--diagnostics`, so the
+runner parses the `@ttsc/lint` check-sidecar wall time that `ttsc` prints
+instead of deriving lint cost from total-minus-total noise. The chart separates
+that measured sidecar portion from the rest of the compiler run and also shows
+the pure lint-to-lint ratio.
 
-The practical takeaway from this split: **`@ttsc/lint` adds only the rule
-walk on top of an existing `ttsc --noEmit`**. The parse, the program load,
-the type checker — all already paid for the type-check pass — are reused.
-On typeorm (3,220 files) the overhead measures **+400–600 ms over the
-bare `ttsc --noEmit`**, vs. **~46 seconds for the equivalent ESLint pass
-on the same code**. Adding `@ttsc/lint` to a project that already runs
-`ttsc` is roughly free; the win shows up as the eslint column disappearing.
+The practical takeaway from this split: **`@ttsc/lint` is measured as the
+native check sidecar that runs inside the `ttsc-lint` command**. That timing is
+the actual plugin process wall clock seen by `ttsc`, not a synthetic
+subtraction against the bare `ttsc` branch. Adding `@ttsc/lint` to a project
+that already runs `ttsc` is roughly free; the win shows up as the eslint column
+disappearing.
 
-When the single-threaded lint overhead measures at or below zero — the
-`ttsc + @ttsc/lint` total lands inside the noise of the bare `ttsc` total — the
-dashboard substitutes a synthetic value derived from the multi-threaded run for
-the same project:
+Older published snapshots did not carry direct plugin timings. When a row lacks
+the parsed `@ttsc/lint` sample, the dashboard falls back to the old estimate:
+`ttsc-lint` total minus the matching plain `ttsc` total. If that fallback lands
+at or below zero for the single-threaded row, the dashboard substitutes a
+synthetic value derived from the fastest available row for the same project:
 
 ```
 ST_overhead = round(ST_ttsc * (MT_overhead / MT_ttsc))
 ```
 
-The substituted row is labelled `ttsc + @ttsc/lint (ST, est.)` so the chart
-keeps a finite bar and the Summary keeps a finite ratio instead of rendering
-`Infinity` / `NaN` against an unobservable cost.
+Fallback rows are labelled `delta est.` so the chart stays explicit about which
+bars are derived from total-command deltas rather than direct plugin timing.
 
 ## Methodology
 
@@ -55,9 +57,10 @@ being measured.
 
 The run count is configured by `TTSC_BENCH_RUNS` and `TTSC_BENCH_WARMUP`, and
 the chosen values are recorded in `website/public/benchmark.json` with the
-median, fastest sample, full sample list, retry counts, and deterministic
-failures. A missing bar means that project does not currently have a valid
-comparable command for that tool.
+median, fastest sample, full sample list, retry counts, deterministic failures,
+and, for `ttsc-lint` build/check cells, parsed `@ttsc/lint` sidecar timings. A
+missing bar means that project does not currently have a valid comparable
+command for that tool.
 
 ## Comparisons
 
@@ -66,28 +69,37 @@ comparable command for that tool.
 - **Type-check**: `tsc --noEmit` versus `ttsc --noEmit`.
 - **Lint**: legacy `tsc + eslint` versus `ttsc + @ttsc/lint`, plus the isolated
   `eslint` time versus the measured `@ttsc/lint` overhead.
-- **Format**: legacy `prettier --check` versus `ttsc format`, run across the
-  four threading variants (below).
+- **Format**: legacy `prettier --check` versus `ttsc format`, shown as the
+  bare default command and the `--singleThreaded` serial run. The checker-pool
+  sweep is intentionally not shown for format because format rules do not use
+  the TypeScript-Go checker pool.
 
 ### Threading variants
 
-Every `ttsc` and `ttsc:tsgo` cell is measured under four threading
-configurations, in display order:
+Build, type-check, and lint cells for `ttsc` and `ttsc:tsgo` are measured under
+four threading configurations, in display order:
 
-| Variant | Flag | What it caps |
-| --- | --- | --- |
-| `single` | `--singleThreaded` | Forces every stage serial: parse, type-check, lint engine. |
-| `checkers2` | `--checkers 2` | Parse and lint stay parallel; the TypeScript-Go checker pool is capped at 2 workers. |
-| `checkers4` | `--checkers 4` | Same, capped at 4 checker workers. |
-| `checkers8` | `--checkers 8` | Same, capped at 8 checker workers. |
+| Variant     | Flag               | What it caps                                                                         |
+| ----------- | ------------------ | ------------------------------------------------------------------------------------ |
+| `single`    | `--singleThreaded` | Forces every stage serial: parse, type-check, lint engine.                           |
+| `checkers2` | `--checkers 2`     | Parse and lint stay parallel; the TypeScript-Go checker pool is capped at 2 workers. |
+| `checkers4` | `--checkers 4`     | Same, capped at 4 checker workers.                                                   |
+| `checkers8` | `--checkers 8`     | Same, capped at 8 checker workers.                                                   |
 
-The previous binary `single` / `multi` axis (where `multi` meant "default,
-uncapped — usually one checker per CPU") is gone. The 4-point spectrum is the
-diminishing-returns curve of the checker pool alone — parse parallelism is
-held constant — so a glance at the four bars per project shows whether 8
-checkers is overkill, 2 is enough, or the rule walk has already saturated.
-The fixture source is expected to be pre-formatted so each format cell
-measures the no-op steady-state cost rather than the first-edit-apply pass.
+The previous binary `single` / `multi` axis for compiler cells (where `multi`
+meant "default, uncapped — usually one checker per CPU") is gone. The 4-point
+spectrum is the diminishing-returns curve of the checker pool alone — parse
+parallelism is held constant — so a glance at the four bars per project shows
+whether 8 checkers is overkill, 2 is enough, or the rule walk has already
+saturated.
+
+Format is the exception. `ttsc format` does not type-check, so `--checkers N`
+does not change the formatter's worker count. The Format chart therefore keeps
+only the meaningful axis: `--singleThreaded` versus the bare `ttsc format`
+default. The fixture source is expected to be pre-formatted so the format cell
+measures the no-op steady-state cost rather than the first-edit-apply pass. The
+current snapshot relabels the former `checkers4` format samples as the bare
+`ttsc format` default row because the flag does not affect formatter work.
 
 ## Why Threading Doesn't Always Help
 
@@ -122,12 +134,12 @@ the only parallelism left to gate is the parse work group and the rule walk.
 On a representative format cell (per-phase timings on this host with
 `TTSC_FORMAT_TIMING`):
 
-| Project       | Files | Parse MT | Parse ST | Engine.Run MT | Engine.Run ST |
-| ------------- | ----- | -------- | -------- | ------------- | ------------- |
-| `type-fest`   | 209   | ~140 ms  | ~230 ms  | ~30 ms        | ~70 ms        |
-| `vue`         | 437   | ~270 ms  | ~900 ms  | ~130 ms       | ~900 ms       |
-| `vscode`      | 6 097 | ~2 200 ms| ~5 700 ms| ~1 000 ms     | ~1 000 ms     |
-| `nestjs/core` | 352   | ~165 ms  | ~230 ms  | ~13 ms        | ~13 ms        |
+| Project       | Files | Parse MT  | Parse ST  | Engine.Run MT | Engine.Run ST |
+| ------------- | ----- | --------- | --------- | ------------- | ------------- |
+| `type-fest`   | 209   | ~140 ms   | ~230 ms   | ~30 ms        | ~70 ms        |
+| `vue`         | 437   | ~270 ms   | ~900 ms   | ~130 ms       | ~900 ms       |
+| `vscode`      | 6 097 | ~2 200 ms | ~5 700 ms | ~1 000 ms     | ~1 000 ms     |
+| `nestjs/core` | 352   | ~165 ms   | ~230 ms   | ~13 ms        | ~13 ms        |
 
 Three patterns fall out of that table. On small file counts (`nestjs/core`,
 `type-fest`), the rule walk is in the tens of milliseconds — under the
@@ -183,10 +195,17 @@ single-cell outliers while keeping a full matrix sweep practical on a single
 host. Override with `TTSC_BENCH_RUNS` / `TTSC_BENCH_WARMUP` when you want a
 quicker spot-check (`TTSC_BENCH_RUNS=1 TTSC_BENCH_WARMUP=0` finishes a sweep
 in roughly half an hour but every cell is one sample) or a steadier
-publication run (`TTSC_BENCH_RUNS=10` is what the prior snapshot used and
-the one this rewrite supersedes). Results are written to
-`experimental/benchmark/.work/report.md`,
+sampling run (e.g. `TTSC_BENCH_RUNS=10` doubles every sample). Results are
+written to `experimental/benchmark/.work/report.md`,
 `experimental/benchmark/.work/report.json`, and `website/public/benchmark.json`.
+
+The published snapshot pins every fixture's `legacy` branch to
+**TypeScript 6.x** (`typescript@next`, currently `6.0.0-dev.20260416`) so
+the `tsc` baseline reflects the same major version the `ttsc` /
+`@typescript/native-preview` row runs against. Earlier snapshots ran legacy
+on TypeScript 4.9.5 / 5.x; the matrix kept its shape but the cross-row
+comparison was apples-to-oranges. The fixtures' `ttsc` and `ttsc-lint`
+branches do not pin `typescript` because they run on tsgo.
 
 The fastest cells (`ttsc:build:single`, `ttsc:noEmit:single`) finish in
 2–8 seconds, which is short enough that ambient host load — a concurrent

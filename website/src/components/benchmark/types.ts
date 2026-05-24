@@ -27,18 +27,21 @@ export type BenchmarkOp = "build" | "noEmit" | "eslint" | "format";
 /**
  * Threading variant the cell was measured under.
  *
- * - `single`: the run forces `--singleThreaded`. Parse, type-check, and
- *   the lint engine all run serially.
- * - `checkers2` / `checkers4` / `checkers8`: parse and the lint engine
- *   use the host's full CPU count, but the TypeScript-Go checker pool
- *   is capped at 2, 4, or 8 workers via tsgo's `--checkers N`. The
- *   spectrum exposes the diminishing-returns shape of the checker
- *   pool independently of the parse parallelism.
+ * - `single`: the run forces `--singleThreaded`. Parse, type-check, and the lint
+ *   engine all run serially.
+ * - `checkers2` / `checkers4` / `checkers8`: parse and the lint engine use the
+ *   host's full CPU count, but the TypeScript-Go checker pool is capped at 2,
+ *   4, or 8 workers via tsgo's `--checkers N`. The spectrum exposes the
+ *   diminishing-returns shape of the checker pool independently of the parse
+ *   parallelism.
+ * - `multi`: the bare command with no threading flag. Legacy measurements use it
+ *   for tools that do not expose ttsc's threading axis, and format measurements
+ *   use it for the default `ttsc format` run because `--checkers N` does not
+ *   control formatter worker count.
  *
- * The legacy `multi` value (uncapped default checker count) is no longer
- * emitted by the runner; a one-time snapshot may still carry it in the
- * file. The dashboard tolerates the legacy value and renders it as the
- * top of the spectrum.
+ * Build, type-check, and lint cells no longer emit `multi`; a one-time snapshot
+ * may still carry it in the file. The dashboard tolerates that legacy value and
+ * renders it as the top of the spectrum.
  */
 export type BenchmarkThreading =
   | "single"
@@ -70,6 +73,16 @@ export interface BenchmarkMeasurement {
   minMs?: number;
   /** Raw per-run wall-clock samples in milliseconds, in run order. */
   samples?: number[];
+  /**
+   * Median `@ttsc/lint` check sidecar wall-clock time parsed from
+   * `ttsc --diagnostics`. Present only for `ttsc-lint` build/check cells
+   * recorded by newer benchmark runs.
+   */
+  lintMedianMs?: number;
+  /** Fastest measured `@ttsc/lint` sidecar run in milliseconds. */
+  lintMinMs?: number;
+  /** Raw per-run `@ttsc/lint` sidecar samples in milliseconds. */
+  lintSamples?: number[];
   /**
    * Count of runs that hit the intermittent parallel-emit data race and were
    * retried. Absent or `0` means the cell measured cleanly.

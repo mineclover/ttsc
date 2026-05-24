@@ -392,6 +392,24 @@ export const FLAG_SCHEMA: readonly FlagSpec[] = [
     description: "Toggle tsgo pretty-printed diagnostics (forwarded to tsgo).",
   },
   {
+    name: "--diagnostics",
+    kind: "boolean",
+    subcommands: ["ttsc", "ttsx", "build", "check", "fix", "format"],
+    consumedBy: ["runBuild", "tsgo"],
+    forwardTo: "tsgo",
+    description:
+      "Print compiler performance information; plugin-backed ttsc runs add plugin wall-clock timings.",
+  },
+  {
+    name: "--extendedDiagnostics",
+    kind: "boolean",
+    subcommands: ["ttsc", "ttsx", "build", "check", "fix", "format"],
+    consumedBy: ["runBuild", "tsgo"],
+    forwardTo: "tsgo",
+    description:
+      "Print detailed compiler performance information; plugin-backed ttsc runs add plugin wall-clock timings.",
+  },
+  {
     name: "--showConfig",
     kind: "boolean",
     subcommands: ["ttsc", "build", "check"],

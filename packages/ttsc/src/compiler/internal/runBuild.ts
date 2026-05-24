@@ -25,6 +25,12 @@ type RunBuildOptions = TtscBuildOptions & {
   forceListEmittedFiles?: boolean;
 };
 
+type BuildTiming = {
+  enabled: boolean;
+  lines: string[];
+  startedAt: bigint;
+};
+
 /**
  * Merge extra environment variables over `process.env`, always injecting
  * `TTSC_NODE_BINARY` so child processes can re-invoke the same Node.js binary
@@ -37,6 +43,71 @@ function mergeEnv(extra?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   };
   if (!extra) return base;
   return { ...base, ...extra };
+}
+
+function createBuildTiming(options: TtscCommonOptions): BuildTiming {
+  return {
+    enabled: hasDiagnosticsFlag(options),
+    lines: [],
+    startedAt: process.hrtime.bigint(),
+  };
+}
+
+function hasDiagnosticsFlag(options: TtscCommonOptions): boolean {
+  return (
+    hasEnabledPassthroughFlag(options, "--diagnostics") ||
+    hasEnabledPassthroughFlag(options, "--extendedDiagnostics")
+  );
+}
+
+function hasEnabledPassthroughFlag(
+  options: TtscCommonOptions,
+  flag: string,
+): boolean {
+  for (const token of options.passthrough ?? []) {
+    if (token === flag) return true;
+    if (token.startsWith(`${flag}=`)) {
+      return token.slice(flag.length + 1).toLowerCase() !== "false";
+    }
+  }
+  return false;
+}
+
+function recordTiming(
+  timing: BuildTiming,
+  label: string,
+  startedAt: bigint,
+): void {
+  if (!timing.enabled) return;
+  timing.lines.push(`${label}: ${formatTimingSeconds(hrtimeMs(startedAt))}`);
+}
+
+function appendTimingOutput(
+  result: TtscBuildResult,
+  timing: BuildTiming,
+): TtscBuildResult {
+  if (!timing.enabled) return result;
+  const lines = [
+    ...timing.lines,
+    `ttsc total time: ${formatTimingSeconds(hrtimeMs(timing.startedAt))}`,
+  ];
+  return {
+    ...result,
+    stdout: appendStdout(result.stdout, lines.join("\n") + "\n"),
+  };
+}
+
+function appendStdout(stdout: string, text: string): string {
+  if (stdout.length === 0 || stdout.endsWith("\n")) return stdout + text;
+  return `${stdout}\n${text}`;
+}
+
+function hrtimeMs(startedAt: bigint): number {
+  return Number(process.hrtime.bigint() - startedAt) / 1e6;
+}
+
+function formatTimingSeconds(ms: number): string {
+  return `${(ms / 1000).toFixed(3)}s`;
 }
 
 /**
@@ -71,13 +142,26 @@ function nativePluginEnv(
  * decide how to surface diagnostics. Does not throw on non-zero exit.
  */
 export function runBuild(options: RunBuildOptions = {}): TtscBuildResult {
+  const timing = createBuildTiming(options);
+  const result = runBuildTimed(options, timing);
+  return appendTimingOutput(result, timing);
+}
+
+function runBuildTimed(
+  options: RunBuildOptions,
+  timing: BuildTiming,
+): TtscBuildResult {
+  const setupStartedAt = process.hrtime.bigint();
   const execution = resolveExecutionContext(options);
+  if (execution.nativePlugins.length > 0) {
+    recordTiming(timing, "ttsc plugin setup time", setupStartedAt);
+  }
   const buildOptions = applyProjectNoEmit(options, execution);
   if (execution.nativePlugins.length > 0) {
     const compilers = execution.nativePlugins.filter(
       (plugin) => plugin.stage === "transform",
     );
-    const checked = runNativeCheckPlugins(buildOptions, execution);
+    const checked = runNativeCheckPlugins(buildOptions, execution, timing);
     if (checked.status !== 0) {
       return checked;
     }
@@ -102,7 +186,12 @@ export function runBuild(options: RunBuildOptions = {}): TtscBuildResult {
         assertSharedHostCompatibility(compilers, "emit");
         return appendBuildOutput(
           checked,
-          buildWithNativeCompilerPlugins(buildOptions, execution, compilers),
+          buildWithNativeCompilerPlugins(
+            buildOptions,
+            execution,
+            compilers,
+            timing,
+          ),
         );
       }
       if (checkPluginsReportTypeScriptDiagnostics(execution.nativePlugins)) {
@@ -119,7 +208,12 @@ export function runBuild(options: RunBuildOptions = {}): TtscBuildResult {
       assertSharedHostCompatibility(compilers, "emit");
       result = appendBuildOutput(
         checked,
-        buildWithNativeCompilerPlugins(buildOptions, execution, compilers),
+        buildWithNativeCompilerPlugins(
+          buildOptions,
+          execution,
+          compilers,
+          timing,
+        ),
       );
     } else {
       if (
@@ -262,6 +356,7 @@ function buildWithNativeCompilerPlugins(
   options: TtscBuildOptions,
   execution: ReturnType<typeof resolveExecutionContext>,
   plugins: readonly ITtscLoadedNativePlugin[],
+  timing: BuildTiming,
 ): TtscBuildResult {
   const host = selectSharedHostPlugin(plugins);
   return runNativePluginCommand(
@@ -270,6 +365,8 @@ function buildWithNativeCompilerPlugins(
     options,
     execution,
     "ttsc.build",
+    timing,
+    transformHostTimingLabel(plugins),
   );
 }
 
@@ -548,6 +645,15 @@ function nativeHostAcceptsThreadingArgs(
   return plugin.capabilities?.threadingArgs === true;
 }
 
+function transformHostTimingLabel(
+  plugins: readonly ITtscLoadedNativePlugin[],
+): string {
+  return (
+    `ttsc transform host [` +
+    `${plugins.map((plugin) => plugin.name).join(", ")}] time`
+  );
+}
+
 /**
  * Forward the tsgo flags ttsc did not recognize to a native sidecar as one
  * JSON-encoded `--tsgo-args` flag. The sidecar replays them through tsgo's own
@@ -598,6 +704,7 @@ function serializeNativePlugins(
 function runNativeCheckPlugins(
   options: TtscBuildOptions,
   execution: ReturnType<typeof resolveExecutionContext>,
+  timing: BuildTiming,
 ): TtscBuildResult {
   let out: TtscBuildResult = {
     diagnostics: [],
@@ -614,6 +721,8 @@ function runNativeCheckPlugins(
       options,
       execution,
       "ttsc.check",
+      timing,
+      `ttsc check plugin ${plugin.name} time`,
     );
     out = appendBuildOutput(out, result);
     if (result.status !== 0) {
@@ -634,12 +743,16 @@ function runNativePluginCommand(
   options: TtscBuildOptions,
   execution: ReturnType<typeof resolveExecutionContext>,
   label: string,
+  timing: BuildTiming,
+  timingLabel: string,
 ): TtscBuildResult {
+  const startedAt = process.hrtime.bigint();
   const res = spawnNative(plugin.binary, args, {
     cwd: execution.projectRoot,
     env: nativePluginEnv(options.env, execution, plugin),
     encoding: "utf8",
   });
+  recordTiming(timing, timingLabel, startedAt);
   if (res.error) {
     throw new Error(
       `${label}: failed to spawn ${plugin.binary}: ${res.error.message}`,

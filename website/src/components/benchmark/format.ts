@@ -20,6 +20,7 @@ export interface Speedup {
   baseline: { tool: string; ms: number };
   fast: { tool: string; ms: number };
   factor: number;
+  referenceOnly?: boolean;
 }
 
 interface FindOptions {
@@ -75,6 +76,7 @@ export function deriveSpeedups(
     detail: string,
     baseline: { tool: string; ms: number } | undefined,
     fast: { tool: string; ms: number } | undefined,
+    referenceOnly = false,
   ) => {
     if (!baseline || !fast) return;
     if (baseline.ms <= 0 || fast.ms <= 0) return;
@@ -85,6 +87,7 @@ export function deriveSpeedups(
       baseline,
       fast,
       factor: baseline.ms / fast.ms,
+      referenceOnly,
     });
   };
 
@@ -199,6 +202,7 @@ export function deriveSpeedups(
       "tsgo build vs ttsc build on the ttsc branch",
       tsgoBuild && { tool: `tsgo ${threading}`, ms: tsgoBuild.medianMs },
       ttscBuild && { tool: `ttsc ${threading}`, ms: ttscBuild.medianMs },
+      true,
     );
 
     const tsgoNoEmit = findMeasurement(measurements, {
@@ -219,6 +223,7 @@ export function deriveSpeedups(
         tool: `ttsc --noEmit ${threading}`,
         ms: ttscNoEmit.medianMs,
       },
+      true,
     );
   }
 
@@ -226,8 +231,10 @@ export function deriveSpeedups(
 }
 
 export function headlineSpeedup(speedups: Speedup[]): Speedup | undefined {
-  return speedups.reduce<Speedup | undefined>(
-    (best, s) => (best === undefined || s.factor > best.factor ? s : best),
-    undefined,
-  );
+  return speedups
+    .filter((speedup) => !speedup.referenceOnly)
+    .reduce<Speedup | undefined>(
+      (best, s) => (best === undefined || s.factor > best.factor ? s : best),
+      undefined,
+    );
 }

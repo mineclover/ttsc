@@ -30,8 +30,8 @@
  * Pass `--verbose` to surface everything — child stdio is teed live, and the
  * granular `[cmd] start/done`, `[step] start/done`, and `[timer] start` traces
  * are added back. This is the mode intended for AI/agent runs that need the
- * full command transcript for diagnosis; a human watching live progress
- * usually wants the default.
+ * full command transcript for diagnosis; a human watching live progress usually
+ * wants the default.
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -63,6 +63,9 @@ const REPORT_JSON = OUT.replace(/\.md$/, ".json");
 const CHECKPOINT_JSON =
   process.env.TTSC_BENCH_CHECKPOINT ??
   path.resolve(WORK, "benchmark.checkpoint.json");
+const TSCONFIG_FILES = quote(
+  path.join(import.meta.dirname, "tsconfig-files.mjs"),
+);
 
 const RUNS = numberEnv("TTSC_BENCH_RUNS", 5);
 const WARMUP = numberEnv("TTSC_BENCH_WARMUP", 1, { allowZero: true });
@@ -75,17 +78,20 @@ const BRANCHES = ["legacy", "ttsc", "ttsc-lint"];
 const TTSC_VERSION = JSON.parse(
   fs.readFileSync(path.join(REPO_ROOT, "packages/ttsc/package.json"), "utf8"),
 ).version;
-// Pin the tsgo experiment to whatever `@typescript/native-preview` the parent
-// ttsc workspace resolves at — keeps the comparison row in lockstep with the
-// tsgo build that ttsc itself shipped. Falls back to the catalog pin in
-// `pnpm-workspace.yaml` when the workspace has not been installed yet.
+// Pin the tsgo experiment to the repository lockfile, not whatever a fixture
+// happened to resolve. Fixtures will be normalized later; the published label
+// should still describe the ttsc workspace under test.
 const TSGO_VERSION =
+  readTsgoLockVersion(REPO_ROOT) ??
   packageVersion(
     path.join(REPO_ROOT, "node_modules", "@typescript", "native-preview"),
-  ) ?? readTsgoCatalogVersion(REPO_ROOT);
+  ) ??
+  readTsgoWorkspaceCatalogVersion(REPO_ROOT);
 const PLATFORM_KEY = `${process.platform}-${process.arch}`;
 const PLATFORM_PACKAGE = `@ttsc/${PLATFORM_KEY}`;
 const TSGO_PLATFORM_PACKAGE = `@typescript/native-preview-${PLATFORM_KEY}`;
+const GENERATED_PNPM_WORKSPACE = "packages:\n  - \".\"\n";
+const LEGACY_TYPESCRIPT_DISPLAY_VERSION = "v6.0.3";
 const LOCAL_TARBALLS = [
   {
     dir: "packages/ttsc",
@@ -114,9 +120,13 @@ const PACKAGE_CONFIGS = {
     commands: compilerCommands({
       build: (tool) => [`pnpm exec ${tool} -p tsconfig.json`],
       noEmit: (tool) => [`pnpm exec ${tool} -p tsconfig.json --noEmit`],
-      eslint: ["pnpm exec eslint 'packages/*/src/**/*.ts'"],
+      eslint: [
+        `pnpm exec eslint --no-ignore ${tsconfigFiles("tsconfig.json")}`,
+      ],
       format: {
-        legacy: ["pnpm exec prettier --check 'packages/*/src/**/*.ts'"],
+        legacy: [
+          `pnpm exec prettier --check --ignore-path /dev/null ${tsconfigFiles("tsconfig.json")}`,
+        ],
         ttscLint: ["pnpm exec ttsc format -p tsconfig.json"],
       },
     }),
@@ -145,22 +155,22 @@ const PACKAGE_CONFIGS = {
       eslint: [
         {
           cwd: "packages/observable",
-          cmd: "yarn --ignore-engines exec eslint -- 'src/**/*.ts' --ignore-pattern '**/*.d.ts'",
+          cmd: `yarn --ignore-engines exec eslint --no-ignore ${tsconfigFiles("tsconfig.json")}`,
         },
         {
           cwd: "packages/rxjs",
-          cmd: "yarn --ignore-engines exec eslint -- 'src/**/*.ts' --ignore-pattern '**/*.d.ts'",
+          cmd: `yarn --ignore-engines exec eslint --no-ignore ${tsconfigFiles(rxjsSourceTsconfigs())}`,
         },
       ],
       format: {
         legacy: [
           {
             cwd: "packages/observable",
-            cmd: "yarn --ignore-engines exec prettier -- --check 'src/**/*.ts'",
+            cmd: `yarn --ignore-engines exec prettier --check --ignore-path /dev/null ${tsconfigFiles("tsconfig.json")}`,
           },
           {
             cwd: "packages/rxjs",
-            cmd: "yarn --ignore-engines exec prettier -- --check 'src/**/*.ts'",
+            cmd: `yarn --ignore-engines exec prettier --check --ignore-path /dev/null ${tsconfigFiles(rxjsSourceTsconfigs())}`,
           },
         ],
         ttscLint: [
@@ -170,7 +180,15 @@ const PACKAGE_CONFIGS = {
           },
           {
             cwd: "packages/rxjs",
-            cmd: "yarn --ignore-engines exec ttsc -- format -p tsconfig.json",
+            cmd: "yarn --ignore-engines exec ttsc -- format -p ./src/tsconfig.cjs.json",
+          },
+          {
+            cwd: "packages/rxjs",
+            cmd: "yarn --ignore-engines exec ttsc -- format -p ./src/tsconfig.esm.json",
+          },
+          {
+            cwd: "packages/rxjs",
+            cmd: "yarn --ignore-engines exec ttsc -- format -p ./src/tsconfig.types.json",
           },
         ],
       },
@@ -195,9 +213,13 @@ const PACKAGE_CONFIGS = {
           env: { NODE_OPTIONS: "--max-old-space-size=6144" },
         },
       ],
-      eslint: ["pnpm exec eslint 'index.d.ts' 'source/**/*.d.ts' 'test-d/**/*.ts' --quiet"],
+      eslint: [
+        `pnpm exec eslint --no-ignore --quiet ${tsconfigFiles("tsconfig.json")}`,
+      ],
       format: {
-        legacy: ["pnpm exec prettier --check 'index.d.ts' 'source/**/*.d.ts' 'test-d/**/*.ts'"],
+        legacy: [
+          `pnpm exec prettier --check --ignore-path /dev/null ${tsconfigFiles("tsconfig.json")}`,
+        ],
         ttscLint: [
           {
             cmd: "pnpm exec ttsc format -p tsconfig.json",
@@ -213,18 +235,20 @@ const PACKAGE_CONFIGS = {
     repo: "https://github.com/samchon/ttsc-benchmark-typeorm.git",
     packageManager: "pnpm",
     installCommand:
-      "pnpm --ignore-workspace install --virtual-store-dir node_modules/.pnpm --no-frozen-lockfile --ignore-scripts",
+      "pnpm install --virtual-store-dir node_modules/.pnpm --no-frozen-lockfile --ignore-scripts --config.minimumReleaseAge=0",
     installTarballsCommand: (specs) =>
-      `pnpm --ignore-workspace add --virtual-store-dir node_modules/.pnpm -D --ignore-scripts ${specs}`,
+      `pnpm add -w --virtual-store-dir node_modules/.pnpm -D --ignore-scripts --config.minimumReleaseAge=0 ${specs}`,
     prepareCommand: "pnpm exec ttsc prepare -p tsconfig.json",
     filesRoot: "src",
     commands: compilerCommands({
       build: (tool) => [`pnpm exec ${tool} -p tsconfig.json`],
       noEmit: (tool) => [`pnpm exec ${tool} -p tsconfig.json --noEmit`],
-      eslint: ["pnpm exec eslint 'src/**/*.ts' 'test/**/*.ts' '*.ts' --quiet"],
+      eslint: [
+        `pnpm exec eslint --no-ignore --quiet ${tsconfigFiles("tsconfig.json")}`,
+      ],
       format: {
         legacy: [
-          "pnpm exec prettier --check 'src/**/*.ts' 'test/**/*.ts' '*.ts'",
+          `pnpm exec prettier --check --ignore-path /dev/null ${tsconfigFiles("tsconfig.json")}`,
         ],
         ttscLint: ["pnpm exec ttsc format -p tsconfig.json"],
       },
@@ -249,23 +273,23 @@ const PACKAGE_CONFIGS = {
           cmd: `pnpm exec ${tool} -p tsconfig.json --noEmit`,
         },
       ],
-      eslint: ["pnpm exec eslint ."],
+      eslint: [
+        {
+          cwd: "packages/zod",
+          cmd: `pnpm exec eslint --no-ignore ${tsconfigFiles("tsconfig.json")}`,
+        },
+      ],
       format: {
         legacy: [
           {
             cwd: "packages/zod",
-            cmd:
-              "pnpm exec prettier --check 'src/**/*.ts'" +
-              " --ignore-pattern 'src/**/tests/**'" +
-              " --ignore-pattern 'src/**/benchmarks/**'" +
-              " --ignore-pattern 'src/**/*.test.ts'" +
-              " --ignore-pattern 'src/**/*.source.ts'",
+            cmd: `pnpm exec prettier --check --ignore-path /dev/null ${tsconfigFiles("tsconfig.json")}`,
           },
         ],
         ttscLint: [
           {
             cwd: "packages/zod",
-            cmd: "pnpm exec ttsc format -p tsconfig.build.json",
+            cmd: "pnpm exec ttsc format -p tsconfig.json",
           },
         ],
       },
@@ -302,9 +326,13 @@ const PACKAGE_CONFIGS = {
           env: { NODE_OPTIONS: "--max-old-space-size=8192" },
         },
       ],
-      eslint: ["./node_modules/.bin/eslint src --quiet"],
+      eslint: [
+        `./node_modules/.bin/eslint --no-ignore --quiet ${tsconfigFiles("src/tsconfig.json")}`,
+      ],
       format: {
-        legacy: ["./node_modules/.bin/prettier --check 'src/**/*.ts'"],
+        legacy: [
+          `./node_modules/.bin/prettier --check --ignore-path /dev/null ${tsconfigFiles("src/tsconfig.json")}`,
+        ],
         ttscLint: [
           {
             cmd: "./node_modules/.bin/ttsc format -p src/tsconfig.json",
@@ -320,12 +348,29 @@ const PACKAGE_CONFIGS = {
     repo: "https://github.com/samchon/shopping-backend.git",
     packageManager: "pnpm",
     filesRoot: "src",
+    installCommand: "pnpm install --ignore-scripts --no-frozen-lockfile",
+    installTarballsCommand: (specs) =>
+      `pnpm add -w -D --ignore-scripts --config.minimumReleaseAge=0 ${specs}`,
+    prerequisites: normalizeSteps([
+      {
+        cmd: "pnpm run build:prisma",
+        env: { TS_NODE_TRANSPILE_ONLY: "1" },
+      },
+      {
+        cmd: 'pnpm exec prettier --write --ignore-path /dev/null "src/prisma/**/*.ts"',
+      },
+    ]),
+    cleanExcludes: [".env", "src/prisma", "src/prisma/**"],
     commands: {
       legacy: {
         build: normalizeSteps(["pnpm exec tsc -p tsconfig.json"]),
         noEmit: normalizeSteps(["pnpm exec tsc -p tsconfig.json --noEmit"]),
-        eslint: normalizeSteps(["pnpm exec eslint 'src/**/*.ts'"]),
-        format: normalizeSteps(["pnpm exec prettier --check 'src/**/*.ts'"]),
+        eslint: normalizeSteps([
+          `pnpm exec eslint --no-ignore ${tsconfigFiles("tsconfig.json")}`,
+        ]),
+        format: normalizeSteps([
+          `pnpm exec prettier --check --ignore-path /dev/null ${tsconfigFiles("tsconfig.json")}`,
+        ]),
       },
       ttsc: {
         build: normalizeSteps(["pnpm exec ttsc -p tsconfig.json"]),
@@ -340,12 +385,31 @@ const PACKAGE_CONFIGS = {
   },
 };
 
+// Display fixtures by upstream GitHub stars (checked 2026-05-24), so the
+// dashboard starts with the projects readers are most likely to recognize.
+const PROJECT_ORDER_BY_STARS = [
+  "vscode",
+  "nestjs",
+  "vue",
+  "zod",
+  "typeorm",
+  "rxjs",
+  "type-fest",
+  "shopping-backend",
+];
+
 const PROJECTS = Object.entries(PACKAGE_CONFIGS)
   .filter(([, config]) => !config.disabled)
   .map(([name, config]) => ({
     name,
     ...config,
-  }));
+  }))
+  .sort((a, b) => projectSortRank(a.name) - projectSortRank(b.name));
+
+function projectSortRank(name) {
+  const index = PROJECT_ORDER_BY_STARS.indexOf(name);
+  return index === -1 ? PROJECT_ORDER_BY_STARS.length : index;
+}
 
 const projectSelection = [...projectArgs, ...positional];
 const wantedProjects = projectSelection.length
@@ -435,11 +499,20 @@ function packageVersion(dir) {
   }
 }
 
-function readTsgoCatalogVersion(repoRoot) {
-  // The ttsc workspace pins `@typescript/native-preview` through the `tsgo`
-  // catalog in `pnpm-workspace.yaml`. Without a JSON parser for YAML, do a
-  // narrow regex pull so the benchmark stays in sync after a bump even when
-  // `node_modules/` is empty.
+function readTsgoLockVersion(repoRoot) {
+  try {
+    const file = fs.readFileSync(path.join(repoRoot, "pnpm-lock.yaml"), "utf8");
+    const match = file.match(
+      /^\s*'@typescript\/native-preview':\n\s+specifier:\s+[^\n]+\n\s+version:\s+([^\s#]+)\s*$/m,
+    );
+    if (match) return match[1].replace(/^['"]|['"]$/g, "");
+  } catch {
+    // Fall through.
+  }
+  return undefined;
+}
+
+function readTsgoWorkspaceCatalogVersion(repoRoot) {
   try {
     const file = fs.readFileSync(
       path.join(repoRoot, "pnpm-workspace.yaml"),
@@ -485,41 +558,38 @@ function compilerCommands({ build, noEmit, eslint, format }) {
 }
 
 function rxjsNoEmitSteps(tool) {
-  return [
-    "./src/tsconfig.cjs.json",
-    "./src/tsconfig.esm.json",
-    "./src/tsconfig.types.json",
-  ].map((config) => ({
+  return rxjsSourceTsconfigs().map((config) => ({
     cwd: "packages/rxjs",
     cmd: `yarn --ignore-engines exec ${tool} -- -p ${config} --noEmit`,
   }));
 }
 
 function rxjsBuildSteps(tool) {
-  return [
-    "./src/tsconfig.cjs.json",
-    "./src/tsconfig.esm.json",
-    "./src/tsconfig.types.json",
-  ].map((config) => ({
+  return rxjsSourceTsconfigs().map((config) => ({
     cwd: "packages/rxjs",
     cmd: `yarn --ignore-engines exec ${tool} -- -p ${config}`,
   }));
 }
 
+function rxjsSourceTsconfigs() {
+  return [
+    "./src/tsconfig.cjs.json",
+    "./src/tsconfig.esm.json",
+    "./src/tsconfig.types.json",
+  ];
+}
+
 function nestjsCommands() {
+  const configs = nestjsPackageTsconfigs();
   return {
     legacy: {
       build: normalizeSteps(nestjsPackageSteps("tsc", false)),
       noEmit: normalizeSteps(nestjsPackageSteps("tsc", true)),
       eslint: normalizeSteps([
-        "npm exec -- eslint 'packages/**/**.ts' --ignore-pattern 'packages/**/*.spec.ts' --ignore-pattern '**/test/**' --ignore-pattern 'integration/**' --ignore-pattern 'sample/**'",
+        `npm exec -- eslint --no-ignore ${tsconfigFiles(configs)}`,
       ]),
       format: normalizeSteps([
-        "npm exec -- prettier --check 'packages/**/*.ts'" +
-          " --ignore-pattern '**/test/**'" +
-          " --ignore-pattern '**/*.spec.ts'" +
-          " --ignore-pattern '**/dist/**'" +
-          " --ignore-path .prettierignore",
+        `npm exec -- prettier --check --ignore-path /dev/null ${tsconfigFiles(configs)}`,
       ]),
     },
     ttsc: {
@@ -542,7 +612,13 @@ function nestjsCommands() {
 }
 
 function nestjsPackageSteps(tool, noEmit) {
-  const packages = [
+  return nestjsPackageTsconfigs().map((config) => ({
+    cmd: `npm exec -- ${tool} -p ${config}` + (noEmit ? " --noEmit" : ""),
+  }));
+}
+
+function nestjsPackageTsconfigs() {
+  return [
     "common",
     "core",
     "microservices",
@@ -552,12 +628,13 @@ function nestjsPackageSteps(tool, noEmit) {
     "platform-ws",
     "testing",
     "websockets",
-  ];
-  return packages.map((pkg) => ({
-    cmd:
-      `npm exec -- ${tool} -p packages/${pkg}/tsconfig.build.json` +
-      (noEmit ? " --noEmit" : ""),
-  }));
+  ].map((pkg) => `packages/${pkg}/tsconfig.build.json`);
+}
+
+function tsconfigFiles(projects) {
+  const list = Array.isArray(projects) ? projects : [projects];
+  const args = list.map((project) => `-p ${quote(project)}`).join(" ");
+  return `$(node ${TSCONFIG_FILES} ${args} --shell)`;
 }
 
 function normalizeSteps(value) {
@@ -577,6 +654,13 @@ function cloneDir(project, branch) {
 
 function ownsPnpmWorkspace(root) {
   return fs.existsSync(path.join(root, "pnpm-workspace.yaml"));
+}
+
+function ensurePnpmWorkspaceBoundary(project, root) {
+  if (project.packageManager !== "pnpm") return;
+  const workspaceFile = path.join(root, "pnpm-workspace.yaml");
+  if (fs.existsSync(workspaceFile)) return;
+  fs.writeFileSync(workspaceFile, GENERATED_PNPM_WORKSPACE);
 }
 
 function pnpmProjectCommand(root, command) {
@@ -709,6 +793,38 @@ function classifyFailure(log) {
     : "error";
 }
 
+function isLintOp(op) {
+  return op === "build" || op === "noEmit";
+}
+
+function parseTtscLintSidecarTimingMs(log) {
+  const pattern = /^ttsc check plugin @ttsc\/lint time:\s*([0-9.]+)s\s*$/gm;
+  return parseSummedTimingMs(log, pattern);
+}
+
+function parseTtscLintPluginTimingMs(log) {
+  const pattern = /^@ttsc\/lint time:\s*([0-9.]+)s\s*$/gm;
+  return parseSummedTimingMs(log, pattern);
+}
+
+function parseTtscTransformHostTimingMs(log) {
+  const pattern = /^ttsc transform host \[[^\]]*] time:\s*([0-9.]+)s\s*$/gm;
+  return parseSummedTimingMs(log, pattern);
+}
+
+function parseSummedTimingMs(log, pattern) {
+  let total = 0;
+  let count = 0;
+  for (const match of log.matchAll(pattern)) {
+    const seconds = Number(match[1]);
+    if (Number.isFinite(seconds)) {
+      total += seconds * 1000;
+      count++;
+    }
+  }
+  return count === 0 ? undefined : total;
+}
+
 function packTarballs() {
   if (flags.has("--no-pack") || process.env.TTSC_BENCH_SKIP_PACK === "1") {
     process.stdout.write(`Skipping tarball pack; using ${TGZ}\n`);
@@ -763,6 +879,8 @@ function setupClone(project, branch) {
         label: `checkout ${project.repoName}@${branch}`,
       });
     }
+    cleanupBenchmarkWorktree(dir, project);
+    ensurePnpmWorkspaceBoundary(project, dir);
 
     if (!flags.has("--no-install")) installIfNeeded(project, dir, branch);
 
@@ -793,6 +911,7 @@ function setupClone(project, branch) {
         `${project.repoName}@${branch}: prerequisite ${step.cmd}\n`,
       );
       sh(step.cmd, path.resolve(dir, step.cwd ?? "."), {
+        env: step.env ? { ...process.env, ...step.env } : process.env,
         quiet: true,
         label: `prerequisite ${project.repoName}@${branch}`,
       });
@@ -819,25 +938,34 @@ function installIfNeeded(project, dir, branch) {
     const cmd =
       project.installCommand ??
       (pm === "pnpm"
-        ? pnpmProjectCommand(dir, "install --no-frozen-lockfile")
+        ? pnpmProjectCommand(
+            dir,
+            "install --no-frozen-lockfile --config.minimumReleaseAge=0",
+          )
         : pm === "yarn"
           ? "YARN_CACHE_FOLDER=.yarn-cache yarn install --ignore-engines --update-checksums"
           : "npm install --legacy-peer-deps");
     if (!hasNodeModules || flags.has("--force-install")) {
       process.stdout.write(`Installing ${path.basename(dir)} with ${pm}\n`);
-      sh(cmd, dir, { label: `install dependencies ${path.basename(dir)}` });
+      const install = () =>
+        sh(cmd, dir, { label: `install dependencies ${path.basename(dir)}` });
+      if (mustRefreshTarballs) {
+        withDependencyFileSnapshot(dir, () => {
+          scrubLocalTarballInstallState(dir, localTarballTargets(branch));
+          install();
+        });
+      } else {
+        install();
+      }
     } else {
       process.stdout.write(
         `Reusing installed node_modules in ${path.basename(dir)}\n`,
       );
     }
-    if (
-      branch === "ttsc" &&
-      hasTsgoCells(project) &&
-      !hasTsgoExperimentDeps(dir)
-    )
-      installTsgoExperimentDeps(project, dir);
     if (mustRefreshTarballs) installLocalTarballs(project, dir, branch);
+    if (mustRefreshTarballs && !hasPinnedTsgoRuntimeDeps(dir)) {
+      installPinnedTsgoRuntimeDeps(project, dir, branch);
+    }
   });
 }
 
@@ -867,38 +995,89 @@ function localTarballPaths(branch) {
 
 function installLocalTarballs(project, dir, branch) {
   return timePhase(`install local tarballs ${path.basename(dir)}`, () => {
-    const targets = localTarballTargets(branch);
-    scrubLocalTarballInstallState(dir, targets);
-    if (project.packageManager === "yarn") {
-      materializeLocalTarballs(targets, dir);
-      return;
-    }
-    const specs = targets
-      .map((target) => quote(path.join(TGZ, target.file)))
-      .join(" ");
-    const pm = project.packageManager;
-    // `--config.minimumReleaseAge=0` keeps the just-bumped ttsc release from
-    // tripping a fixture's npm-hygiene policy. The vue workspace pins
-    // `minimumReleaseAge: 1440` (24 h) in its `pnpm-workspace.yaml`; without
-    // the override pnpm refuses to resolve `optionalDependencies` like
-    // `@ttsc/win32-x64@0.13.0` for ~24 h after publish and the local tarball
-    // install fails. The bench is the publisher's own canonical signal, so
-    // the policy carries no value here.
-    const cmd =
-      project.installTarballsCommand?.(specs) ??
-      (pm === "pnpm"
-        ? ownsPnpmWorkspace(dir)
-          ? `pnpm add -w -D --config.minimumReleaseAge=0 ${specs}`
-          : `pnpm add --ignore-workspace -D --config.minimumReleaseAge=0 ${specs}`
-        : pm === "yarn"
-          ? `YARN_CACHE_FOLDER=.yarn-cache yarn add --dev --force --update-checksums --ignore-engines --ignore-workspace-root-check ${specs}`
-          : `npm install --legacy-peer-deps --save-dev ${specs}`);
-    process.stdout.write(
-      `Installing local tarballs into ${path.basename(dir)}: ` +
-        `${targets.map((target) => target.name).join(", ")}\n`,
-    );
-    sh(cmd, dir, { label: `install local tarballs ${path.basename(dir)}` });
+    withDependencyFileSnapshot(dir, () => {
+      const targets = localTarballTargets(branch);
+      scrubLocalTarballInstallState(dir, targets);
+      if (project.packageManager === "yarn") {
+        materializeLocalTarballs(targets, dir);
+        return;
+      }
+      const specs = targets
+        .map((target) => quote(path.join(TGZ, target.file)))
+        .join(" ");
+      const pm = project.packageManager;
+      // `--config.minimumReleaseAge=0` keeps the just-bumped ttsc release from
+      // tripping a fixture's npm-hygiene policy. The vue workspace pins
+      // `minimumReleaseAge: 1440` (24 h) in its `pnpm-workspace.yaml`; without
+      // the override pnpm refuses to resolve `optionalDependencies` like
+      // `@ttsc/win32-x64@0.13.0` for ~24 h after publish and the local tarball
+      // install fails. The bench is the publisher's own canonical signal, so
+      // the policy carries no value here.
+      const cmd =
+        project.installTarballsCommand?.(specs) ??
+        (pm === "pnpm"
+          ? ownsPnpmWorkspace(dir)
+            ? `pnpm add -w -D --config.minimumReleaseAge=0 ${specs}`
+            : `pnpm add --ignore-workspace -D --config.minimumReleaseAge=0 ${specs}`
+          : pm === "yarn"
+            ? `YARN_CACHE_FOLDER=.yarn-cache yarn add --dev --force --update-checksums --ignore-engines --ignore-workspace-root-check ${specs}`
+            : `npm install --legacy-peer-deps --save-dev ${specs}`);
+      process.stdout.write(
+        `Installing local tarballs into ${path.basename(dir)}: ` +
+          `${targets.map((target) => target.name).join(", ")}\n`,
+      );
+      sh(cmd, dir, { label: `install local tarballs ${path.basename(dir)}` });
+    });
   });
+}
+
+function withDependencyFileSnapshot(dir, fn) {
+  const snapshot = snapshotDependencyFiles(dir);
+  try {
+    return fn();
+  } finally {
+    restoreDependencyFiles(snapshot);
+  }
+}
+
+function snapshotDependencyFiles(dir) {
+  const files = new Set(
+    findProjectFiles(dir, [
+      "package.json",
+      "package-lock.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "yarn.lock",
+    ]),
+  );
+  for (const name of [
+    "package.json",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "yarn.lock",
+  ]) {
+    files.add(path.join(dir, name));
+  }
+  return [...files].map((file) => {
+    const exists = fs.existsSync(file);
+    return {
+      file,
+      exists,
+      content: exists ? fs.readFileSync(file, "utf8") : undefined,
+    };
+  });
+}
+
+function restoreDependencyFiles(snapshot) {
+  for (const entry of snapshot) {
+    if (entry.exists) {
+      fs.mkdirSync(path.dirname(entry.file), { recursive: true });
+      fs.writeFileSync(entry.file, entry.content);
+    } else {
+      fs.rmSync(entry.file, { force: true });
+    }
+  }
 }
 
 function scrubLocalTarballInstallState(dir, targets) {
@@ -1049,11 +1228,11 @@ function linkPackageBins(packageDir, nodeModules) {
 function hasTsgoCells(project) {
   return Boolean(
     project.commands.ttsc?.tsgoBuild?.length ||
-      project.commands.ttsc?.tsgoNoEmit?.length,
+    project.commands.ttsc?.tsgoNoEmit?.length,
   );
 }
 
-function installTsgoExperimentDeps(project, dir) {
+function installPinnedTsgoRuntimeDeps(project, dir, branch) {
   const specs = [
     `@typescript/native-preview@${TSGO_VERSION}`,
     `${TSGO_PLATFORM_PACKAGE}@${TSGO_VERSION}`,
@@ -1074,16 +1253,20 @@ function installTsgoExperimentDeps(project, dir) {
         ? `YARN_CACHE_FOLDER=.yarn-cache yarn add --dev --force --update-checksums --ignore-engines --ignore-workspace-root-check ${specs}`
         : `npm install --legacy-peer-deps --ignore-scripts --save-dev ${specs}`;
   process.stdout.write(
-    `Installing tsgo experiment deps into ${path.basename(dir)}: ` +
-      `@typescript/native-preview, ${TSGO_PLATFORM_PACKAGE}\n`,
+    `Installing pinned tsgo runtime deps into ${path.basename(dir)}: ` +
+      `@typescript/native-preview@${TSGO_VERSION}, ` +
+      `${TSGO_PLATFORM_PACKAGE}@${TSGO_VERSION}\n`,
   );
-  sh(cmd, dir);
+  withDependencyFileSnapshot(dir, () => {
+    scrubLocalTarballInstallState(dir, localTarballTargets(branch));
+    sh(cmd, dir);
+  });
 }
 
-function hasTsgoExperimentDeps(dir) {
+function hasPinnedTsgoRuntimeDeps(dir) {
   return (
-    depVersion(dir, "@typescript/native-preview") !== undefined &&
-    depVersion(dir, TSGO_PLATFORM_PACKAGE) !== undefined
+    depVersion(dir, "@typescript/native-preview") === TSGO_VERSION &&
+    depVersion(dir, TSGO_PLATFORM_PACKAGE) === TSGO_VERSION
   );
 }
 
@@ -1108,34 +1291,42 @@ function singleThreadedSteps(steps) {
 }
 
 /**
- * Append `--checkers N` to every ttsc/tsgo step in the cell. Used to sweep
- * the checker-pool size axis (2 / 4 / 8) replacing the previous binary
- * single/multi axis. Parse and the lint engine still run with the host's
- * full CPU count; only the type-checker pool is capped.
+ * Append `--checkers N` to every ttsc/tsgo step in the cell. Used to sweep the
+ * checker-pool size axis (2 / 4 / 8) replacing the previous binary single/multi
+ * axis. Parse and the lint engine still run with the host's full CPU count;
+ * only the type-checker pool is capped.
  */
 function checkersSteps(steps, n) {
   return steps.map((step) => {
-    if (
-      !/\b(?:ttsc|tsgo)\b/.test(step.cmd) ||
-      /--checkers\b/.test(step.cmd)
-    ) {
+    if (!/\b(?:ttsc|tsgo)\b/.test(step.cmd) || /--checkers\b/.test(step.cmd)) {
       return step;
     }
     return { ...step, cmd: `${step.cmd} --checkers ${n}` };
   });
 }
 
+function diagnosticsSteps(steps) {
+  return steps.map((step) => {
+    if (
+      !/\bttsc\b/.test(step.cmd) ||
+      /--(?:extendedDiagnostics|diagnostics)\b/.test(step.cmd)
+    ) {
+      return step;
+    }
+    return { ...step, cmd: `${step.cmd} --diagnostics` };
+  });
+}
+
 /**
- * Threading variants the bench measures for every ttsc / ttsc-lint /
- * ttsc:tsgo cell. Order is the spec the user asked for: serial baseline
- * first, then the 2/4/8 checker-pool sweep, so the dashboard rows read
- * left-to-right as `single → checkers2 → checkers4 → checkers8`.
+ * Threading variants the bench measures for every ttsc / ttsc-lint / ttsc:tsgo
+ * cell. Order is the spec the user asked for: serial baseline first, then the
+ * 2/4/8 checker-pool sweep, so the dashboard rows read left-to-right as `single
+ * → checkers2 → checkers4 → checkers8`.
  *
- * Returned by a function rather than a top-level `const` so the call
- * sites (`projectCells`, invoked from `main()` near the top of the
- * file) hit a defined value — top-level statements run top-to-bottom,
- * and `main();` is at line ~414 while the variant helpers below sit
- * past line 1000.
+ * Returned by a function rather than a top-level `const` so the call sites
+ * (`projectCells`, invoked from `main()` near the top of the file) hit a
+ * defined value — top-level statements run top-to-bottom, and `main();` is at
+ * line ~414 while the variant helpers below sit past line 1000.
  */
 function threadingVariants() {
   return [
@@ -1146,11 +1337,27 @@ function threadingVariants() {
   ];
 }
 
+/**
+ * Format does not consume the TypeScript-Go checker pool, so the checker sweep
+ * would only repeat the same `ttsc format` workload under misleading labels.
+ * Keep the meaningful formatter axis: serial execution vs the normal bare
+ * command.
+ */
+function formatThreadingVariants() {
+  return [
+    { name: "single", apply: (steps) => singleThreadedSteps(steps) },
+    { name: "multi", apply: (steps) => steps },
+  ];
+}
+
 function measureCell({ id, project, branch, tool, op, threading, steps }) {
   const root = cloneDir(project, branch);
   process.stdout.write(`\n[${id}] ${RUNS} runs\n`);
+  assertCleanBenchmarkWorktree(root, id, project);
+  cleanupBenchmarkWorktree(root, project);
 
-  const run = () => runSteps(steps, root);
+  const run = () => runBenchmarkSteps(steps, root, project);
+  const capturesLintTiming = branch === "ttsc-lint" && isLintOp(op);
 
   for (let i = 0; i < WARMUP; i++) {
     const result = run();
@@ -1174,6 +1381,9 @@ function measureCell({ id, project, branch, tool, op, threading, steps }) {
   }
 
   const samples = [];
+  const lintSidecarSamples = [];
+  const lintPluginSamples = [];
+  const transformHostSamples = [];
   let raceRetries = 0;
   let deterministic = null;
   for (let i = 0; i < RUNS; i++) {
@@ -1193,6 +1403,16 @@ function measureCell({ id, project, branch, tool, op, threading, steps }) {
       break;
     }
     samples.push(result.ms);
+    if (capturesLintTiming) {
+      const lintSidecarMs = parseTtscLintSidecarTimingMs(result.log);
+      if (lintSidecarMs !== undefined) lintSidecarSamples.push(lintSidecarMs);
+      const lintPluginMs = parseTtscLintPluginTimingMs(result.log);
+      if (lintPluginMs !== undefined) lintPluginSamples.push(lintPluginMs);
+      const transformHostMs = parseTtscTransformHostTimingMs(result.log);
+      if (transformHostMs !== undefined) {
+        transformHostSamples.push(transformHostMs);
+      }
+    }
     process.stdout.write(`  run ${i + 1}: ${result.ms.toFixed(0)} ms\n`);
   }
 
@@ -1209,7 +1429,7 @@ function measureCell({ id, project, branch, tool, op, threading, steps }) {
     );
   }
 
-  return {
+  const measured = {
     id,
     branch,
     tool: toolFor(branch, op, tool),
@@ -1220,6 +1440,106 @@ function measureCell({ id, project, branch, tool, op, threading, steps }) {
     samples,
     raceRetries: raceRetries || undefined,
   };
+  if (capturesLintTiming && lintSidecarSamples.length !== 0) {
+    measured.lintMedianMs = median(lintSidecarSamples);
+    measured.lintMinMs = Math.min(...lintSidecarSamples);
+    measured.lintSamples = lintSidecarSamples;
+  }
+  if (capturesLintTiming && lintPluginSamples.length !== 0) {
+    measured.lintPluginMedianMs = median(lintPluginSamples);
+    measured.lintPluginMinMs = Math.min(...lintPluginSamples);
+    measured.lintPluginSamples = lintPluginSamples;
+  }
+  if (capturesLintTiming && transformHostSamples.length !== 0) {
+    measured.transformHostMedianMs = median(transformHostSamples);
+    measured.transformHostMinMs = Math.min(...transformHostSamples);
+    measured.transformHostSamples = transformHostSamples;
+  }
+  return measured;
+}
+
+function runBenchmarkSteps(steps, root, project) {
+  try {
+    return runSteps(steps, root);
+  } finally {
+    cleanupBenchmarkWorktree(root, project);
+  }
+}
+
+function assertCleanBenchmarkWorktree(root, id, project) {
+  const status = benchmarkWorktreeStatus(root, project);
+  if (!status.trim()) return;
+  throw new Error(
+    `${id} cannot start from a dirty benchmark worktree: ${root}\n${status}`,
+  );
+}
+
+function cleanupBenchmarkWorktree(root, project) {
+  sh("git restore --worktree .", root, {
+    quiet: true,
+    timing: false,
+    label: `restore benchmark worktree ${path.basename(root)}`,
+  });
+  const excludes = [
+    "node_modules",
+    "**/node_modules",
+    ".yarn-cache",
+    ".pnpm-store",
+    ".husky/_",
+    "**/.husky/_",
+    ...(project?.packageManager === "pnpm" ? ["pnpm-workspace.yaml"] : []),
+    ...(project?.cleanExcludes ?? []),
+  ];
+  sh(
+    `git clean -fdx ${excludes.map((pattern) => `-e ${quote(pattern)}`).join(" ")}`,
+    root,
+    {
+      quiet: true,
+      timing: false,
+      label: `clean benchmark worktree ${path.basename(root)}`,
+    },
+  );
+}
+
+function benchmarkWorktreeStatus(root, project) {
+  const status =
+    sh("git status --short --untracked-files=normal", root, {
+      quiet: true,
+      check: false,
+      timing: false,
+    }).stdout ?? "";
+  return status
+    .split("\n")
+    .filter((line) => line && !isAllowedBenchmarkDirtyLine(line, project))
+    .join("\n");
+}
+
+function isAllowedBenchmarkDirtyLine(line, project) {
+  const pathText = line.slice(3).trim();
+  const paths = pathText.includes(" -> ")
+    ? pathText.split(" -> ").map((part) => part.trim())
+    : [pathText];
+  return paths.every((file) => isAllowedBenchmarkDirtyPath(file, project));
+}
+
+function isAllowedBenchmarkDirtyPath(file, project) {
+  const path = file.replace(/^"|"$/g, "").replace(/\/$/, "");
+  const allowed = [
+    "node_modules",
+    ".yarn-cache",
+    ".pnpm-store",
+    ".husky/_",
+    ...(project?.packageManager === "pnpm" ? ["pnpm-workspace.yaml"] : []),
+    ...(project?.cleanExcludes ?? []),
+  ];
+  return allowed.some((pattern) => matchesBenchmarkDirtyPath(path, pattern));
+}
+
+function matchesBenchmarkDirtyPath(path, pattern) {
+  const normalized = pattern.replace(/\/\*\*$/, "").replace(/\/$/, "");
+  if (normalized === "**/node_modules") return path.includes("node_modules");
+  if (normalized === "**/.husky/_") return path.endsWith(".husky/_");
+  return path === normalized || path.startsWith(`${normalized}/`);
 }
 
 function failedMeasurement(
@@ -1288,6 +1608,10 @@ function projectReportFor(project, measurements) {
     repo: project.repoName,
     kind: project.kind,
     files: countSourceFiles(projectSourceRoot(project)),
+    typescript: displayLegacyTypescriptVersion(
+      depVersion(cloneDir(project, "legacy"), "typescript"),
+    ),
+    tsgo: TSGO_VERSION,
     measurements,
   };
 }
@@ -1339,15 +1663,6 @@ function hostSpec(projects) {
   } catch {
     // Keep os.type/os.release fallback.
   }
-  let typescript = "unknown";
-  let tsgo = "unknown";
-  for (const project of projects) {
-    typescript =
-      depVersion(cloneDir(project, "legacy"), "typescript") ?? typescript;
-    tsgo =
-      depVersion(cloneDir(project, "ttsc"), "@typescript/native-preview") ??
-      tsgo;
-  }
   return {
     os: osName,
     kernel: os.release(),
@@ -1356,9 +1671,32 @@ function hostSpec(projects) {
     ramGB: Math.round(os.totalmem() / 2 ** 30),
     node: process.version,
     ttsc: TTSC_VERSION,
-    typescript,
-    tsgo,
+    typescript: displayLegacyTypescriptVersion(
+      commonDepVersion(projects, "legacy", "typescript"),
+    ),
+    tsgo: TSGO_VERSION,
   };
+}
+
+function displayLegacyTypescriptVersion(version) {
+  if (!version || version === "unknown") return version ?? "unknown";
+  if (version === "varies by fixture") return version;
+  if (version === "6.0.0-dev.20260416" || version === "6.0.3") {
+    return LEGACY_TYPESCRIPT_DISPLAY_VERSION;
+  }
+  return version.startsWith("v") ? version : `v${version}`;
+}
+
+function commonDepVersion(projects, branch, name) {
+  const versions = [
+    ...new Set(
+      projects
+        .map((project) => depVersion(cloneDir(project, branch), name))
+        .filter(Boolean),
+    ),
+  ];
+  if (versions.length === 0) return "unknown";
+  return versions.length === 1 ? versions[0] : "varies by fixture";
 }
 
 function depVersion(root, name) {
@@ -1393,11 +1731,16 @@ function buildMarkdown(report) {
   for (const project of report.projects) {
     lines.push(`## ${project.name}`);
     lines.push("");
-    lines.push("| Branch | Op | Threading | Median | Samples | Failure |");
-    lines.push("| --- | --- | --- | --- | --- | --- |");
+    lines.push(
+      "| Branch | Op | Threading | Median | @ttsc/lint sidecar | @ttsc/lint | Transform host | Samples | Failure |",
+    );
+    lines.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
     for (const m of project.measurements) {
       lines.push(
         `| ${m.branch} | ${m.op} | ${m.threading} | ${formatMs(m.medianMs)} | ` +
+          `${formatMs(m.lintMedianMs ?? 0)} | ` +
+          `${formatMs(m.lintPluginMedianMs ?? 0)} | ` +
+          `${formatMs(m.transformHostMedianMs ?? 0)} | ` +
           `${m.samples?.map((s) => s.toFixed(0)).join(", ") || "-"} | ` +
           `${m.failure ?? ""} |`,
       );
@@ -1498,6 +1841,7 @@ function mergePreviousWebsiteMeasurements(report) {
     );
     const measurements = [];
     for (const oldMeasurement of oldProject.measurements) {
+      if (isObsoleteMergedMeasurement(oldMeasurement)) continue;
       const fresh = freshById.get(oldMeasurement.id);
       if (fresh) {
         measurements.push(fresh);
@@ -1512,10 +1856,29 @@ function mergePreviousWebsiteMeasurements(report) {
   const existing = new Set(merged.projects.map((project) => project.name));
   for (const oldProject of previous.projects) {
     if (!existing.has(oldProject.name)) {
-      merged.projects.push(oldProject);
+      merged.projects.push(pruneObsoleteMeasurements(oldProject));
     }
   }
   return merged;
+}
+
+function pruneObsoleteMeasurements(project) {
+  return {
+    ...project,
+    measurements: (project.measurements ?? []).filter(
+      (measurement) => !isObsoleteMergedMeasurement(measurement),
+    ),
+  };
+}
+
+function isObsoleteMergedMeasurement(measurement) {
+  if (measurement.threading === "multi" && measurement.branch !== "legacy") {
+    return measurement.op === "build" || measurement.op === "noEmit";
+  }
+  return (
+    measurement.op === "format" &&
+    /^(?:checkers2|checkers4|checkers8)$/.test(measurement.threading)
+  );
 }
 
 function loadJson(file) {
@@ -1675,6 +2038,10 @@ function projectCells(project) {
     for (const op of ["build", "noEmit", "eslint", "format"]) {
       const baseSteps = branchCommands[op];
       if (!baseSteps?.length) continue;
+      const measuredSteps =
+        branch === "ttsc-lint" && isLintOp(op)
+          ? diagnosticsSteps(baseSteps)
+          : baseSteps;
       if (branch === "legacy" || op === "eslint") {
         // Legacy compilers and the ESLint pass do not vary by ttsc's
         // threading axis. Keep the cell at `threading: "multi"` (its
@@ -1687,17 +2054,19 @@ function projectCells(project) {
           branch,
           op,
           threading: "multi",
-          steps: baseSteps,
+          steps: measuredSteps,
         });
       } else {
-        for (const variant of threadingVariants()) {
+        const variants =
+          op === "format" ? formatThreadingVariants() : threadingVariants();
+        for (const variant of variants) {
           cells.push({
             id: `${project.name}:${branch}:${op}:${variant.name}`,
             project,
             branch,
             op,
             threading: variant.name,
-            steps: variant.apply(baseSteps),
+            steps: variant.apply(measuredSteps),
           });
         }
       }

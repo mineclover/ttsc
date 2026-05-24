@@ -135,26 +135,8 @@ function tabFromHash(hash: string): BenchmarkTab {
 
 function Snapshot({ report }: { report: BenchmarkReport }) {
   const best = bestRatio(report);
-  const totalMeasurements = report.projects.reduce(
-    (sum, project) => sum + project.measurements.length,
-    0,
-  );
-  const totalSamples = report.projects.reduce(
-    (sum, project) =>
-      sum +
-      project.measurements.reduce(
-        (inner, measurement) => inner + (measurement.samples?.length ?? 0),
-        0,
-      ),
-    0,
-  );
   const stats = [
     { label: "Projects", value: report.projects.length.toLocaleString() },
-    { label: "Measurements", value: totalMeasurements.toLocaleString() },
-    {
-      label: "Samples",
-      value: totalSamples > 0 ? totalSamples.toLocaleString() : "not recorded",
-    },
     {
       label: "Runs per cell",
       value:
@@ -182,7 +164,7 @@ function Snapshot({ report }: { report: BenchmarkReport }) {
           from the generated benchmark JSON.
         </p>
       </div>
-      <dl className="grid grid-cols-2 gap-px bg-[#262b36] md:grid-cols-3 xl:grid-cols-6">
+      <dl className="grid grid-cols-2 gap-px bg-[#262b36] xl:grid-cols-4">
         {stats.map((stat) => (
           <div key={stat.label} className="bg-[#0f1115] px-4 py-3">
             <dt className="font-mono text-[11px] uppercase text-neutral-500">
@@ -237,11 +219,7 @@ function SummaryTab({ report }: { report: BenchmarkReport }) {
             />
           ) : null}
           {lint ? (
-            <ProjectLintRows
-              project={lint.project}
-              op="noEmit"
-              title="Lint"
-            />
+            <ProjectLintRows project={lint.project} op="noEmit" title="Lint" />
           ) : null}
           {format ? (
             <ProjectFormatRows project={format.project} title="Format" />
@@ -316,7 +294,12 @@ function ProjectOperationRows({
   if (!baseline || rows.length <= 1) return null;
 
   const best = rows
-    .filter((row) => !row.baseline && row.measurement.medianMs > 0)
+    .filter(
+      (row) =>
+        !row.baseline &&
+        row.measurement.tool === "ttsc" &&
+        row.measurement.medianMs > 0,
+    )
     .reduce<{ factor: number; label: string } | undefined>((acc, row) => {
       const factor = baseline.measurement.medianMs / row.measurement.medianMs;
       return !acc || factor > acc.factor ? { factor, label: row.label } : acc;
@@ -365,7 +348,10 @@ function LintTab({ report }: { report: BenchmarkReport }) {
       <HeroRatio winner={hero} scope="Lint" />
       <LintMatrix
         title="Lint Tool Matrix"
-        description="Legacy stacks tsc --noEmit plus ESLint; ttsc-lint stacks ttsc --noEmit plus the @ttsc/lint overhead."
+        description={
+          "Legacy stacks tsc --noEmit plus ESLint; ttsc-lint reports the " +
+          "measured @ttsc/lint time from ttsc --diagnostics."
+        }
         projects={projects}
         op="noEmit"
       />
@@ -428,8 +414,8 @@ function ProjectLintRows({
   // Lint's "best" is the lint-pass-only ratio (ESLint time vs @ttsc/lint
   // overhead) — that's the multiplier the dashboard is actually selling.
   // Total-stack ratio (`tsc + eslint` vs `ttsc + @ttsc/lint`) lives in the
-  // bars on the right and reads ~10–20x; the isolated lint factor reads
-  // ~50x+ because eslint alone is the slow side.
+  // bars on the right; the isolated lint factor can be hundreds of times
+  // larger because eslint alone is the slow side.
   const best = rows
     .filter((row) => !row.baseline && (row.lintFactor ?? 0) > 0)
     .reduce<{ factor: number; label: string } | undefined>((acc, row) => {
@@ -493,6 +479,11 @@ function ProjectLabel({
       <p className="mt-1 text-[11px] text-neutral-500">
         {project.files.toLocaleString()} files
       </p>
+      {project.typescript ? (
+        <p className="mt-1 break-all font-mono text-[10px] text-neutral-500">
+          legacy TS {project.typescript}
+        </p>
+      ) : null}
       <p className="mt-2 font-mono text-[11px] text-neutral-400">
         baseline: {formatDuration(baselineMs)}
       </p>
@@ -582,7 +573,10 @@ function StackedDurationBar({
 }) {
   const widthPct = Math.max(4, (totalMs / maxMs) * 100);
   const labelTooltip = estimated
-    ? `${label} — estimated from MT ratio; ST lint overhead measured below the noise floor`
+    ? [
+        `${label} — estimated from total ttsc-lint minus plain ttsc;`,
+        "rerun the benchmark to use direct @ttsc/lint timing",
+      ].join(" ")
     : label;
 
   return (
@@ -690,8 +684,10 @@ interface LintRow {
   baseline?: boolean;
   eslintMs?: number;
   lintOverheadMs?: number;
+  transformHostMs?: number;
   lintFactor?: number;
   estimated?: boolean;
+  directLintTiming?: boolean;
 }
 
 interface LintRatioParts {
@@ -788,13 +784,23 @@ function lintRowsForProject(
       ],
     });
 
-  // Snapshot the raw per-threading numbers so we can back-fill the ST row's
-  // lint overhead from the MT ratio when the ST measurement lands below the
-  // noise floor (lint <= ttsc plain). Without the back-fill, the ST row
-  // collapses to a 0 ms overhead and downstream factor math produces
-  // `Infinity`/`NaN` in the chart.
+  // Newer runs record the native @ttsc/lint and transform-host wall-clock
+  // timings from `ttsc --diagnostics`. Older snapshots recorded only the whole
+  // @ttsc/lint sidecar, which includes TypeScript diagnostics and makes the
+  // compiler segment look implausibly small, so those rows deliberately fall
+  // back to total-minus-plain until the published dataset is refreshed.
   const ttscByThreading: Partial<
-    Record<Threading, { plainMs: number; totalMs: number; rawOverhead: number }>
+    Record<
+      Threading,
+      {
+        directLintTiming: boolean;
+        lintMs: number;
+        plainMs: number;
+        transformHostMs: number;
+        totalMs: number;
+        rawOverhead: number;
+      }
+    >
   > = {};
   for (const threading of TTSC_THREADING_SPECTRUM) {
     const total = findTtscLintTotal(measurements, op, threading);
@@ -805,8 +811,15 @@ function lintRowsForProject(
       threading,
     });
     if (!total || !plainTtsc) continue;
+    const directLintMs =
+      total.lintPluginMedianMs !== undefined && total.lintPluginMedianMs > 0
+        ? total.lintPluginMedianMs
+        : undefined;
     ttscByThreading[threading] = {
+      directLintTiming: directLintMs !== undefined,
+      lintMs: directLintMs ?? total.medianMs - plainTtsc.medianMs,
       plainMs: plainTtsc.medianMs,
+      transformHostMs: Math.max(0, total.transformHostMedianMs ?? 0),
       totalMs: total.medianMs,
       rawOverhead: total.medianMs - plainTtsc.medianMs,
     };
@@ -816,34 +829,48 @@ function lintRowsForProject(
     const current = ttscByThreading[threading];
     if (!current) continue;
 
-    const { plainMs, totalMs, rawOverhead } = current;
-    let lintOverheadMs = Math.max(0, rawOverhead);
-    let estimated = false;
+    const { directLintTiming, plainMs, totalMs, rawOverhead, transformHostMs } =
+      current;
+    let lintOverheadMs = directLintTiming
+      ? Math.max(0, current.lintMs)
+      : Math.max(0, rawOverhead);
+    const estimated = !directLintTiming;
 
-    // ST back-fill: when the single-threaded lint cost cannot be observed
-    // (overhead <= 0 in raw timings) the checker spectrum is sweeping
-    // around the noise floor on the ST end. Synthesize the ST overhead
-    // from `checkers8`'s ratio — the fastest spectrum point and the
-    // closest to the pre-spectrum "multi" baseline:
+    // ST fallback: when a snapshot has no direct @ttsc/lint timing and
+    // total-minus-plain lands below the noise floor, synthesize the ST lint
+    // cost from `checkers8`'s ratio — the fastest spectrum point and the
+    // closest to the former "multi" baseline:
     //   ST_synthetic = round(ST_plain * (C8_overhead / C8_plain))
     // The synthetic row is tagged `estimated` so the renderer can mark
     // it as a derived figure rather than a measurement.
-    if (threading === "single" && rawOverhead <= 0) {
+    if (!directLintTiming && threading === "single" && rawOverhead <= 0) {
       const fast = ttscByThreading.checkers8 ?? ttscByThreading.multi;
-      if (fast && fast.plainMs > 0 && fast.rawOverhead > 0) {
-        lintOverheadMs = Math.round(
-          plainMs * (fast.rawOverhead / fast.plainMs),
-        );
-        estimated = lintOverheadMs > 0;
+      const fastLintMs = fast?.directLintTiming
+        ? fast.lintMs
+        : fast?.rawOverhead;
+      if (
+        fast &&
+        fast.plainMs > 0 &&
+        fastLintMs !== undefined &&
+        fastLintMs > 0
+      ) {
+        lintOverheadMs = Math.round(plainMs * (fastLintMs / fast.plainMs));
       }
     }
 
-    const ttscMs = estimated ? plainMs : Math.min(plainMs, totalMs);
-    const adjustedTotalMs = estimated ? ttscMs + lintOverheadMs : totalMs;
+    const boundedTransformHostMs = directLintTiming
+      ? Math.min(transformHostMs, Math.max(0, totalMs - lintOverheadMs))
+      : 0;
+    const ttscMs = directLintTiming
+      ? Math.max(0, totalMs - lintOverheadMs - boundedTransformHostMs)
+      : plainMs;
+    const adjustedTotalMs = directLintTiming
+      ? totalMs
+      : ttscMs + lintOverheadMs;
     const flagSuffix = formatFlagLabel(threading);
     const baseLabel = "ttsc + @ttsc/lint";
     const label = estimated
-      ? `${baseLabel} (${flagSuffix}, est.)`
+      ? `${baseLabel} (${flagSuffix}, delta est.)`
       : flagSuffix
         ? `${baseLabel} (${flagSuffix})`
         : baseLabel;
@@ -860,6 +887,8 @@ function lintRowsForProject(
         eslint && lintOverheadMs > 0
           ? eslint.medianMs / lintOverheadMs
           : undefined,
+      transformHostMs: boundedTransformHostMs || undefined,
+      directLintTiming,
       estimated,
       segments: [
         { label: "ttsc", ms: ttscMs, color: "bg-cyan-500" },
@@ -868,7 +897,14 @@ function lintRowsForProject(
           ms: lintOverheadMs,
           color: "bg-emerald-400",
         },
-      ],
+        boundedTransformHostMs > 0
+          ? {
+              label: "transform host",
+              ms: boundedTransformHostMs,
+              color: "bg-blue-500",
+            }
+          : undefined,
+      ].filter((segment): segment is LintSegment => segment !== undefined),
     });
   }
 
@@ -886,11 +922,10 @@ function hasComparableLint(project: BenchmarkProject, op: Operation) {
 }
 
 /**
- * Hero panel: the biggest single speedup across the tab's scope rendered
- * at oversized point size on the left, with the project + cell label
- * underneath. Rendered above Build / Type-check / Lint / Format tabs
- * (NOT the Summary tab — that one's per-project label badges already
- * carry the per-project best).
+ * Hero panel: the biggest single speedup across the tab's scope rendered at
+ * oversized point size on the left, with the project + cell label underneath.
+ * Rendered above Build / Type-check / Lint / Format tabs (NOT the Summary tab —
+ * that one's per-project label badges already carry the per-project best).
  */
 function HeroRatio({
   winner,
@@ -938,7 +973,6 @@ function bestRatio(report: BenchmarkReport): Winner | undefined {
   );
 }
 
-
 function bestOperationProject(
   report: BenchmarkReport,
   op: Operation,
@@ -949,7 +983,7 @@ function bestOperationProject(
     if (!baseline) return best;
 
     const winner = rows
-      .filter((row) => !row.baseline)
+      .filter((row) => !row.baseline && row.measurement.tool === "ttsc")
       .reduce<Winner | undefined>((innerBest, row) => {
         const factor = baseline.measurement.medianMs / row.measurement.medianMs;
         const current = {
@@ -1069,7 +1103,7 @@ function FormatTab({ report }: { report: BenchmarkReport }) {
       <section className={panelClass}>
         <TableHeader
           title="Format Tool Matrix"
-          description="Prettier (legacy) vs ttsc format (ttsc-lint), across the threading spectrum."
+          description="Prettier (legacy) vs ttsc format (ttsc-lint), single-threaded and default."
           suffix={`${projects.length.toLocaleString()} projects`}
         />
         <div className="divide-y divide-[#252b36]">
@@ -1163,7 +1197,7 @@ function formatRowsForProject(project: BenchmarkProject): OperationRow[] {
       color: "bg-amber-500",
       baseline: true,
     });
-  for (const threading of TTSC_THREADING_SPECTRUM) {
+  for (const threading of FORMAT_THREADING_SPECTRUM) {
     const ttscFormat = measurements.find(
       (m) =>
         m.branch === "ttsc-lint" &&
@@ -1252,6 +1286,9 @@ const TTSC_THREADING_SPECTRUM: readonly Threading[] = [
   "checkers8",
 ];
 
+/** Format rows render the only formatter-sensitive axis: serial vs default. */
+const FORMAT_THREADING_SPECTRUM: readonly Threading[] = ["single", "multi"];
+
 /**
  * Tailwind class for the bar of a threading variant. The spectrum reads
  * dark→light from `single` (most-constrained, slowest) to `checkers8`
@@ -1289,9 +1326,5 @@ function tsgoBarColor(threading: Threading): string {
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return date.toISOString().slice(0, 10);
 }

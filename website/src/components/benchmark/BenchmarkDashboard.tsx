@@ -135,26 +135,8 @@ function tabFromHash(hash: string): BenchmarkTab {
 
 function Snapshot({ report }: { report: BenchmarkReport }) {
   const best = bestRatio(report);
-  const totalMeasurements = report.projects.reduce(
-    (sum, project) => sum + project.measurements.length,
-    0,
-  );
-  const totalSamples = report.projects.reduce(
-    (sum, project) =>
-      sum +
-      project.measurements.reduce(
-        (inner, measurement) => inner + (measurement.samples?.length ?? 0),
-        0,
-      ),
-    0,
-  );
   const stats = [
     { label: "Projects", value: report.projects.length.toLocaleString() },
-    { label: "Measurements", value: totalMeasurements.toLocaleString() },
-    {
-      label: "Samples",
-      value: totalSamples > 0 ? totalSamples.toLocaleString() : "not recorded",
-    },
     {
       label: "Runs per cell",
       value:
@@ -182,7 +164,7 @@ function Snapshot({ report }: { report: BenchmarkReport }) {
           from the generated benchmark JSON.
         </p>
       </div>
-      <dl className="grid grid-cols-2 gap-px bg-[#262b36] md:grid-cols-3 xl:grid-cols-6">
+      <dl className="grid grid-cols-2 gap-px bg-[#262b36] xl:grid-cols-4">
         {stats.map((stat) => (
           <div key={stat.label} className="bg-[#0f1115] px-4 py-3">
             <dt className="font-mono text-[11px] uppercase text-neutral-500">
@@ -312,7 +294,12 @@ function ProjectOperationRows({
   if (!baseline || rows.length <= 1) return null;
 
   const best = rows
-    .filter((row) => !row.baseline && row.measurement.medianMs > 0)
+    .filter(
+      (row) =>
+        !row.baseline &&
+        row.measurement.tool === "ttsc" &&
+        row.measurement.medianMs > 0,
+    )
     .reduce<{ factor: number; label: string } | undefined>((acc, row) => {
       const factor = baseline.measurement.medianMs / row.measurement.medianMs;
       return !acc || factor > acc.factor ? { factor, label: row.label } : acc;
@@ -996,7 +983,7 @@ function bestOperationProject(
     if (!baseline) return best;
 
     const winner = rows
-      .filter((row) => !row.baseline)
+      .filter((row) => !row.baseline && row.measurement.tool === "ttsc")
       .reduce<Winner | undefined>((innerBest, row) => {
         const factor = baseline.measurement.medianMs / row.measurement.medianMs;
         const current = {
@@ -1339,9 +1326,5 @@ function tsgoBarColor(threading: Threading): string {
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return date.toISOString().slice(0, 10);
 }

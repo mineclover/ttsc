@@ -18,11 +18,7 @@ export default function HostPanel({
   const measured = new Date(date);
   const measuredLabel = Number.isNaN(measured.getTime())
     ? date
-    : measured.toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
+    : measured.toISOString().slice(0, 10);
 
   const specs: { label: string; value: string }[] = [
     { label: "CPU", value: fallback(host.cpu) },

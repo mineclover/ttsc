@@ -17,7 +17,9 @@ still depend on the host shown below.
 
 The Summary tab keeps only the strongest result in each category. Build and
 Type-check compare one unit of work across the legacy compiler, `ttsc` in
-single-threaded and default multi-threaded modes.
+single-threaded and checker-pool modes. Raw `tsgo` rows are kept as a reference
+for native-preview overhead, but they are not eligible for the headline winner
+or per-project best ratio.
 
 Lint is intentionally split out. The legacy path is `tsc + eslint`, two
 separate passes over the project. The `ttsc-lint` path runs `ttsc` with

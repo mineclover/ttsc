@@ -12,5 +12,5 @@ import "testing"
 // 2. Enable only storybook/await-interactions from the fixture annotation.
 // 3. Assert the native Engine reports the unawaited interaction call.
 func TestRuleCorpusStorybookAwaitInteractions(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/await-interactions.ts", "export default { component: Button };\nexport const Primary = {\n  play: async () => {\n    // expect: storybook/await-interactions error\n    userEvent.click(button);\n  },\n};\n")
+  assertRuleCorpusCase(t, "storybook/await-interactions.ts", "export default { component: Button };\nexport const Primary = {\n  play: async () => {\n    // expect: storybook/await-interactions error\n    userEvent.click(button);\n  },\n};\n")
 }

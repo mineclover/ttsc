@@ -11,5 +11,5 @@ import "testing"
 // 2. Enable storybook/default-exports from the annotation.
 // 3. Assert the missing default export diagnostic lands on the story export.
 func TestRuleCorpusStorybookDefaultExports(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/default-exports.ts", "// expect: storybook/default-exports error\nexport const Primary = {};\n")
+  assertRuleCorpusCase(t, "storybook/default-exports.ts", "// expect: storybook/default-exports error\nexport const Primary = {};\n")
 }

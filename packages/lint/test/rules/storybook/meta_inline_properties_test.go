@@ -11,5 +11,5 @@ import "testing"
 // 2. Use that variable as the default meta title.
 // 3. Assert storybook/meta-inline-properties reports the dynamic property.
 func TestRuleCorpusStorybookMetaInlineProperties(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/meta-inline-properties.ts", "const title = \"Atoms/Button\";\nexport default {\n  // expect: storybook/meta-inline-properties error\n  title,\n  component: Button,\n};\nexport const Primary = {};\n")
+  assertRuleCorpusCase(t, "storybook/meta-inline-properties.ts", "const title = \"Atoms/Button\";\nexport default {\n  // expect: storybook/meta-inline-properties error\n  title,\n  component: Button,\n};\nexport const Primary = {};\n")
 }

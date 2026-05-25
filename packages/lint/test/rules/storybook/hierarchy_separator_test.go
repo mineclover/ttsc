@@ -11,5 +11,5 @@ import "testing"
 // 2. Enable storybook/hierarchy-separator from the annotation.
 // 3. Assert the title property is reported.
 func TestRuleCorpusStorybookHierarchySeparator(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/hierarchy-separator.ts", "export default {\n  // expect: storybook/hierarchy-separator warn\n  title: \"Atoms|Button\",\n  component: Button,\n};\nexport const Primary = {};\n")
+  assertRuleCorpusCase(t, "storybook/hierarchy-separator.ts", "export default {\n  // expect: storybook/hierarchy-separator warn\n  title: \"Atoms|Button\",\n  component: Button,\n};\nexport const Primary = {};\n")
 }

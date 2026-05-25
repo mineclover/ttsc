@@ -11,5 +11,5 @@ import "testing"
 // 2. Enable storybook/meta-satisfies-type from the annotation.
 // 3. Assert the meta object is reported.
 func TestRuleCorpusStorybookMetaSatisfiesType(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/meta-satisfies-type.ts", "// expect: storybook/meta-satisfies-type error\nexport default { component: Button };\nexport const Primary = {};\n")
+  assertRuleCorpusCase(t, "storybook/meta-satisfies-type.ts", "// expect: storybook/meta-satisfies-type error\nexport default { component: Button };\nexport const Primary = {};\n")
 }

@@ -11,5 +11,5 @@ import "testing"
 // 2. Enable storybook/csf-component from the expectation comment.
 // 3. Assert the rule reports the default export.
 func TestRuleCorpusStorybookCsfComponent(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/csf-component.ts", "// expect: storybook/csf-component error\nexport default { title: \"Atoms/Button\" };\nexport const Primary = {};\n")
+  assertRuleCorpusCase(t, "storybook/csf-component.ts", "// expect: storybook/csf-component error\nexport default { title: \"Atoms/Button\" };\nexport const Primary = {};\n")
 }

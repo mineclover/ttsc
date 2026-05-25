@@ -11,5 +11,5 @@ import "testing"
 // 2. Call another story's play function without forwarding that context.
 // 3. Assert storybook/context-in-play-function reports the call expression.
 func TestRuleCorpusStorybookContextInPlayFunction(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/context-in-play-function.ts", "export default { component: Button };\nexport const Primary = {};\nexport const Secondary = {\n  play: async (context) => {\n    // expect: storybook/context-in-play-function error\n    Primary.play();\n  },\n};\n")
+  assertRuleCorpusCase(t, "storybook/context-in-play-function.ts", "export default { component: Button };\nexport const Primary = {};\nexport const Secondary = {\n  play: async (context) => {\n    // expect: storybook/context-in-play-function error\n    Primary.play();\n  },\n};\n")
 }

@@ -11,5 +11,5 @@ import "testing"
 // 2. Enable storybook/no-redundant-story-name from the annotation.
 // 3. Assert the redundant property is reported.
 func TestRuleCorpusStorybookNoRedundantStoryName(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/no-redundant-story-name.ts", "export default { component: Button };\nexport const Primary = {\n  // expect: storybook/no-redundant-story-name warn\n  name: \"Primary\",\n};\n")
+  assertRuleCorpusCase(t, "storybook/no-redundant-story-name.ts", "export default { component: Button };\nexport const Primary = {\n  // expect: storybook/no-redundant-story-name warn\n  name: \"Primary\",\n};\n")
 }

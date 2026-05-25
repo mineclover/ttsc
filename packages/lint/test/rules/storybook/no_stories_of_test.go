@@ -11,5 +11,5 @@ import "testing"
 // 2. Enable storybook/no-stories-of from the annotation.
 // 3. Assert the import specifier is reported.
 func TestRuleCorpusStorybookNoStoriesOf(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/no-stories-of.ts", "import {\n  // expect: storybook/no-stories-of error\n  storiesOf,\n} from \"@storybook/react\";\nstoriesOf(\"Atoms/Button\", module);\n")
+  assertRuleCorpusCase(t, "storybook/no-stories-of.ts", "import {\n  // expect: storybook/no-stories-of error\n  storiesOf,\n} from \"@storybook/react\";\nstoriesOf(\"Atoms/Button\", module);\n")
 }

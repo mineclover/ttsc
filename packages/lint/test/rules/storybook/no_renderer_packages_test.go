@@ -11,5 +11,5 @@ import "testing"
 // 2. Enable storybook/no-renderer-packages from the annotation.
 // 3. Assert the renderer import is reported.
 func TestRuleCorpusStorybookNoRendererPackages(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/no-renderer-packages.ts", "// expect: storybook/no-renderer-packages error\nimport type { Meta } from \"@storybook/react\";\nexport default { component: Button };\nexport const Primary = {};\n")
+  assertRuleCorpusCase(t, "storybook/no-renderer-packages.ts", "// expect: storybook/no-renderer-packages error\nimport type { Meta } from \"@storybook/react\";\nexport default { component: Button };\nexport const Primary = {};\n")
 }

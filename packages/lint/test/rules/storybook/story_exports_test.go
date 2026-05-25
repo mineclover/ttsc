@@ -11,5 +11,5 @@ import "testing"
 // 2. Enable storybook/story-exports from the annotation.
 // 3. Assert the default meta statement is reported as having no stories.
 func TestRuleCorpusStorybookStoryExports(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/story-exports.ts", "// expect: storybook/story-exports error\nexport default { component: Button };\nexport const __namedExportsOrder = [\"Primary\"];\n")
+  assertRuleCorpusCase(t, "storybook/story-exports.ts", "// expect: storybook/story-exports error\nexport default { component: Button };\nexport const __namedExportsOrder = [\"Primary\"];\n")
 }

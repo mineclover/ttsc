@@ -11,5 +11,5 @@ import "testing"
 // 2. Enable storybook/use-storybook-testing-library from the annotation.
 // 3. Assert the direct Testing Library import is reported.
 func TestRuleCorpusStorybookUseStorybookTestingLibrary(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/use-storybook-testing-library.ts", "// expect: storybook/use-storybook-testing-library error\nimport { screen } from \"@testing-library/react\";\nexport default { component: Button };\nexport const Primary = {};\nvoid screen;\n")
+  assertRuleCorpusCase(t, "storybook/use-storybook-testing-library.ts", "// expect: storybook/use-storybook-testing-library error\nimport { screen } from \"@testing-library/react\";\nexport default { component: Button };\nexport const Primary = {};\nvoid screen;\n")
 }

@@ -11,5 +11,5 @@ import "testing"
 // 2. Enable storybook/no-title-property-in-meta from the annotation.
 // 3. Assert the title property is reported.
 func TestRuleCorpusStorybookNoTitlePropertyInMeta(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/no-title-property-in-meta.ts", "export default {\n  // expect: storybook/no-title-property-in-meta error\n  title: \"Atoms/Button\",\n  component: Button,\n};\nexport const Primary = {};\n")
+  assertRuleCorpusCase(t, "storybook/no-title-property-in-meta.ts", "export default {\n  // expect: storybook/no-title-property-in-meta error\n  title: \"Atoms/Button\",\n  component: Button,\n};\nexport const Primary = {};\n")
 }

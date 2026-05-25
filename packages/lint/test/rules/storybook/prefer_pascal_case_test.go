@@ -11,5 +11,5 @@ import "testing"
 // 2. Export a lowercase story variable.
 // 3. Assert storybook/prefer-pascal-case reports the story identifier.
 func TestRuleCorpusStorybookPreferPascalCase(t *testing.T) {
-	assertRuleCorpusCase(t, "storybook/prefer-pascal-case.ts", "export default { component: Button };\n// expect: storybook/prefer-pascal-case warn\nexport const primary = {};\n")
+  assertRuleCorpusCase(t, "storybook/prefer-pascal-case.ts", "export default { component: Button };\n// expect: storybook/prefer-pascal-case warn\nexport const primary = {};\n")
 }

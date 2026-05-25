@@ -14,10 +14,17 @@ import {
   PLAYGROUND_EXAMPLES,
 } from "../../compiler/PlaygroundExamples";
 import {
+  BUILT_IN_PLAYGROUND_PACKAGES,
+  type IPlaygroundDependencyProgress,
+  collectExternalPackageNames,
+  installPlaygroundDependencies,
+} from "../../compiler/npm-dependencies";
+import {
   createSandboxRequire,
   loadTypiaRuntimePack,
 } from "../../compiler/typia-runtime-pack";
 import ConsoleViewer, { type IConsoleMessage } from "./ConsoleViewer";
+import DependencyProgressModal from "./DependencyProgressModal";
 import DiagnosticsPanel from "./DiagnosticsPanel";
 import ExamplePicker from "./ExamplePicker";
 import OptionsPanel from "./OptionsPanel";
@@ -59,6 +66,8 @@ const DEFAULT_OPTIONS: ITransformOptions = {
   lint: true,
 };
 
+const DEPENDENCY_INSTALL_QUIET_MS = 900;
+
 // Cap the share URL at roughly the lowest-common-denominator browser limit
 // (~2KB). lz-string compresses well but pathological inputs blow past this.
 const SHARE_URL_WARN_BYTES = 2000;
@@ -83,12 +92,39 @@ export default function PlaygroundShell() {
   const [bundleError, setBundleError] = useState<string | null>(null);
   const [shareWarn, setShareWarn] = useState<string | null>(null);
   const [sourceFromURL, setSourceFromURL] = useState(false);
+  const [editorExtraLibs, setEditorExtraLibs] = useState<
+    Record<string, string>
+  >({});
+  const [dependencyProgress, setDependencyProgress] =
+    useState<IPlaygroundDependencyProgress | null>(null);
+  const [dependencyPackageNames, setDependencyPackageNames] = useState<
+    string[]
+  >([]);
   const debounce = useRef<number | null>(null);
   const shareToastTimer = useRef<number | null>(null);
+  const dependencyProgressTimer = useRef<number | null>(null);
+  const dependencyInstallChain = useRef<Promise<void>>(Promise.resolve());
+  const dependencyAbort = useRef<AbortController | null>(null);
+  const installedDependencyNames = useRef<Set<string>>(
+    new Set<string>(BUILT_IN_PLAYGROUND_PACKAGES),
+  );
+  const runtimeDependencyFiles = useRef<Record<string, string>>({});
+  const sourceVersion = useRef(0);
+  const latestSource = useRef(source);
   // Race guard: every `run` call bumps this epoch; only the call whose epoch
   // matches the latest at completion time wins the state update. Otherwise a
   // slow keystroke-N compile can overwrite a faster keystroke-N+1 result.
   const runEpoch = useRef(0);
+
+  const updateSource = useCallback((next: string) => {
+    sourceVersion.current++;
+    latestSource.current = next;
+    runEpoch.current++;
+    dependencyAbort.current?.abort(createAbortError("source changed"));
+    setDependencyProgress(null);
+    setDependencyPackageNames([]);
+    setSource(next);
+  }, []);
 
   // ── Decode source from URL on mount ──
   useEffect(() => {
@@ -97,11 +133,11 @@ export default function PlaygroundShell() {
     if (encoded) {
       const decoded = decompressFromEncodedURIComponent(encoded);
       if (decoded) {
-        setSource(decoded);
+        updateSource(decoded);
         setSourceFromURL(true);
       }
     }
-  }, []);
+  }, [updateSource]);
 
   // ── Eagerly boot the worker so first compile is instant ──
   useEffect(() => {
@@ -123,12 +159,131 @@ export default function PlaygroundShell() {
     };
   }, []);
 
+  const installDependenciesForSource = useCallback(
+    async (
+      input: string,
+      version: number = sourceVersion.current,
+    ): Promise<unknown | null> => {
+      const task = dependencyInstallChain.current.then(async () => {
+        const firstPassPackageNames = collectExternalPackageNames(
+          input,
+          BUILT_IN_PLAYGROUND_PACKAGES,
+        );
+        const firstPassMissing = firstPassPackageNames.filter(
+          (name) => !installedDependencyNames.current.has(name),
+        );
+        if (firstPassMissing.length === 0) return null;
+
+        await wait(DEPENDENCY_INSTALL_QUIET_MS);
+        if (sourceVersion.current !== version) return null;
+
+        const packageNames = collectExternalPackageNames(
+          latestSource.current,
+          BUILT_IN_PLAYGROUND_PACKAGES,
+        );
+        const missing = packageNames.filter(
+          (name) => !installedDependencyNames.current.has(name),
+        );
+        if (missing.length === 0) return null;
+
+        if (dependencyProgressTimer.current !== null) {
+          window.clearTimeout(dependencyProgressTimer.current);
+          dependencyProgressTimer.current = null;
+        }
+        setDependencyPackageNames(missing);
+        const abort = new AbortController();
+        dependencyAbort.current = abort;
+        try {
+          const installed = await installPlaygroundDependencies(missing, {
+            installedPackages: installedDependencyNames.current,
+            ignoredPackages: BUILT_IN_PLAYGROUND_PACKAGES,
+            signal: abort.signal,
+            onProgress: setDependencyProgress,
+          });
+          if (sourceVersion.current !== version) return null;
+          if (Object.keys(installed.compilerFiles).length > 0) {
+            const service = await createCompilerService();
+            await service.installDependencies({
+              files: installed.compilerFiles,
+              packages: installed.packages.map(({ name, version }) => ({
+                name,
+                version,
+              })),
+            });
+          }
+          for (const pkg of installed.packages) {
+            installedDependencyNames.current.add(pkg.name);
+          }
+          if (Object.keys(installed.editorLibs).length > 0) {
+            setEditorExtraLibs((prev) => ({
+              ...prev,
+              ...installed.editorLibs,
+            }));
+          }
+          runtimeDependencyFiles.current = {
+            ...runtimeDependencyFiles.current,
+            ...installed.runtimeFiles,
+          };
+          dependencyProgressTimer.current = window.setTimeout(() => {
+            setDependencyProgress(null);
+            setDependencyPackageNames([]);
+            dependencyProgressTimer.current = null;
+          }, 350);
+          return null;
+        } catch (error) {
+          if (isAbortError(error)) {
+            setDependencyProgress(null);
+            setDependencyPackageNames([]);
+            return null;
+          }
+          setDependencyProgress({
+            phase: "error",
+            packageName: missing[0],
+            completed: 0,
+            total: missing.length,
+            message: describeUnknownError(error),
+          });
+          dependencyProgressTimer.current = window.setTimeout(() => {
+            setDependencyProgress(null);
+            setDependencyPackageNames([]);
+            dependencyProgressTimer.current = null;
+          }, 2400);
+          return error;
+        } finally {
+          if (dependencyAbort.current === abort) dependencyAbort.current = null;
+        }
+      });
+      dependencyInstallChain.current = task.then(() => {});
+      return task;
+    },
+    [],
+  );
+
   // ── Run compile when source / target / options change ──
   const run = useCallback(
-    async (input: string, mode: Target, opts: ITransformOptions) => {
+    async (
+      input: string,
+      mode: Target,
+      opts: ITransformOptions,
+      version: number,
+    ) => {
       const epoch = ++runEpoch.current;
       setRunning(true);
       try {
+        const dependencyError = await installDependenciesForSource(
+          input,
+          version,
+        );
+        if (runEpoch.current !== epoch) return;
+        if (dependencyError) {
+          setResult({
+            type: "error",
+            target: "javascript",
+            value: normalizeClientError(dependencyError),
+          });
+          setLintDiagnostics([]);
+          return;
+        }
         // Every diagnostic — type errors and lint findings — comes back
         // through the same worker-driven compile. We surface lint-only
         // diagnostics in the "Lint" tab and full diagnostics in the
@@ -151,14 +306,15 @@ export default function PlaygroundShell() {
         if (runEpoch.current === epoch) setRunning(false);
       }
     },
-    [],
+    [installDependenciesForSource],
   );
 
   useEffect(() => {
     if (bootPhase !== "ready") return;
     if (debounce.current !== null) window.clearTimeout(debounce.current);
+    const version = sourceVersion.current;
     debounce.current = window.setTimeout(() => {
-      void run(source, target, options);
+      void run(source, target, options, version);
     }, 280);
     return () => {
       if (debounce.current !== null) window.clearTimeout(debounce.current);
@@ -193,22 +349,28 @@ export default function PlaygroundShell() {
     () => () => {
       if (shareToastTimer.current !== null)
         window.clearTimeout(shareToastTimer.current);
+      if (dependencyProgressTimer.current !== null)
+        window.clearTimeout(dependencyProgressTimer.current);
+      dependencyAbort.current?.abort(createAbortError("playground unmounted"));
     },
     [],
   );
 
-  const onPickExample = useCallback((id: string) => {
-    const example = PLAYGROUND_EXAMPLES.find((e) => e.id === id);
-    if (example) {
-      setSource(example.source);
-      setSourceFromURL(false);
-    }
-  }, []);
+  const onPickExample = useCallback(
+    (id: string) => {
+      const example = PLAYGROUND_EXAMPLES.find((e) => e.id === id);
+      if (example) {
+        updateSource(example.source);
+        setSourceFromURL(false);
+      }
+    },
+    [updateSource],
+  );
 
   const onReset = useCallback(() => {
-    setSource(PLAYGROUND_DEFAULT_SCRIPT);
+    updateSource(PLAYGROUND_DEFAULT_SCRIPT);
     setSourceFromURL(false);
-  }, []);
+  }, [updateSource]);
 
   const onExecute = useCallback(async () => {
     setExecuting(true);
@@ -219,6 +381,14 @@ export default function PlaygroundShell() {
       setConsoleMessages([...messages]);
     };
     try {
+      const dependencyError = await installDependenciesForSource(
+        source,
+        sourceVersion.current,
+      );
+      if (dependencyError) {
+        push("error", [dependencyError]);
+        return;
+      }
       // Bundle the source through the worker. `service.bundle` runs the typia
       // TS transformer over the user's code, then asks the wasm to emit CJS.
       // The worker wraps the emit in `(function(require, module, exports,
@@ -229,8 +399,8 @@ export default function PlaygroundShell() {
         const message =
           typeof compiled.value === "string"
             ? compiled.value
-            : (compiled.value as { message?: string })?.message ??
-              "Bundle failed";
+            : ((compiled.value as { message?: string })?.message ??
+              "Bundle failed");
         setBundleError(message);
         push("error", [compiled.value]);
         return;
@@ -252,9 +422,10 @@ export default function PlaygroundShell() {
       // specifiers throw with the original specifier so the user sees the
       // unsupported dependency.
       const runtimePack = await loadTypiaRuntimePack();
-      const sandboxRequire = createSandboxRequire(runtimePack, {
-        console: sandboxConsole,
-      });
+      const sandboxRequire = createSandboxRequire(
+        { ...runtimePack, ...runtimeDependencyFiles.current },
+        { console: sandboxConsole },
+      );
       const moduleObj: { exports: Record<string, unknown> } = { exports: {} };
       try {
         const wrapped = `(function(require, module, exports, console) {\n${code}\n})`;
@@ -273,7 +444,7 @@ export default function PlaygroundShell() {
     } finally {
       setExecuting(false);
     }
-  }, [source, options]);
+  }, [source, options, installDependenciesForSource]);
 
   const allDiagnostics = useMemo(() => {
     const fromCompile =
@@ -318,9 +489,7 @@ export default function PlaygroundShell() {
     return (
       <div className="flex flex-col h-screen w-full items-center justify-center bg-neutral-950 text-neutral-200 gap-5 px-6 text-center">
         <span className="text-red-400 text-3xl">⚠</span>
-        <h1 className="text-lg font-mono">
-          Playground failed to boot.
-        </h1>
+        <h1 className="text-lg font-mono">Playground failed to boot.</h1>
         <pre className="max-w-xl text-[12px] font-mono text-neutral-400 whitespace-pre-wrap break-words">
           {(() => {
             const e = bootError;
@@ -396,7 +565,8 @@ export default function PlaygroundShell() {
       {/* ── Source-from-URL banner ── */}
       {sourceFromURL && (
         <div className="shrink-0 px-4 py-1.5 text-[11px] font-mono text-amber-200 bg-amber-500/10 border-b border-amber-700/40">
-          Source loaded from share URL. Hit Reset to return to the default example.
+          Source loaded from share URL. Hit Reset to return to the default
+          example.
         </div>
       )}
 
@@ -448,7 +618,11 @@ export default function PlaygroundShell() {
             </span>
           </div>
           <div className="flex-1 min-h-0">
-            <SourceEditor value={source} onChange={setSource} />
+            <SourceEditor
+              value={source}
+              onChange={updateSource}
+              extraLibs={editorExtraLibs}
+            />
           </div>
         </div>
 
@@ -528,8 +702,43 @@ export default function PlaygroundShell() {
           onClose={() => setOptionsOpen(false)}
         />
       )}
+
+      <DependencyProgressModal
+        progress={dependencyProgress}
+        packages={dependencyPackageNames}
+      />
     </div>
   );
+}
+
+function describeUnknownError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+function normalizeClientError(error: unknown): unknown {
+  if (error instanceof Error) {
+    return { name: error.name, message: error.message, stack: error.stack };
+  }
+  return { name: "Error", message: describeUnknownError(error) };
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function createAbortError(reason: string): Error {
+  const error = new Error(`Dependency install aborted: ${reason}.`);
+  error.name = "AbortError";
+  return error;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 function LintOnlyPane({

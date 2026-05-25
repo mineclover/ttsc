@@ -8,6 +8,7 @@ Rule corpus tests are grouped by rule semantics, not by alphabetic ranges.
 - `functions-classes`: functions, constructors, classes, methods, and call-shape rules.
 - `imports-modules`: imports, namespaces, require usage, and module-reference rules.
 - `runtime-safety`: runtime hazards, dangerous globals, equality, eval, and diagnostic sanity rules.
+- `solid`: Solid JSX, reactivity, import, event handler, and rendering preference rules.
 - `strings-regex`: string literal, template, regex, whitespace, and octal-text rules.
 - `style-suggestions`: low-risk style/suggestion rules that do not fit a narrower domain.
 - `typescript`: TypeScript-only type, enum, assertion, namespace, and non-null rules.

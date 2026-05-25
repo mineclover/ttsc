@@ -164,6 +164,17 @@ export default {
 
 The rule corpus is tested in `tests/test-lint/src/cases/*.ts`, which is the best place to check the exact patterns currently covered. Each rule below links to its tested fixture:
 
+### Solid
+
+`@ttsc/lint` ships the `solid/*` family from `eslint-plugin-solid` for TSX source. These rules are AST-only and focus on high-confidence Solid patterns after a Solid import is present.
+
+- `solid/reactivity`, `solid/no-destructure`, `solid/components-return-once`: catch common Solid reactivity breakages in components.
+- `solid/jsx-no-undef`, `solid/jsx-no-duplicate-props`, `solid/jsx-no-script-url`, `solid/no-innerhtml`, `solid/no-unknown-namespaces`: guard JSX correctness and unsafe DOM attributes.
+- `solid/event-handlers`, `solid/no-array-handlers`, `solid/no-react-specific-props`: keep DOM event and prop shapes aligned with Solid rather than React.
+- `solid/imports`, `solid/no-react-deps`, `solid/no-proxy-apis`: enforce canonical Solid imports and non-React/non-Proxy call patterns.
+- `solid/prefer-for`, `solid/prefer-show`, `solid/prefer-classlist`, `solid/self-closing-comp`, `solid/style-prop`: cover Solid rendering and style preferences.
+- `solid/jsx-uses-vars`: accepted for config compatibility; it does not emit native diagnostics because @ttsc/lint does not implement ESLint's unused-variable marker pass.
+
 - [`adjacent-overload-signatures`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/adjacent-overload-signatures.ts): keeps overload declarations for the same member adjacent.
 - [`array-type`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/array-type.ts): prefers `T[]` and `readonly T[]` over array helper types.
 - [`await-thenable`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/await-thenable.ts): rejects `await` on a value that is neither a Promise nor a thenable (type-aware).

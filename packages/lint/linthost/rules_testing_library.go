@@ -145,7 +145,6 @@ func collectTestingLibraryState(ctx *Context) *testingLibraryState {
       state.collectVariable(child)
     case shimast.KindBindingElement:
       state.bindingElements = append(state.bindingElements, child)
-      state.collectBindingElement(child)
     case shimast.KindJsxAttribute:
       state.jsxAttributes = append(state.jsxAttributes, child)
     }
@@ -281,21 +280,6 @@ func (s *testingLibraryState) collectVariable(node *shimast.Node) {
   }
 }
 
-func (s *testingLibraryState) collectBindingElement(node *shimast.Node) {
-  el := node.AsBindingElement()
-  if el == nil {
-    return
-  }
-  imported := moduleExportNameText(el.PropertyName)
-  local := identifierText(el.Name())
-  if imported == "" {
-    imported = local
-  }
-  if imported == "container" && local != "" {
-    s.containerNames[local] = true
-  }
-}
-
 func (s *testingLibraryState) reportUnhandledAsyncQueries(ctx *Context) {
   for _, node := range s.calls {
     call := node.AsCallExpression()
@@ -348,16 +332,7 @@ func (s *testingLibraryState) reportAwaitedSyncQueries(ctx *Context) {
 
 func (s *testingLibraryState) reportContainerAccess(ctx *Context) {
   for _, node := range s.bindingElements {
-    el := node.AsBindingElement()
-    if el == nil {
-      continue
-    }
-    imported := moduleExportNameText(el.PropertyName)
-    local := identifierText(el.Name())
-    if imported == "" {
-      imported = local
-    }
-    if imported == "container" {
+    if s.isRenderContainerBinding(node) {
       ctx.Report(node, "Avoid destructuring `container`; prefer Testing Library queries.")
     }
   }
@@ -369,6 +344,29 @@ func (s *testingLibraryState) reportContainerAccess(ctx *Context) {
     }
     ctx.Report(node, "Avoid querying through `container`; use screen queries instead.")
   }
+}
+
+func (s *testingLibraryState) isRenderContainerBinding(node *shimast.Node) bool {
+  el := node.AsBindingElement()
+  if el == nil {
+    return false
+  }
+  imported := moduleExportNameText(el.PropertyName)
+  local := identifierText(el.Name())
+  if imported == "" {
+    imported = local
+  }
+  if imported != "container" {
+    return false
+  }
+  for cur := node.Parent; cur != nil; cur = cur.Parent {
+    if cur.Kind != shimast.KindVariableDeclaration {
+      continue
+    }
+    decl := cur.AsVariableDeclaration()
+    return decl != nil && s.isRenderCall(stripParens(decl.Initializer))
+  }
+  return false
 }
 
 func (s *testingLibraryState) reportDebuggingUtils(ctx *Context) {
@@ -587,6 +585,9 @@ func (s *testingLibraryState) reportPreferPresenceQueries(ctx *Context) {
       continue
     }
     expectArg := firstExpectArgument(node)
+    if expectArg == nil {
+      continue
+    }
     inner := expectArg.AsCallExpression()
     if inner == nil {
       continue
@@ -613,6 +614,9 @@ func (s *testingLibraryState) reportPreferQueryByDisappearance(ctx *Context) {
         return false
       }
       arg := firstExpectArgument(child)
+      if arg == nil {
+        return false
+      }
       inner := arg.AsCallExpression()
       return matcherCallIsNegated(child) && inner != nil && s.isQueryCall(inner, queryGet|queryAsync)
     }) {
@@ -629,6 +633,9 @@ func (s *testingLibraryState) reportPreferQueryMatchers(ctx *Context) {
       continue
     }
     arg := firstExpectArgument(node)
+    if arg == nil {
+      continue
+    }
     inner := arg.AsCallExpression()
     if inner != nil && s.isQueryCall(inner, queryAny) {
       ctx.Report(node, "Use jest-dom document matchers with Testing Library queries.")
@@ -786,8 +793,12 @@ func (s *testingLibraryState) isQueryCall(call *shimast.CallExpression, kinds te
 }
 
 func (s *testingLibraryState) isQueryExpression(node *shimast.Node) bool {
+  node = stripParens(node)
+  if node == nil || node.Kind != shimast.KindCallExpression {
+    return false
+  }
   call := node.AsCallExpression()
-  return call != nil && s.isQueryCall(call, queryAny)
+  return s.isQueryCall(call, queryAny)
 }
 
 func (s *testingLibraryState) isFireEventCall(call *shimast.CallExpression) bool {
@@ -797,14 +808,15 @@ func (s *testingLibraryState) isFireEventCall(call *shimast.CallExpression) bool
 
 func (s *testingLibraryState) isUserEventCall(call *shimast.CallExpression) bool {
   info := callInfoFromCall(call)
-  return info.receiver != "" && (s.userEventNames[info.receiver] || s.userEventSetups[info.receiver])
+  return info.receiver != "" && info.name != "setup" && (s.userEventNames[info.receiver] || s.userEventSetups[info.receiver])
 }
 
 func (s *testingLibraryState) isUserEventSetupCall(node *shimast.Node) bool {
-  call := node.AsCallExpression()
-  if call == nil {
+  node = stripParens(node)
+  if node == nil || node.Kind != shimast.KindCallExpression {
     return false
   }
+  call := node.AsCallExpression()
   info := callInfoFromCall(call)
   return info.name == "setup" && s.userEventNames[info.receiver]
 }
@@ -819,10 +831,11 @@ func (s *testingLibraryState) isWaitForCall(call *shimast.CallExpression) bool {
 }
 
 func (s *testingLibraryState) isRenderCall(node *shimast.Node) bool {
-  call := node.AsCallExpression()
-  if call == nil {
+  node = stripParens(node)
+  if node == nil || node.Kind != shimast.KindCallExpression {
     return false
   }
+  call := node.AsCallExpression()
   info := callInfoFromCall(call)
   return s.renderNames[info.name]
 }

@@ -130,7 +130,7 @@ func nextjsNoAsyncClientComponent(ctx *Context, file *shimast.Node) {
       if name != "" && nextjsHasModifier(stmt, shimast.KindAsyncKeyword) {
         asyncBindings[name] = stmt
       }
-      if nextjsHasModifier(stmt, shimast.KindDefaultKeyword) && nextjsHasModifier(stmt, shimast.KindAsyncKeyword) && nextjsIsCapitalized(name) {
+      if nextjsHasModifier(stmt, shimast.KindDefaultKeyword) && nextjsHasModifier(stmt, shimast.KindAsyncKeyword) && (name == "" || nextjsIsCapitalized(name)) {
         ctx.Report(stmt, "Client components must not be async functions.")
       }
       continue

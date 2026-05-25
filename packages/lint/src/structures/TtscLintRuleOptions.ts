@@ -151,8 +151,41 @@ export interface ITtscLintReactPerfRuleOptions {
   nativeAllowList?: "all" | readonly string[];
 }
 
+/** `react-refresh/only-export-components` rule options. */
+export interface ITtscLintReactRefreshOnlyExportComponentsRuleOptions {
+  /**
+   * Extra higher-order component names that wrap component exports.
+   *
+   * @default []
+   */
+  extraHOCs?: readonly string[];
+
+  /**
+   * Export names the active framework handles during refresh, such as route
+   * metadata exports.
+   *
+   * @default []
+   */
+  allowExportNames?: readonly string[];
+
+  /**
+   * Permit literal/string/boolean/template/binary constant exports alongside
+   * component exports.
+   *
+   * @default false
+   */
+  allowConstantExport?: boolean;
+
+  /**
+   * Also scan JavaScript files that import React. TSX files are always scanned.
+   *
+   * @default false
+   */
+  checkJS?: boolean;
+}
+
 /**
- * Index from format rule name to its option object. Kept as a public lookup
+ * Index from typed rule name to its option object. Kept as a public lookup
  * type for consumers that want to derive option helpers from the same rule
  * names accepted by `ITtscLintRules`.
  */
@@ -167,4 +200,5 @@ export interface ITtscLintRuleOptionsMap {
   "react-perf/jsx-no-new-function-as-prop": ITtscLintReactPerfRuleOptions;
   "react-perf/jsx-no-new-object-as-prop": ITtscLintReactPerfRuleOptions;
   "react-perf/jsx-no-jsx-as-prop": ITtscLintReactPerfRuleOptions;
+  "react-refresh/only-export-components": ITtscLintReactRefreshOnlyExportComponentsRuleOptions;
 }

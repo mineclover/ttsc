@@ -147,6 +147,7 @@ export type TtscLintRule =
   | "react-perf/jsx-no-new-function-as-prop"
   | "react-perf/jsx-no-new-object-as-prop"
   | "react-perf/jsx-no-jsx-as-prop"
+  | "react-refresh/only-export-components"
   | "require-yield"
   | "triple-slash-reference"
   | "use-isnan"

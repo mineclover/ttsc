@@ -169,6 +169,19 @@ The rule corpus is tested in `tests/test-lint/src/cases/*.ts`, which is the best
 - [`await-thenable`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/await-thenable.ts): rejects `await` on a value that is neither a Promise nor a thenable (type-aware).
 - [`ban-ts-comment`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/ban-ts-comment.ts): rejects TypeScript suppression comments such as `@ts-ignore`.
 - [`ban-tslint-comment`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/ban-tslint-comment.ts): rejects obsolete `tslint:` comments.
+- `cypress/assertion-before-screenshot`: requires a Cypress assertion before `cy.screenshot()`.
+- `cypress/no-and`: prefers `.should()` over `.and()` when starting Cypress assertion chains.
+- `cypress/no-assigning-return-values`: rejects assigning the return value of Cypress commands.
+- `cypress/no-async-before`: rejects async `before` and `beforeEach` callbacks.
+- `cypress/no-async-tests`: rejects async Cypress test callbacks.
+- `cypress/no-chained-get`: rejects chained `.get()` calls.
+- `cypress/no-debug`: rejects `cy.debug()` and chained `.debug()` commands.
+- `cypress/no-force`: rejects `{ force: true }` on Cypress action commands.
+- `cypress/no-pause`: rejects `cy.pause()` and chained `.pause()` commands.
+- `cypress/no-unnecessary-waiting`: rejects numeric `cy.wait(...)` sleeps.
+- `cypress/no-xpath`: rejects deprecated `cy.xpath()` selectors.
+- `cypress/require-data-selectors`: requires statically known `cy.get()` selectors to target `data-*` attributes.
+- `cypress/unsafe-to-chain-command`: rejects chaining more commands after Cypress action commands.
 - [`consistent-indexed-object-style`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/consistent-indexed-object-style.ts): prefers `Record` for single index-signature object types.
 - [`consistent-type-assertions`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/consistent-type-assertions.ts): prefers `as` type assertions over angle-bracket assertions.
 - [`consistent-type-definitions`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/consistent-type-definitions.ts): prefers interfaces for object-shaped type definitions.

@@ -1,4 +1,5 @@
 import type {
+  ITtscLintCypressUnsafeToChainCommandRuleOptions,
   ITtscLintJsdocRuleOptions,
   ITtscLintPrintWidthRuleOptions,
   ITtscLintQuotesRuleOptions,
@@ -41,6 +42,45 @@ export interface ITtscLintRules {
 
   /** rejects obsolete `tslint:` comments. */
   "ban-tslint-comment"?: TtscLintRuleSetting;
+
+  /** requires a Cypress assertion before `cy.screenshot()`. */
+  "cypress/assertion-before-screenshot"?: TtscLintRuleSetting;
+
+  /** prefers `.should()` over `.and()` when starting Cypress assertion chains. */
+  "cypress/no-and"?: TtscLintRuleSetting;
+
+  /** rejects assigning the return value of Cypress commands. */
+  "cypress/no-assigning-return-values"?: TtscLintRuleSetting;
+
+  /** rejects async `before` and `beforeEach` callbacks in Cypress specs. */
+  "cypress/no-async-before"?: TtscLintRuleSetting;
+
+  /** rejects async Cypress test callbacks. */
+  "cypress/no-async-tests"?: TtscLintRuleSetting;
+
+  /** rejects chained `.get()` calls. */
+  "cypress/no-chained-get"?: TtscLintRuleSetting;
+
+  /** rejects `cy.debug()` and chained `.debug()` commands. */
+  "cypress/no-debug"?: TtscLintRuleSetting;
+
+  /** rejects `{ force: true }` on Cypress action commands. */
+  "cypress/no-force"?: TtscLintRuleSetting;
+
+  /** rejects `cy.pause()` and chained `.pause()` commands. */
+  "cypress/no-pause"?: TtscLintRuleSetting;
+
+  /** rejects numeric `cy.wait(...)` sleeps. */
+  "cypress/no-unnecessary-waiting"?: TtscLintRuleSetting;
+
+  /** rejects deprecated `cy.xpath()` selectors. */
+  "cypress/no-xpath"?: TtscLintRuleSetting;
+
+  /** requires `cy.get()` selectors to target `data-*` attributes when statically known. */
+  "cypress/require-data-selectors"?: TtscLintRuleSetting;
+
+  /** rejects chaining more commands after Cypress action commands. */
+  "cypress/unsafe-to-chain-command"?: TtscLintRuleOptionsSetting<ITtscLintCypressUnsafeToChainCommandRuleOptions>;
 
   /** prefers `Record` for single index-signature object types. */
   "consistent-indexed-object-style"?: TtscLintRuleSetting;

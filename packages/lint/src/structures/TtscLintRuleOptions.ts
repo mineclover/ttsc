@@ -137,12 +137,24 @@ export interface ITtscLintJsdocRuleOptions {
   sortTags?: boolean;
 }
 
+/** `cypress/unsafe-to-chain-command` rule options. */
+export interface ITtscLintCypressUnsafeToChainCommandRuleOptions {
+  /**
+   * Additional Cypress command names that should be treated as unsafe action
+   * commands when another command is chained after them.
+   *
+   * @default []
+   */
+  methods?: readonly string[];
+}
+
 /**
- * Index from format rule name to its option object. Kept as a public lookup
+ * Index from option-bearing rule name to its option object. Kept as a public lookup
  * type for consumers that want to derive option helpers from the same rule
  * names accepted by `ITtscLintRules`.
  */
 export interface ITtscLintRuleOptionsMap {
+  "cypress/unsafe-to-chain-command": ITtscLintCypressUnsafeToChainCommandRuleOptions;
   "format/semi": ITtscLintSemiRuleOptions;
   "format/quotes": ITtscLintQuotesRuleOptions;
   "format/trailing-comma": ITtscLintTrailingCommaRuleOptions;

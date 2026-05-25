@@ -23,17 +23,22 @@ import (
 // shut down a pump loop without surfacing an error to the editor.
 var ErrFrameClosed = errors.New("lsp: frame stream closed")
 
-// ErrFrameTooLarge reports that a peer announced a Content-Length above
-// the safety cap. ttscserver bounds the value defensively so a confused
-// editor or compromised pipe cannot drive the proxy OOM with a single
-// gigabyte-scale header.
-var ErrFrameTooLarge = errors.New("lsp: frame body exceeds maximum size")
+// ErrFrameTooLarge reports that a peer sent a header block or announced a
+// Content-Length above the safety cap. ttscserver bounds both defensively so a
+// confused editor or compromised pipe cannot drive the proxy OOM with a single
+// gigabyte-scale frame.
+var ErrFrameTooLarge = errors.New("lsp: frame exceeds maximum size")
 
 // MaxFrameBytes caps Content-Length to 64 MiB. The largest payload the
 // LSP base protocol routinely produces is workspace symbol responses
 // for very large monorepos; 64 MiB leaves a wide margin over any real
 // editor traffic while still capping attacker-supplied lengths.
 const MaxFrameBytes = 64 << 20
+
+// MaxHeaderBytes caps the LSP header block to 64 KiB. Real LSP traffic carries
+// only Content-Length plus occasional Content-Type, so anything larger is a
+// malformed peer rather than useful protocol data.
+const MaxHeaderBytes = 64 << 10
 
 // FrameReader decodes Content-Length-framed JSON-RPC messages from r. It
 // is intentionally permissive about extra headers (we forward whatever the
@@ -56,13 +61,27 @@ func (fr *FrameReader) Read() (headers string, body []byte, err error) {
   var headerBuf strings.Builder
   contentLength := -1
   for {
-    line, lineErr := fr.br.ReadString('\n')
-    if lineErr != nil {
-      if lineErr == io.EOF && headerBuf.Len() == 0 && line == "" {
+    var lineBuf strings.Builder
+    for {
+      chunk, lineErr := fr.br.ReadSlice('\n')
+      if len(chunk) != 0 {
+        if headerBuf.Len()+lineBuf.Len()+len(chunk) > MaxHeaderBytes {
+          return "", nil, fmt.Errorf("%w (header got more than %d bytes)", ErrFrameTooLarge, MaxHeaderBytes)
+        }
+        lineBuf.Write(chunk)
+      }
+      if lineErr == nil {
+        break
+      }
+      if errors.Is(lineErr, bufio.ErrBufferFull) {
+        continue
+      }
+      if lineErr == io.EOF && headerBuf.Len() == 0 && lineBuf.Len() == 0 {
         return "", nil, ErrFrameClosed
       }
       return "", nil, fmt.Errorf("lsp: header read: %w", lineErr)
     }
+    line := lineBuf.String()
     trimmed := strings.TrimRight(line, "\r\n")
     if trimmed == "" {
       break

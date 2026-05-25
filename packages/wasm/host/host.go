@@ -3,16 +3,17 @@
 // JS-side bindings for the host package.
 //
 // `Expose` installs `globalThis[apiName]` with the base ttsc endpoints
-// (version, build, check, transform) plus a `plugin(name, command, opts)`
-// dispatcher that routes into the consumer's registered plugins. The handler
-// shape mirrors typia's `ttsc-typia` wasm so JS callers can build a single
-// boot helper that works against any host-built binary.
+// (version, build, check, transform) plus `plugin({ name, command, ...opts })`,
+// routing into the consumer's registered plugins. Every async endpoint returns
+// the JS result envelope so callers can build a single boot helper that works
+// against any host-built binary.
 package host
 
 import (
   "fmt"
   "os"
   "runtime"
+  "sync"
   "sync/atomic"
   "syscall/js"
   "time"
@@ -35,11 +36,14 @@ var (
 // The contract:
 //
 //   - globalThis[apiName].version()                        → version banner
-//   - globalThis[apiName].build({ cwd, tsconfig })         → Promise<CompileResult>
-//   - globalThis[apiName].check({ cwd, tsconfig })         → Promise<CompileResult>
-//   - globalThis[apiName].transform({ cwd, tsconfig })     → Promise<TransformResult>
-//   - globalThis[apiName].plugin({ name, command, ...opts}) → Promise<APIResult>
+//   - globalThis[apiName].build({ cwd, tsconfig })         → Promise<ITtscResult>
+//   - globalThis[apiName].check({ cwd, tsconfig })         → Promise<ITtscResult>
+//   - globalThis[apiName].transform({ cwd, tsconfig })     → Promise<ITtscResult>
+//   - globalThis[apiName].plugin({ name, command, ...opts}) → Promise<ITtscResult>
 //   - globalThis[apiName].plugins()                        → string[] of registered names
+//
+// build/check/transform encode their structured payloads as JSON in
+// ITtscResult.result. Plugin stdout/stderr are captured in the envelope streams.
 //
 // A matching readiness resolver is invoked: `globalThis[`${apiName}Ready`]`.
 // JS callers register this BEFORE go.run begins so they can await wasm boot.
@@ -294,6 +298,9 @@ func stringProp(obj js.Value, key string) string {
 // supported on the wasm target. The temp-file approach works because the
 // MemFS shim implements file open/write/read.
 func runWithCapturedIO(task func() int) APIResult {
+  captureMu.Lock()
+  defer captureMu.Unlock()
+
   prevOut, prevErr := os.Stdout, os.Stderr
   // The defer is a safety net: if an early return skips the explicit restore
   // below, os.Stdout/os.Stderr are still restored. The explicit restore that
@@ -329,9 +336,25 @@ func runWithCapturedIO(task func() int) APIResult {
     }
     return APIResult{Code: task()}
   }
+  capturing := false
+  defer func() {
+    if capturing {
+      os.Stdout = prevOut
+      os.Stderr = prevErr
+    }
+    if outFile != nil {
+      _ = outFile.Close()
+    }
+    if errFile != nil {
+      _ = errFile.Close()
+    }
+    _ = os.Remove(stdoutPath)
+    _ = os.Remove(stderrPath)
+  }()
 
   os.Stdout = outFile
   os.Stderr = errFile
+  capturing = true
 
   code := task()
 
@@ -340,15 +363,16 @@ func runWithCapturedIO(task func() int) APIResult {
   _ = outFile.Sync()
   _ = errFile.Sync()
   _ = outFile.Close()
+  outFile = nil
   _ = errFile.Close()
+  errFile = nil
 
   os.Stdout = prevOut
   os.Stderr = prevErr
+  capturing = false
 
   stdoutBytes, _ := os.ReadFile(stdoutPath)
   stderrBytes, _ := os.ReadFile(stderrPath)
-  _ = os.Remove(stdoutPath)
-  _ = os.Remove(stderrPath)
 
   return APIResult{
     Code:   code,
@@ -361,3 +385,8 @@ func runWithCapturedIO(task func() int) APIResult {
 // overlap (multiple goroutines could be in runWithCapturedIO concurrently
 // from independent JS callers).
 var captureCounter atomic.Uint64
+
+// captureMu serializes temporary replacement of package-global stdout/stderr.
+// The temp filenames are unique, but os.Stdout/os.Stderr themselves are shared
+// process state in the wasm runtime.
+var captureMu sync.Mutex

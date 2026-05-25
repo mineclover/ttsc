@@ -236,34 +236,46 @@ function runPreparedEntry(
   execution: ReturnType<typeof prepareExecution>,
   cwd: string,
 ): number {
-  fs.mkdirSync(execution.emitDir, { recursive: true });
-  if (execution.moduleKind === "esm") {
-    rewriteEsmSpecifiers(execution.emitDir);
-    fs.writeFileSync(
-      path.join(execution.emitDir, "package.json"),
-      JSON.stringify({ type: "module" }),
-      "utf8",
-    );
+  try {
+    fs.mkdirSync(execution.emitDir, { recursive: true });
+    if (execution.moduleKind === "esm") {
+      rewriteEsmSpecifiers(execution.emitDir);
+      fs.writeFileSync(
+        path.join(execution.emitDir, "package.json"),
+        JSON.stringify({ type: "module" }),
+        "utf8",
+      );
+    }
+    const args = [
+      ...parsed.preload.flatMap((preload) => [
+        "-r",
+        resolvePreload(cwd, preload),
+      ]),
+      execution.entryFile,
+      ...parsed.passthrough,
+    ];
+    const result = spawnSync(process.execPath, args, {
+      cwd,
+      stdio: "inherit",
+      env: process.env,
+      windowsHide: true,
+    });
+    if (result.error) {
+      process.stderr.write(`${result.error.message}\n`);
+      return 1;
+    }
+    return result.status ?? 1;
+  } finally {
+    removeRuntimeOutput(execution.cleanupDir);
   }
-  const args = [
-    ...parsed.preload.flatMap((preload) => [
-      "-r",
-      resolvePreload(cwd, preload),
-    ]),
-    execution.entryFile,
-    ...parsed.passthrough,
-  ];
-  const result = spawnSync(process.execPath, args, {
-    cwd,
-    stdio: "inherit",
-    env: process.env,
-    windowsHide: true,
-  });
-  if (result.error) {
-    process.stderr.write(`${result.error.message}\n`);
-    return 1;
+}
+
+function removeRuntimeOutput(directory: string): void {
+  try {
+    fs.rmSync(directory, { force: true, recursive: true });
+  } catch {
+    // Best effort: cleanup must not replace the child process exit status.
   }
-  return result.status ?? 1;
 }
 
 /**
@@ -492,11 +504,11 @@ function withResolvableExtension(fromFile: string, specifier: string): string {
     // Bare specifiers (packages, builtins) need no rewriting.
     return specifier;
   }
-  if (/\.(?:[cm]?js|json|node)$/i.test(specifier)) {
+  const [pathname, suffix = ""] = splitSpecifierSuffix(specifier);
+  if (/\.(?:[cm]?js|json|node)$/i.test(pathname)) {
     // Already has a concrete extension the loader understands.
     return specifier;
   }
-  const [pathname, suffix = ""] = splitSpecifierSuffix(specifier);
   const fromDir = path.dirname(fromFile);
   // 1. Try the specifier as a file path with each JS extension.
   for (const extension of [".js", ".mjs", ".cjs"]) {
@@ -512,7 +524,7 @@ function withResolvableExtension(fromFile: string, specifier: string): string {
     }
   }
   // 3. Last resort: append `.js` and let Node surface the error if it's wrong.
-  return `${specifier}.js`;
+  return `${pathname}.js${suffix}`;
 }
 
 function splitSpecifierSuffix(specifier: string): [string, string?] {

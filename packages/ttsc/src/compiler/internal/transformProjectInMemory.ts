@@ -129,9 +129,14 @@ function transformProjectWithPlugins(
   const transformers = loaded.nativePlugins.filter(
     (plugin) => plugin.stage === "transform",
   );
+  const tsgoBinary =
+    loaded.nativePlugins.length === 0
+      ? ""
+      : resolveTsgo({ ...options, cwd: project.root }).binary;
   const checked = runNativeChecks(
     options,
     project,
+    tsgoBinary,
     loaded.nativePlugins,
     checks,
   );
@@ -156,7 +161,7 @@ function transformProjectWithPlugins(
     createNativeTransformArgs(project, transformers),
     {
       cwd: project.root,
-      env: nativePluginEnv(options, project.root, loaded.nativePlugins, plugin),
+      env: nativePluginEnv(options, tsgoBinary, loaded.nativePlugins, plugin),
     },
   );
   if (res.error) {
@@ -187,6 +192,7 @@ function transformProjectWithPlugins(
 function runNativeChecks(
   options: ITtscCompilerContext,
   project: ITtscParsedProjectConfig,
+  tsgoBinary: string,
   nativePlugins: readonly ITtscLoadedNativePlugin[],
   checks: readonly ITtscLoadedNativePlugin[],
 ): TtscBuildResult {
@@ -202,7 +208,7 @@ function runNativeChecks(
       createNativeCheckArgs(project, nativePlugins),
       {
         cwd: project.root,
-        env: nativePluginEnv(options, project.root, nativePlugins, plugin),
+        env: nativePluginEnv(options, tsgoBinary, nativePlugins, plugin),
       },
     );
     if (res.error) {
@@ -278,15 +284,14 @@ function serializeNativePlugins(
  */
 function nativePluginEnv(
   options: ITtscCompilerContext,
-  projectRoot: string,
+  tsgoBinary: string,
   nativePlugins?: readonly ITtscLoadedNativePlugin[],
   plugin?: ITtscLoadedNativePlugin,
 ): NodeJS.ProcessEnv {
-  const tsgo = resolveTsgo({ ...options, cwd: projectRoot });
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     TTSC_NODE_BINARY: process.env.TTSC_NODE_BINARY ?? process.execPath,
-    TTSC_TSGO_BINARY: process.env.TTSC_TSGO_BINARY ?? tsgo.binary,
+    TTSC_TSGO_BINARY: process.env.TTSC_TSGO_BINARY ?? tsgoBinary,
     TTSC_TTSX_BINARY:
       process.env.TTSC_TTSX_BINARY ??
       path.join(__dirname, "..", "..", "launcher", "ttsx.js"),

@@ -79,6 +79,10 @@ type LSPUpstreamRunner = lspserver.LSPUpstreamRunner
 // the proxy will read without returning ErrFrameTooLarge.
 const MaxFrameBytes = lspserver.MaxFrameBytes
 
+// MaxHeaderBytes is the maximum byte length of a JSON-RPC frame header block
+// the proxy will read without returning ErrFrameTooLarge.
+const MaxHeaderBytes = lspserver.MaxHeaderBytes
+
 // Sentinel errors forwarded from lspserver.
 var ErrCommandNotHandled = lspserver.ErrCommandNotHandled
 var ErrFrameClosed = lspserver.ErrFrameClosed

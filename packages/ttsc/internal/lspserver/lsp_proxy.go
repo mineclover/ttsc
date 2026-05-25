@@ -84,11 +84,22 @@ func (p *Proxy) Run(ctx context.Context) error {
   var first error
   for i := 0; i < 2; i++ {
     err := <-errCh
-    if first == nil && err != nil && !errors.Is(err, ErrFrameClosed) {
+    if first == nil && err != nil && !errors.Is(err, ErrFrameClosed) && !errors.Is(err, context.Canceled) {
       first = err
+      p.closeAfterPumpError()
     }
   }
   return first
+}
+
+// closeAfterPumpError unblocks the opposite pump after one side reports a hard
+// transport error. In production RunLSPServer passes closeable pipe ends, and
+// tests may pass plain readers/writers where the assertions close streams
+// themselves.
+func (p *Proxy) closeAfterPumpError() {
+  closeIfCloser(p.editorIn)
+  closeIfCloser(p.upstreamOut)
+  closeIfCloser(p.upstreamIn)
 }
 
 // pumpEditorToUpstream reads frames from the editor, decides whether to
@@ -184,6 +195,10 @@ func (p *Proxy) forgetCancelledRequest(env Envelope) {
 // response from upstream can be augmented with ttsc-owned code actions
 // for the same range.
 func (p *Proxy) rememberCodeActionRequest(env Envelope) {
+  key := env.IDKey()
+  if key == "" {
+    return
+  }
   var params struct {
     TextDocument struct {
       URI string `json:"uri"`
@@ -196,7 +211,7 @@ func (p *Proxy) rememberCodeActionRequest(env Envelope) {
   }
   p.pendingMu.Lock()
   defer p.pendingMu.Unlock()
-  p.pendingActions[env.IDKey()] = pendingCodeActionRequest{
+  p.pendingActions[key] = pendingCodeActionRequest{
     uri: params.TextDocument.URI,
     rng: params.Range,
     ctx: params.Context,
@@ -292,10 +307,14 @@ func (p *Proxy) augmentUpstream(env Envelope, body []byte) []byte {
     }
   }
   if env.IsResponse() {
+    key := env.IDKey()
+    if key == "" {
+      return body
+    }
     p.pendingMu.Lock()
-    pending, ok := p.pendingActions[env.IDKey()]
+    pending, ok := p.pendingActions[key]
     if ok {
-      delete(p.pendingActions, env.IDKey())
+      delete(p.pendingActions, key)
     }
     p.pendingMu.Unlock()
     if ok {

@@ -162,6 +162,12 @@ export default {
 } satisfies ITtscLintConfig;
 ```
 
+Vitest source rules use the `vitest/*` namespace. The native set focuses on
+high-confidence AST checks shared with Jest-style test linting: focused or
+disabled tests, duplicate titles, missing or conditional assertions, standalone
+`expect` calls, done callbacks, invalid `expect` chains, invalid titles,
+returned test values, and `.length` assertions that should use `toHaveLength`.
+
 The rule corpus is tested in `tests/test-lint/src/cases/*.ts`, which is the best place to check the exact patterns currently covered. Each rule below links to its tested fixture:
 
 - [`adjacent-overload-signatures`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/adjacent-overload-signatures.ts): keeps overload declarations for the same member adjacent.

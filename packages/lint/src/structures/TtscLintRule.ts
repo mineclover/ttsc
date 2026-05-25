@@ -151,6 +151,7 @@ export type TtscLintRule =
   | "react-hooks/set-state-in-effect"
   | "react-hooks/set-state-in-render"
   | "react-hooks/use-memo"
+  | "react-refresh/only-export-components"
   | "require-yield"
   | "triple-slash-reference"
   | "use-isnan"

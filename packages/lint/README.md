@@ -177,6 +177,18 @@ The rule corpus is tested in `tests/test-lint/src/cases/*.ts`, which is the best
 - [`dot-notation`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/dot-notation.ts): prefers dot property access when a string-literal key is a valid identifier.
 - [`eqeqeq`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/eqeqeq.ts): requires strict equality operators.
 - [`for-direction`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/for-direction.ts): catches loop counters updated in the wrong direction.
+- `jsdoc/check-tag-names`: rejects unknown JSDoc block tag names.
+- `jsdoc/check-values`: validates closed-set JSDoc tag values such as `@access`.
+- `jsdoc/empty-tags`: rejects content on marker-only JSDoc tags such as `@async`.
+- `jsdoc/no-types`: rejects redundant JSDoc type braces in TypeScript source comments.
+- `jsdoc/reject-any-type`: rejects `any` and `*` inside JSDoc type braces.
+- `jsdoc/reject-function-type`: rejects the unsafe `Function` type inside JSDoc type braces.
+- `jsdoc/require-description`: requires JSDoc blocks to include block-level description text.
+- `jsdoc/require-param-description`: requires every `@param` tag with a name to include a description.
+- `jsdoc/require-param-name`: requires every `@param` tag to include a parameter name.
+- `jsdoc/require-property-description`: requires every `@property` tag with a name to include a description.
+- `jsdoc/require-property-name`: requires every `@property` tag to include a property name.
+- `jsdoc/require-returns-description`: requires every `@returns` tag to include a description.
 - [`method-signature-style`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/method-signature-style.ts): prefers function-property signatures over method shorthand signatures.
 - [`no-alert`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-alert.ts): rejects `alert`, `confirm`, and `prompt`.
 - [`no-array-constructor`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-array-constructor.ts): rejects `Array` constructor calls.

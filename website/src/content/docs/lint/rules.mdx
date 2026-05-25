@@ -111,6 +111,25 @@ If you're skimming: the `error`-severity defaults at the bottom of this page are
 | `no-with` | Reject `with (...)`. |
 | `no-multi-assign` | Reject `a = b = 0` chains. |
 
+## JSDoc
+
+These rules inspect TypeScript source `/** ... */` comments. They are separate from `format/jsdoc`; they do not rewrite or format comment layout.
+
+| Rule | Effect |
+| ---- | ------ |
+| `jsdoc/check-tag-names` | Reject unknown JSDoc block tag names. |
+| `jsdoc/check-values` | Validate closed-set JSDoc tag values such as `@access`. |
+| `jsdoc/empty-tags` | Reject content on marker-only tags such as `@async`. |
+| `jsdoc/no-types` | Reject redundant JSDoc type braces in TypeScript source comments. |
+| `jsdoc/reject-any-type` | Reject `any` and `*` inside JSDoc type braces. |
+| `jsdoc/reject-function-type` | Reject the unsafe `Function` type inside JSDoc type braces. |
+| `jsdoc/require-description` | Require JSDoc blocks to include block-level description text. |
+| `jsdoc/require-param-description` | Require every `@param` tag with a name to include a description. |
+| `jsdoc/require-param-name` | Require every `@param` tag to include a parameter name. |
+| `jsdoc/require-property-description` | Require every `@property` tag with a name to include a description. |
+| `jsdoc/require-property-name` | Require every `@property` tag to include a property name. |
+| `jsdoc/require-returns-description` | Require every `@returns` tag to include a description. |
+
 ## Format
 
 The `format*` rules cover Prettier's territory. They live on their own page — [Format rules](/docs/lint/format).

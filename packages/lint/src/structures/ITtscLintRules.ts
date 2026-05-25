@@ -66,6 +66,42 @@ export interface ITtscLintRules {
   /** `for (i = 0; i < 10; i--)` → fail. */
   "for-direction"?: TtscLintRuleSetting;
 
+  /** rejects unknown JSDoc block tag names. */
+  "jsdoc/check-tag-names"?: TtscLintRuleSetting;
+
+  /** validates closed-set JSDoc tag values such as `@access`. */
+  "jsdoc/check-values"?: TtscLintRuleSetting;
+
+  /** rejects content on marker-only JSDoc tags such as `@async`. */
+  "jsdoc/empty-tags"?: TtscLintRuleSetting;
+
+  /** rejects redundant JSDoc type braces in TypeScript source comments. */
+  "jsdoc/no-types"?: TtscLintRuleSetting;
+
+  /** rejects `any` and `*` inside JSDoc type braces. */
+  "jsdoc/reject-any-type"?: TtscLintRuleSetting;
+
+  /** rejects the unsafe `Function` type inside JSDoc type braces. */
+  "jsdoc/reject-function-type"?: TtscLintRuleSetting;
+
+  /** requires JSDoc blocks to include block-level description text. */
+  "jsdoc/require-description"?: TtscLintRuleSetting;
+
+  /** requires every `@param` tag with a name to include a description. */
+  "jsdoc/require-param-description"?: TtscLintRuleSetting;
+
+  /** requires every `@param` tag to include a parameter name. */
+  "jsdoc/require-param-name"?: TtscLintRuleSetting;
+
+  /** requires every `@property` tag with a name to include a description. */
+  "jsdoc/require-property-description"?: TtscLintRuleSetting;
+
+  /** requires every `@property` tag to include a property name. */
+  "jsdoc/require-property-name"?: TtscLintRuleSetting;
+
+  /** requires every `@returns` tag to include a description. */
+  "jsdoc/require-returns-description"?: TtscLintRuleSetting;
+
   /** prefers function-property signatures over method shorthand signatures. */
   "method-signature-style"?: TtscLintRuleSetting;
 

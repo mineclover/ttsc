@@ -2,14 +2,14 @@ package linthost
 
 import shimast "github.com/microsoft/typescript-go/shim/ast"
 
-// default-param-last: forbid parameters with default initializers that
+// defaultParamLast: forbid parameters with default initializers that
 // precede non-default parameters. The combination forces every caller
 // to spell out `undefined` for the defaulted parameter — which defeats
 // the purpose of the default. ESLint canonical:
 // https://eslint.org/docs/latest/rules/default-param-last
 type defaultParamLast struct{}
 
-func (defaultParamLast) Name() string { return "default-param-last" }
+func (defaultParamLast) Name() string { return "defaultParamLast" }
 func (defaultParamLast) Visits() []shimast.Kind {
   return []shimast.Kind{
     shimast.KindFunctionDeclaration,

@@ -74,7 +74,7 @@ func printObjectLiteral(ctx *PrintContext, node *shimast.Node) (Doc, bool) {
 //
 // Prettier's objectWrap:"preserve" default keeps such an object
 // expanded even when it would fit flat, treating the author's line
-// break as intentional structure. format/print-width mirrors that:
+// break as intentional structure. formatPrintWidth mirrors that:
 // without it a deliberately multi-line object that happens to fit
 // would be silently collapsed onto one line, which Prettier never
 // does.

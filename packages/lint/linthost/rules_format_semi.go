@@ -4,7 +4,7 @@ import (
   shimast "github.com/microsoft/typescript-go/shim/ast"
 )
 
-// format/semi controls trailing-semicolon style on ASI statements.
+// formatSemi controls trailing-semicolon style on ASI statements.
 // Mirrors prettier's `semi` option:
 //
 //   - `prefer: "always"` (default) inserts a missing terminator.
@@ -24,7 +24,7 @@ type formatSemiOptions struct {
   Prefer string `json:"prefer"`
 }
 
-func (formatSemi) Name() string   { return "format/semi" }
+func (formatSemi) Name() string   { return "formatSemi" }
 func (formatSemi) IsFormat() bool { return true }
 
 func (formatSemi) Visits() []shimast.Kind {

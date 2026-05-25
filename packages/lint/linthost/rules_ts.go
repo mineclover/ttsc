@@ -6,20 +6,20 @@ package linthost
 
 import shimast "github.com/microsoft/typescript-go/shim/ast"
 
-// no-explicit-any: ban `: any` annotations. Loud equivalent of
+// noExplicitAny: ban `: any` annotations. Loud equivalent of
 // `@typescript-eslint/no-explicit-any`.
 type noExplicitAny struct{}
 
-func (noExplicitAny) Name() string           { return "no-explicit-any" }
+func (noExplicitAny) Name() string           { return "noExplicitAny" }
 func (noExplicitAny) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindAnyKeyword} }
 func (noExplicitAny) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "Unexpected any. Specify a different type.")
 }
 
-// no-non-null-assertion: ban the postfix `!` non-null assertion.
+// noNonNullAssertion: ban the postfix `!` non-null assertion.
 type noNonNullAssertion struct{}
 
-func (noNonNullAssertion) Name() string { return "no-non-null-assertion" }
+func (noNonNullAssertion) Name() string { return "noNonNullAssertion" }
 func (noNonNullAssertion) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindNonNullExpression}
 }
@@ -27,11 +27,11 @@ func (noNonNullAssertion) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "Forbidden non-null assertion.")
 }
 
-// no-empty-interface: empty `interface { }` declarations are an alias
+// noEmptyInterface: empty `interface { }` declarations are an alias
 // for the supertype with extra ceremony.
 type noEmptyInterface struct{}
 
-func (noEmptyInterface) Name() string { return "no-empty-interface" }
+func (noEmptyInterface) Name() string { return "noEmptyInterface" }
 func (noEmptyInterface) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindInterfaceDeclaration}
 }
@@ -45,11 +45,11 @@ func (noEmptyInterface) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-inferrable-types: `let x: number = 0` — the annotation is what TS
+// noInferrableTypes: `let x: number = 0` — the annotation is what TS
 // would have inferred anyway.
 type noInferrableTypes struct{}
 
-func (noInferrableTypes) Name() string { return "no-inferrable-types" }
+func (noInferrableTypes) Name() string { return "noInferrableTypes" }
 func (noInferrableTypes) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindVariableDeclaration, shimast.KindParameter, shimast.KindPropertyDeclaration}
 }
@@ -126,11 +126,11 @@ func isUnaryNumeric(node *shimast.Node) bool {
   return false
 }
 
-// no-namespace: TypeScript-only `namespace`/`module` declarations. They
+// noNamespace: TypeScript-only `namespace`/`module` declarations. They
 // exist for legacy reasons; modern TS uses ES modules.
 type noNamespace struct{}
 
-func (noNamespace) Name() string           { return "no-namespace" }
+func (noNamespace) Name() string           { return "noNamespace" }
 func (noNamespace) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindModuleDeclaration} }
 func (noNamespace) Check(ctx *Context, node *shimast.Node) {
   decl := node.AsModuleDeclaration()
@@ -145,11 +145,11 @@ func (noNamespace) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "ES2015 module syntax is preferred over namespaces.")
 }
 
-// no-this-alias: `const self = this;` reassigns `this` to a local. Use
+// noThisAlias: `const self = this;` reassigns `this` to a local. Use
 // arrow functions or `.bind(this)` instead.
 type noThisAlias struct{}
 
-func (noThisAlias) Name() string           { return "no-this-alias" }
+func (noThisAlias) Name() string           { return "noThisAlias" }
 func (noThisAlias) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindVariableDeclaration} }
 func (noThisAlias) Check(ctx *Context, node *shimast.Node) {
   decl := node.AsVariableDeclaration()
@@ -161,10 +161,10 @@ func (noThisAlias) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// prefer-as-const: `as 'foo'` / `as 1` should be `as const`.
+// preferAsConst: `as 'foo'` / `as 1` should be `as const`.
 type preferAsConst struct{}
 
-func (preferAsConst) Name() string { return "prefer-as-const" }
+func (preferAsConst) Name() string { return "preferAsConst" }
 func (preferAsConst) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindAsExpression, shimast.KindTypeAssertionExpression}
 }
@@ -213,7 +213,7 @@ func (preferAsConst) Check(ctx *Context, node *shimast.Node) {
 }
 
 // literalsMatchSourceText reports whether lhs and rhs are both literal
-// expressions whose source text is identical. Used by prefer-as-const to
+// expressions whose source text is identical. Used by preferAsConst to
 // detect `x as "foo"` where "foo" matches x's literal value.
 func literalsMatchSourceText(file *shimast.SourceFile, lhs, rhs *shimast.Node) bool {
   if lhs == nil || rhs == nil {
@@ -225,11 +225,11 @@ func literalsMatchSourceText(file *shimast.SourceFile, lhs, rhs *shimast.Node) b
   return nodeText(file, lhs) == nodeText(file, rhs)
 }
 
-// no-require-imports: ban `require(...)` calls in TS source. Use
+// noRequireImports: ban `require(...)` calls in TS source. Use
 // ES `import` instead.
 type noRequireImports struct{}
 
-func (noRequireImports) Name() string { return "no-require-imports" }
+func (noRequireImports) Name() string { return "noRequireImports" }
 func (noRequireImports) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindCallExpression, shimast.KindImportEqualsDeclaration}
 }
@@ -250,11 +250,11 @@ func (noRequireImports) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// ban-ts-comment: `// @ts-ignore` / `// @ts-nocheck` / `// @ts-expect-error`
+// banTsComment: `// @ts-ignore` / `// @ts-nocheck` / `// @ts-expect-error`
 // silence the type checker. Default mode flags every variant.
 type banTsComment struct{}
 
-func (banTsComment) Name() string           { return "ban-ts-comment" }
+func (banTsComment) Name() string           { return "banTsComment" }
 func (banTsComment) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindSourceFile} }
 func (banTsComment) Check(ctx *Context, node *shimast.Node) {
   if ctx.File == nil {

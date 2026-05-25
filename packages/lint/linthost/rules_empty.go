@@ -2,12 +2,12 @@ package linthost
 
 import shimast "github.com/microsoft/typescript-go/shim/ast"
 
-// no-empty: empty block statements (`{}`), but allow empty catch
+// noEmpty: empty block statements (`{}`), but allow empty catch
 // clauses since they're idiomatic for "ignore the error".
 // https://eslint.org/docs/latest/rules/no-empty
 type noEmpty struct{}
 
-func (noEmpty) Name() string           { return "no-empty" }
+func (noEmpty) Name() string           { return "noEmpty" }
 func (noEmpty) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindBlock} }
 func (noEmpty) Check(ctx *Context, node *shimast.Node) {
   block := node.AsBlock()
@@ -22,16 +22,16 @@ func (noEmpty) Check(ctx *Context, node *shimast.Node) {
     return // tolerated — see ESLint default options
   }
   if isFunctionLikeKind(parent) {
-    return // empty function body is `no-empty-function`'s job
+    return // empty function body is `noEmptyFunction`'s job
   }
   ctx.Report(node, "Empty block statement.")
 }
 
-// no-empty-function: empty function / method / arrow / accessor bodies.
+// noEmptyFunction: empty function / method / arrow / accessor bodies.
 // https://eslint.org/docs/latest/rules/no-empty-function
 type noEmptyFunction struct{}
 
-func (noEmptyFunction) Name() string { return "no-empty-function" }
+func (noEmptyFunction) Name() string { return "noEmptyFunction" }
 func (noEmptyFunction) Visits() []shimast.Kind {
   return []shimast.Kind{
     shimast.KindFunctionDeclaration,
@@ -60,12 +60,12 @@ func (noEmptyFunction) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-empty-pattern: `({}) => x` or `function ({}) {}` — destructuring
+// noEmptyPattern: `({}) => x` or `function ({}) {}` — destructuring
 // patterns with no bindings are usually a bug.
 // https://eslint.org/docs/latest/rules/no-empty-pattern
 type noEmptyPattern struct{}
 
-func (noEmptyPattern) Name() string { return "no-empty-pattern" }
+func (noEmptyPattern) Name() string { return "noEmptyPattern" }
 func (noEmptyPattern) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindObjectBindingPattern, shimast.KindArrayBindingPattern}
 }

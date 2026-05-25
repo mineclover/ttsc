@@ -2,11 +2,11 @@ package linthost
 
 import shimast "github.com/microsoft/typescript-go/shim/ast"
 
-// no-var: ban `var` declarations. ESLint canonical:
+// noVar: ban `var` declarations. ESLint canonical:
 // https://eslint.org/docs/latest/rules/no-var
 type noVar struct{}
 
-func (noVar) Name() string           { return "no-var" }
+func (noVar) Name() string           { return "noVar" }
 func (noVar) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindVariableStatement} }
 func (noVar) Check(ctx *Context, node *shimast.Node) {
   stmt := node.AsVariableStatement()
@@ -34,7 +34,7 @@ func (noVar) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// prefer-const: flag `let` declarations whose binding is never reassigned.
+// preferConst: flag `let` declarations whose binding is never reassigned.
 // This follows ESLint's core rule for the common AST-local cases. It is
 // intentionally conservative: destructuring and declaration-only `let`
 // variables (those without an initializer and not in a for-of/for-in
@@ -42,7 +42,7 @@ func (noVar) Check(ctx *Context, node *shimast.Node) {
 // ESLint canonical: https://eslint.org/docs/latest/rules/prefer-const
 type preferConst struct{}
 
-func (preferConst) Name() string           { return "prefer-const" }
+func (preferConst) Name() string           { return "preferConst" }
 func (preferConst) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindSourceFile} }
 func (preferConst) Check(ctx *Context, node *shimast.Node) {
   type candidate struct {
@@ -135,7 +135,7 @@ func isSingleDeclarationList(node *shimast.Node) bool {
 }
 
 // isConstEligibleLetDeclaration reports whether a `let` VariableDeclaration
-// node is eligible for prefer-const analysis. A declaration is eligible when:
+// node is eligible for preferConst analysis. A declaration is eligible when:
 //   - it has an initializer (the value is set immediately), or
 //   - it is the loop variable of a for-in or for-of statement (e.g. `for (let k of m)`).
 //
@@ -154,11 +154,11 @@ func isConstEligibleLetDeclaration(node *shimast.Node, decl *shimast.VariableDec
     (node.Parent.Parent.Kind == shimast.KindForInStatement || node.Parent.Parent.Kind == shimast.KindForOfStatement)
 }
 
-// no-undef-init: forbid `let x = undefined` and `var x = undefined`.
+// noUndefInit: forbid `let x = undefined` and `var x = undefined`.
 // ESLint canonical: https://eslint.org/docs/latest/rules/no-undef-init
 type noUndefInit struct{}
 
-func (noUndefInit) Name() string           { return "no-undef-init" }
+func (noUndefInit) Name() string           { return "noUndefInit" }
 func (noUndefInit) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindVariableDeclaration} }
 func (noUndefInit) Check(ctx *Context, node *shimast.Node) {
   decl := node.AsVariableDeclaration()

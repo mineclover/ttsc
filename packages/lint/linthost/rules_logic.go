@@ -10,12 +10,12 @@ import (
   shimscanner "github.com/microsoft/typescript-go/shim/scanner"
 )
 
-// no-extra-boolean-cast: `if (!!x)`, `if (Boolean(x))`, `Boolean(!!x)` —
+// noExtraBooleanCast: `if (!!x)`, `if (Boolean(x))`, `Boolean(!!x)` —
 // the conversion is implicit in a boolean context.
 // https://eslint.org/docs/latest/rules/no-extra-boolean-cast
 type noExtraBooleanCast struct{}
 
-func (noExtraBooleanCast) Name() string { return "no-extra-boolean-cast" }
+func (noExtraBooleanCast) Name() string { return "noExtraBooleanCast" }
 func (noExtraBooleanCast) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindCallExpression, shimast.KindPrefixUnaryExpression}
 }
@@ -148,12 +148,12 @@ func skipParents(node *shimast.Node) *shimast.Node {
   return node
 }
 
-// no-unsafe-negation: `!a in b` and `!a instanceof b` — the parser
+// noUnsafeNegation: `!a in b` and `!a instanceof b` — the parser
 // applies the negation to `a`, not to the whole comparison.
 // https://eslint.org/docs/latest/rules/no-unsafe-negation
 type noUnsafeNegation struct{}
 
-func (noUnsafeNegation) Name() string           { return "no-unsafe-negation" }
+func (noUnsafeNegation) Name() string           { return "noUnsafeNegation" }
 func (noUnsafeNegation) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindBinaryExpression} }
 func (noUnsafeNegation) Check(ctx *Context, node *shimast.Node) {
   expr := node.AsBinaryExpression()
@@ -247,13 +247,13 @@ func comparableLiteralKind(node *shimast.Node) string {
   return ""
 }
 
-// use-isnan: `x === NaN` is always false. Use `Number.isNaN(x)`.
+// useIsNaN: `x === NaN` is always false. Use `Number.isNaN(x)`.
 // https://eslint.org/docs/latest/rules/use-isnan
-type useIsnan struct{}
+type useIsNaN struct{}
 
-func (useIsnan) Name() string           { return "use-isnan" }
-func (useIsnan) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindBinaryExpression} }
-func (useIsnan) Check(ctx *Context, node *shimast.Node) {
+func (useIsNaN) Name() string           { return "useIsNaN" }
+func (useIsNaN) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindBinaryExpression} }
+func (useIsNaN) Check(ctx *Context, node *shimast.Node) {
   expr := node.AsBinaryExpression()
   if expr == nil || expr.OperatorToken == nil {
     return
@@ -266,12 +266,12 @@ func (useIsnan) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// valid-typeof: typeof expressions can only be compared to known type
+// validTypeof: typeof expressions can only be compared to known type
 // strings. Catches `typeof x === "stirng"`.
 // https://eslint.org/docs/latest/rules/valid-typeof
 type validTypeof struct{}
 
-func (validTypeof) Name() string           { return "valid-typeof" }
+func (validTypeof) Name() string           { return "validTypeof" }
 func (validTypeof) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindBinaryExpression} }
 func (validTypeof) Check(ctx *Context, node *shimast.Node) {
   expr := node.AsBinaryExpression()
@@ -311,12 +311,12 @@ func isValidTypeofString(value string) bool {
   return false
 }
 
-// no-compare-neg-zero: `x === -0`. Comparison ignores the sign — use
+// noCompareNegZero: `x === -0`. Comparison ignores the sign — use
 // `Object.is(x, -0)` if you really mean it.
 // https://eslint.org/docs/latest/rules/no-compare-neg-zero
 type noCompareNegZero struct{}
 
-func (noCompareNegZero) Name() string           { return "no-compare-neg-zero" }
+func (noCompareNegZero) Name() string           { return "noCompareNegZero" }
 func (noCompareNegZero) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindBinaryExpression} }
 func (noCompareNegZero) Check(ctx *Context, node *shimast.Node) {
   expr := node.AsBinaryExpression()
@@ -342,13 +342,13 @@ func isNegZero(node *shimast.Node) bool {
   return numericLiteralText(prefix.Operand) == "0"
 }
 
-// no-cond-assign: `if (a = b)` is almost always a typo for `if (a == b)`.
+// noCondAssign: `if (a = b)` is almost always a typo for `if (a == b)`.
 // Default mode matches ESLint's `except-parens` — wrapping in `( )`
 // silences the rule.
 // https://eslint.org/docs/latest/rules/no-cond-assign
 type noCondAssign struct{}
 
-func (noCondAssign) Name() string { return "no-cond-assign" }
+func (noCondAssign) Name() string { return "noCondAssign" }
 func (noCondAssign) Visits() []shimast.Kind {
   return []shimast.Kind{
     shimast.KindIfStatement,
@@ -418,12 +418,12 @@ func isAssignmentOperator(kind shimast.Kind) bool {
   return false
 }
 
-// no-constant-condition: `if (true)`, `while (1)`, `if (literal)`. Often
+// noConstantCondition: `if (true)`, `while (1)`, `if (literal)`. Often
 // the result of leftover debug code or a typo.
 // https://eslint.org/docs/latest/rules/no-constant-condition
 type noConstantCondition struct{}
 
-func (noConstantCondition) Name() string { return "no-constant-condition" }
+func (noConstantCondition) Name() string { return "noConstantCondition" }
 func (noConstantCondition) Visits() []shimast.Kind {
   return []shimast.Kind{
     shimast.KindIfStatement,
@@ -495,7 +495,7 @@ func init() {
   Register(noExtraBooleanCast{})
   Register(noUnsafeNegation{})
   Register(eqeqeq{})
-  Register(useIsnan{})
+  Register(useIsNaN{})
   Register(validTypeof{})
   Register(noCompareNegZero{})
   Register(noCondAssign{})

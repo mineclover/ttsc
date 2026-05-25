@@ -47,12 +47,12 @@ func (radix) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-new-wrappers: `new String("")`, `new Number(0)`, `new Boolean(false)`
+// noNewWrappers: `new String("")`, `new Number(0)`, `new Boolean(false)`
 // build wrapper objects rarely intended.
 // https://eslint.org/docs/latest/rules/no-new-wrappers
 type noNewWrappers struct{}
 
-func (noNewWrappers) Name() string           { return "no-new-wrappers" }
+func (noNewWrappers) Name() string           { return "noNewWrappers" }
 func (noNewWrappers) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindNewExpression} }
 func (noNewWrappers) Check(ctx *Context, node *shimast.Node) {
   ne := node.AsNewExpression()

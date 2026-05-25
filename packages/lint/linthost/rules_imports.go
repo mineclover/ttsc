@@ -5,14 +5,14 @@ import (
   shimscanner "github.com/microsoft/typescript-go/shim/scanner"
 )
 
-// no-import-type-side-effects: an import whose every named specifier
+// noImportTypeSideEffects: an import whose every named specifier
 // uses the inline `type` modifier is morally a type-only import; hoist
 // the `type` to the import clause to make that intent explicit and let
 // `verbatimModuleSyntax` elide the import entirely. typescript-eslint
 // stylistic: https://typescript-eslint.io/rules/no-import-type-side-effects/
 type noImportTypeSideEffects struct{}
 
-func (noImportTypeSideEffects) Name() string { return "no-import-type-side-effects" }
+func (noImportTypeSideEffects) Name() string { return "noImportTypeSideEffects" }
 func (noImportTypeSideEffects) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindImportDeclaration}
 }

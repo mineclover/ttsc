@@ -6,7 +6,7 @@ import (
   shimast "github.com/microsoft/typescript-go/shim/ast"
 )
 
-// format/quotes normalizes string-literal quote style. Mirrors
+// formatQuotes normalizes string-literal quote style. Mirrors
 // prettier's `singleQuote` option:
 //
 //   - `prefer: "double"` (default) converts single-quoted literals to
@@ -32,7 +32,7 @@ type formatQuotesOptions struct {
   Prefer string `json:"prefer"`
 }
 
-func (formatQuotes) Name() string   { return "format/quotes" }
+func (formatQuotes) Name() string   { return "formatQuotes" }
 func (formatQuotes) IsFormat() bool { return true }
 
 func (formatQuotes) Visits() []shimast.Kind {

@@ -2,12 +2,12 @@ package linthost
 
 import shimast "github.com/microsoft/typescript-go/shim/ast"
 
-// no-sparse-arrays: `[1, , 2]` — the implied undefined slot is almost
+// noSparseArrays: `[1, , 2]` — the implied undefined slot is almost
 // always a typo.
 // https://eslint.org/docs/latest/rules/no-sparse-arrays
 type noSparseArrays struct{}
 
-func (noSparseArrays) Name() string { return "no-sparse-arrays" }
+func (noSparseArrays) Name() string { return "noSparseArrays" }
 func (noSparseArrays) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindArrayLiteralExpression}
 }
@@ -24,7 +24,7 @@ func (noSparseArrays) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-array-constructor: forbid `new Array(0)` / `Array(1, 2, 3)` (use
+// noArrayConstructor: forbid `new Array(0)` / `Array(1, 2, 3)` (use
 // array literals). The single-argument form is intentionally excluded from
 // the ban: `Array(n)` is commonly used to pre-allocate a sparse array by
 // length, and banning it would generate noise on existing idiomatic code.
@@ -33,7 +33,7 @@ func (noSparseArrays) Check(ctx *Context, node *shimast.Node) {
 // https://eslint.org/docs/latest/rules/no-array-constructor
 type noArrayConstructor struct{}
 
-func (noArrayConstructor) Name() string { return "no-array-constructor" }
+func (noArrayConstructor) Name() string { return "noArrayConstructor" }
 func (noArrayConstructor) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindNewExpression, shimast.KindCallExpression}
 }

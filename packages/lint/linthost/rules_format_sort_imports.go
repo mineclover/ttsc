@@ -29,7 +29,7 @@ type formatSortImportsOptions struct {
 // landed, so omitting `importOrder` produces the same output.
 var defaultImportOrder = []string{thirdPartyModulesPlaceholder, `^\.`}
 
-// format/sort-imports orders the file's top-level import declarations into
+// formatSortImports orders the file's top-level import declarations into
 // canonical groups and alphabetizes each group. Compatible-by-spirit with
 // `@trivago/prettier-plugin-sort-imports`. Groups are user-configurable via
 // the `importOrder` option; when omitted, the rule falls back to a
@@ -55,7 +55,7 @@ var defaultImportOrder = []string{thirdPartyModulesPlaceholder, `^\.`}
 // participate in the same group based on their module specifier.
 type formatSortImports struct{}
 
-func (formatSortImports) Name() string   { return "format/sort-imports" }
+func (formatSortImports) Name() string   { return "formatSortImports" }
 func (formatSortImports) IsFormat() bool { return true }
 func (formatSortImports) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindSourceFile}

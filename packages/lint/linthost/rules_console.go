@@ -2,12 +2,12 @@ package linthost
 
 import shimast "github.com/microsoft/typescript-go/shim/ast"
 
-// no-console: forbid `console.*` calls. This implementation models the
+// noConsole: forbid `console.*` calls. This implementation models the
 // default rule shape and flags every console method.
 // https://eslint.org/docs/latest/rules/no-console
 type noConsole struct{}
 
-func (noConsole) Name() string           { return "no-console" }
+func (noConsole) Name() string           { return "noConsole" }
 func (noConsole) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindCallExpression} }
 func (noConsole) Check(ctx *Context, node *shimast.Node) {
   call := node.AsCallExpression()

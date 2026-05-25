@@ -1,6 +1,6 @@
 import type { ITtscLintFormatConfig } from "./ITtscLintFormatConfig";
 import type { ITtscLintPlugin } from "./ITtscLintPlugin";
-import type { TtscLintRuleMap } from "./TtscLintRuleMap";
+import type { ITtscLintRules } from "./ITtscLintRules";
 
 /**
  * Top-level object accepted by `@ttsc/lint` config files.
@@ -25,9 +25,15 @@ export interface ITtscLintConfig {
   /** Contributor plugin objects keyed by namespace. */
   plugins?: Record<string, ITtscLintPlugin>;
 
-  /** Rule-name to severity map. Supports severity tuples with options. */
-  rules?: TtscLintRuleMap;
+  /**
+   * Camel-case built-in rule severities plus namespaced contributor rules.
+   *
+   * Built-in rules are concrete interface properties for autocomplete and
+   * typo checking. Contributor rules use the familiar namespace form such as
+   * `demo/no-demo`.
+   */
+  rules?: ITtscLintRules;
 
-  /** Prettier-style flat configuration for the `format/*` rules. */
+  /** Prettier-style flat configuration for the format rules. */
   format?: ITtscLintFormatConfig;
 }

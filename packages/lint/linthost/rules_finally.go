@@ -2,12 +2,12 @@ package linthost
 
 import shimast "github.com/microsoft/typescript-go/shim/ast"
 
-// no-unsafe-finally: `return` / `break` / `continue` / `throw` inside a
+// noUnsafeFinally: `return` / `break` / `continue` / `throw` inside a
 // `finally` clause silently overrides the in-flight exception or value.
 // https://eslint.org/docs/latest/rules/no-unsafe-finally
 type noUnsafeFinally struct{}
 
-func (noUnsafeFinally) Name() string { return "no-unsafe-finally" }
+func (noUnsafeFinally) Name() string { return "noUnsafeFinally" }
 func (noUnsafeFinally) Visits() []shimast.Kind {
   return []shimast.Kind{
     shimast.KindReturnStatement,
@@ -83,11 +83,11 @@ func keywordOfControl(node *shimast.Node) string {
   return "control flow"
 }
 
-// no-useless-catch: `catch (err) { throw err; }` adds no behavior.
+// noUselessCatch: `catch (err) { throw err; }` adds no behavior.
 // https://eslint.org/docs/latest/rules/no-useless-catch
 type noUselessCatch struct{}
 
-func (noUselessCatch) Name() string           { return "no-useless-catch" }
+func (noUselessCatch) Name() string           { return "noUselessCatch" }
 func (noUselessCatch) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindCatchClause} }
 func (noUselessCatch) Check(ctx *Context, node *shimast.Node) {
   clause := node.AsCatchClause()

@@ -137,8 +137,40 @@ export interface ITtscLintJsdocRuleOptions {
   sortTags?: boolean;
 }
 
-/**
- * `testing-library/consistent-data-testid` rule options.
+/** `react-refresh/only-export-components` rule options. */
+export interface ITtscLintReactRefreshOnlyExportComponentsRuleOptions {
+  /**
+   * Extra higher-order component names that wrap component exports.
+   *
+   * @default []
+   */
+  extraHOCs?: readonly string[];
+
+  /**
+   * Export names the active framework handles during refresh, such as route
+   * metadata exports.
+   *
+   * @default []
+   */
+  allowExportNames?: readonly string[];
+
+  /**
+   * Permit literal/string/boolean/template/binary constant exports alongside
+   * component exports.
+   *
+   * @default false
+   */
+  allowConstantExport?: boolean;
+
+  /**
+   * Also scan JavaScript files that import React. TSX files are always scanned.
+   *
+   * @default false
+   */
+  checkJS?: boolean;
+}
+
+/** `testing-library/consistent-data-testid` rule options.
  */
 export interface ITtscLintTestingLibraryConsistentDataTestIdRuleOptions {
   /**
@@ -168,4 +200,5 @@ export interface ITtscLintRuleOptionsMap {
   "format/sort-imports": ITtscLintSortImportsRuleOptions;
   "format/jsdoc": ITtscLintJsdocRuleOptions;
   "format/print-width": ITtscLintPrintWidthRuleOptions;
+  "react-refresh/only-export-components": ITtscLintReactRefreshOnlyExportComponentsRuleOptions;
 }

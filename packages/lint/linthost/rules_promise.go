@@ -5,7 +5,7 @@ import (
   shimchecker "github.com/microsoft/typescript-go/shim/checker"
 )
 
-// await-thenable: `await x` where `x` is not a Promise and not a
+// awaitThenable: `await x` where `x` is not a Promise and not a
 // thenable is always a no-op. The runtime resolves `await 42` to `42`
 // after one microtask hop — almost never the intent. typescript-eslint
 // recommended-type-checked:
@@ -18,7 +18,7 @@ import (
 // no shim addition.
 type awaitThenable struct{}
 
-func (awaitThenable) Name() string { return "await-thenable" }
+func (awaitThenable) Name() string { return "awaitThenable" }
 func (awaitThenable) NeedsTypeChecker() bool {
   return true
 }

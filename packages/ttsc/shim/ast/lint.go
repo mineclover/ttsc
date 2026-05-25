@@ -111,7 +111,7 @@ type YieldExpression = innerast.YieldExpression
 type RegularExpressionLiteral = innerast.RegularExpressionLiteral
 type SatisfiesExpression = innerast.SatisfiesExpression
 
-// ---- Comment directives (ban-ts-comment) ----
+// ---- Comment directives (banTsComment) ----
 
 type CommentDirective = innerast.CommentDirective
 type CommentDirectiveKind = innerast.CommentDirectiveKind

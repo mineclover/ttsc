@@ -6,12 +6,12 @@ import (
   shimast "github.com/microsoft/typescript-go/shim/ast"
 )
 
-// no-template-curly-in-string: a regular string contains `${...}`. The
+// noTemplateCurlyInString: a regular string contains `${...}`. The
 // developer probably meant a template literal.
 // https://eslint.org/docs/latest/rules/no-template-curly-in-string
 type noTemplateCurlyInString struct{}
 
-func (noTemplateCurlyInString) Name() string { return "no-template-curly-in-string" }
+func (noTemplateCurlyInString) Name() string { return "noTemplateCurlyInString" }
 func (noTemplateCurlyInString) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindStringLiteral}
 }
@@ -45,12 +45,12 @@ func hasTemplatePlaceholder(text string) bool {
   return false
 }
 
-// no-multi-str: `"line one \\n line two"` style backslash continuations.
+// noMultiStr: `"line one \\n line two"` style backslash continuations.
 // TS strips them silently and the result is rarely what the author meant.
 // https://eslint.org/docs/latest/rules/no-multi-str
 type noMultiStr struct{}
 
-func (noMultiStr) Name() string           { return "no-multi-str" }
+func (noMultiStr) Name() string           { return "noMultiStr" }
 func (noMultiStr) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindStringLiteral} }
 func (noMultiStr) Check(ctx *Context, node *shimast.Node) {
   src := nodeText(ctx.File, node)
@@ -75,12 +75,12 @@ func hasBackslashLineContinuation(src string) bool {
   return false
 }
 
-// no-useless-concat: `"a" + "b"` of two literals. The compiler can't
+// noUselessConcat: `"a" + "b"` of two literals. The compiler can't
 // constant-fold every case, but this catches the obvious shapes.
 // https://eslint.org/docs/latest/rules/no-useless-concat
 type noUselessConcat struct{}
 
-func (noUselessConcat) Name() string           { return "no-useless-concat" }
+func (noUselessConcat) Name() string           { return "noUselessConcat" }
 func (noUselessConcat) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindBinaryExpression} }
 func (noUselessConcat) Check(ctx *Context, node *shimast.Node) {
   expr := node.AsBinaryExpression()
@@ -109,12 +109,12 @@ func isStringLikeLiteral(node *shimast.Node) bool {
   return false
 }
 
-// no-octal: `010` octal literal. Has to be opt-in via `0o10` in
+// noOctal: `010` octal literal. Has to be opt-in via `0o10` in
 // modern code; the legacy form is silently confusing.
 // https://eslint.org/docs/latest/rules/no-octal
 type noOctal struct{}
 
-func (noOctal) Name() string           { return "no-octal" }
+func (noOctal) Name() string           { return "noOctal" }
 func (noOctal) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindNumericLiteral} }
 func (noOctal) Check(ctx *Context, node *shimast.Node) {
   src := nodeText(ctx.File, node)

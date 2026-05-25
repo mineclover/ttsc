@@ -11,10 +11,10 @@ import (
   shimast "github.com/microsoft/typescript-go/shim/ast"
 )
 
-// no-confusing-non-null-assertion: `a! == b` reads ambiguously.
+// noConfusingNonNullAssertion: `a! == b` reads ambiguously.
 type noConfusingNonNullAssertion struct{}
 
-func (noConfusingNonNullAssertion) Name() string { return "no-confusing-non-null-assertion" }
+func (noConfusingNonNullAssertion) Name() string { return "noConfusingNonNullAssertion" }
 func (noConfusingNonNullAssertion) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindBinaryExpression}
 }
@@ -37,11 +37,11 @@ func (noConfusingNonNullAssertion) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-duplicate-enum-values: `enum E { A = 1, B = 1 }` — duplicate values
+// noDuplicateEnumValues: `enum E { A = 1, B = 1 }` — duplicate values
 // silently collapse.
 type noDuplicateEnumValues struct{}
 
-func (noDuplicateEnumValues) Name() string { return "no-duplicate-enum-values" }
+func (noDuplicateEnumValues) Name() string { return "noDuplicateEnumValues" }
 func (noDuplicateEnumValues) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindEnumDeclaration}
 }
@@ -77,13 +77,13 @@ func (noDuplicateEnumValues) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-mixed-enums: forbid enums that mix numeric and string member shapes.
+// noMixedEnums: forbid enums that mix numeric and string member shapes.
 // A single enum with `{ A, B = "two" }` produces broken reverse mappings
 // and surprising assignability. typescript-eslint recommended:
 // https://typescript-eslint.io/rules/no-mixed-enums/
 type noMixedEnums struct{}
 
-func (noMixedEnums) Name() string { return "no-mixed-enums" }
+func (noMixedEnums) Name() string { return "noMixedEnums" }
 func (noMixedEnums) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindEnumDeclaration}
 }
@@ -137,10 +137,10 @@ func (noMixedEnums) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-extra-non-null-assertion: `a!!` / `a!?.b` collapses two assertions.
+// noExtraNonNullAssertion: `a!!` / `a!?.b` collapses two assertions.
 type noExtraNonNullAssertion struct{}
 
-func (noExtraNonNullAssertion) Name() string { return "no-extra-non-null-assertion" }
+func (noExtraNonNullAssertion) Name() string { return "noExtraNonNullAssertion" }
 func (noExtraNonNullAssertion) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindNonNullExpression}
 }
@@ -169,11 +169,11 @@ func (noExtraNonNullAssertion) Check(ctx *Context, node *shimast.Node) {
   )
 }
 
-// no-non-null-asserted-optional-chain: `foo?.bar!` — the chain produces
+// noNonNullAssertedOptionalChain: `foo?.bar!` — the chain produces
 // undefined; asserting non-null on the whole chain defeats the chain.
 type noNonNullAssertedOptionalChain struct{}
 
-func (noNonNullAssertedOptionalChain) Name() string { return "no-non-null-asserted-optional-chain" }
+func (noNonNullAssertedOptionalChain) Name() string { return "noNonNullAssertedOptionalChain" }
 func (noNonNullAssertedOptionalChain) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindNonNullExpression}
 }
@@ -224,12 +224,12 @@ func containsOptionalChain(node *shimast.Node) bool {
   return false
 }
 
-// no-misused-new: declaring a `new` signature on a non-class interface
+// noMisusedNew: declaring a `new` signature on a non-class interface
 // or a `constructor` method on an interface — these don't do what
 // authors expect.
 type noMisusedNew struct{}
 
-func (noMisusedNew) Name() string { return "no-misused-new" }
+func (noMisusedNew) Name() string { return "noMisusedNew" }
 func (noMisusedNew) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindInterfaceDeclaration, shimast.KindTypeAliasDeclaration}
 }
@@ -257,11 +257,11 @@ func (noMisusedNew) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// prefer-enum-initializers: every enum member should have an explicit
+// preferEnumInitializers: every enum member should have an explicit
 // initializer (avoids order-dependent values).
 type preferEnumInitializers struct{}
 
-func (preferEnumInitializers) Name() string { return "prefer-enum-initializers" }
+func (preferEnumInitializers) Name() string { return "preferEnumInitializers" }
 func (preferEnumInitializers) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindEnumDeclaration}
 }
@@ -281,11 +281,11 @@ func (preferEnumInitializers) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// prefer-for-of: `for (let i = 0; i < arr.length; i++) { use(arr[i]) }`
+// preferForOf: `for (let i = 0; i < arr.length; i++) { use(arr[i]) }`
 // can usually be replaced with `for (const x of arr) { use(x); }`.
 type preferForOf struct{}
 
-func (preferForOf) Name() string           { return "prefer-for-of" }
+func (preferForOf) Name() string           { return "preferForOf" }
 func (preferForOf) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindForStatement} }
 func (preferForOf) Check(ctx *Context, node *shimast.Node) {
   loop := node.AsForStatement()
@@ -351,13 +351,13 @@ func isCounterIncrement(node *shimast.Node, counter string) bool {
   return false
 }
 
-// prefer-function-type: a single-call-signature interface or type alias
+// preferFunctionType: a single-call-signature interface or type alias
 // is more readably written as a function type.
 //
 //  interface F { (x: number): string }   -> type F = (x: number) => string
 type preferFunctionType struct{}
 
-func (preferFunctionType) Name() string { return "prefer-function-type" }
+func (preferFunctionType) Name() string { return "preferFunctionType" }
 func (preferFunctionType) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindInterfaceDeclaration}
 }
@@ -376,11 +376,11 @@ func (preferFunctionType) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "Interface only has a call signature; use 'type' alias and function type instead.")
 }
 
-// prefer-namespace-keyword: `module Foo {}` (TS namespace via `module`
+// preferNamespaceKeyword: `module Foo {}` (TS namespace via `module`
 // keyword) → `namespace Foo {}`.
 type preferNamespaceKeyword struct{}
 
-func (preferNamespaceKeyword) Name() string { return "prefer-namespace-keyword" }
+func (preferNamespaceKeyword) Name() string { return "preferNamespaceKeyword" }
 func (preferNamespaceKeyword) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindModuleDeclaration}
 }
@@ -408,11 +408,11 @@ func (preferNamespaceKeyword) Check(ctx *Context, node *shimast.Node) {
   )
 }
 
-// triple-slash-reference: `/// <reference path="..." />` directives.
+// tripleSlashReference: `/// <reference path="..." />` directives.
 // Discouraged in modern code in favor of `import`.
 type tripleSlashReference struct{}
 
-func (tripleSlashReference) Name() string           { return "triple-slash-reference" }
+func (tripleSlashReference) Name() string           { return "tripleSlashReference" }
 func (tripleSlashReference) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindSourceFile} }
 func (tripleSlashReference) Check(ctx *Context, node *shimast.Node) {
   if ctx.File == nil {
@@ -426,10 +426,10 @@ func (tripleSlashReference) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-array-delete: `delete arr[0]` leaves a sparse hole. Use `splice`.
+// noArrayDelete: `delete arr[0]` leaves a sparse hole. Use `splice`.
 type noArrayDelete struct{}
 
-func (noArrayDelete) Name() string           { return "no-array-delete" }
+func (noArrayDelete) Name() string           { return "noArrayDelete" }
 func (noArrayDelete) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindDeleteExpression} }
 func (noArrayDelete) Check(ctx *Context, node *shimast.Node) {
   del := node.AsDeleteExpression()
@@ -451,7 +451,7 @@ func (noArrayDelete) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// consistent-type-imports: `import { Foo } from "./types"` where Foo is
+// consistentTypeImports: `import { Foo } from "./types"` where Foo is
 // only used as a type → `import type { Foo } from "./types"`. We
 // approximate by flagging every `import type` candidate where the
 // specifier appears in a type-only context inside the file.
@@ -462,7 +462,7 @@ func (noArrayDelete) Check(ctx *Context, node *shimast.Node) {
 // common case.
 type consistentTypeImports struct{}
 
-func (consistentTypeImports) Name() string { return "consistent-type-imports" }
+func (consistentTypeImports) Name() string { return "consistentTypeImports" }
 func (consistentTypeImports) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindImportDeclaration}
 }
@@ -549,12 +549,12 @@ func allUsesAreTypeOnly(root *shimast.Node, names []string) bool {
   return allOk
 }
 
-// no-empty-object-type: `interface Foo {}` / `type Foo = {}`. ESLint
+// noEmptyObjectType: `interface Foo {}` / `type Foo = {}`. ESLint
 // flags empty types because they're equivalent to `unknown` (everything
 // satisfies `{}`).
 type noEmptyObjectType struct{}
 
-func (noEmptyObjectType) Name() string           { return "no-empty-object-type" }
+func (noEmptyObjectType) Name() string           { return "noEmptyObjectType" }
 func (noEmptyObjectType) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindTypeLiteral} }
 func (noEmptyObjectType) Check(ctx *Context, node *shimast.Node) {
   lit := node.AsTypeLiteralNode()
@@ -566,10 +566,10 @@ func (noEmptyObjectType) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// array-type: `Array<T>` vs `T[]`. ESLint default mode prefers `T[]`.
+// arrayType: `Array<T>` vs `T[]`. ESLint default mode prefers `T[]`.
 type arrayType struct{}
 
-func (arrayType) Name() string           { return "array-type" }
+func (arrayType) Name() string           { return "arrayType" }
 func (arrayType) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindTypeReference} }
 func (arrayType) Check(ctx *Context, node *shimast.Node) {
   ref := node.AsTypeReferenceNode()
@@ -590,11 +590,11 @@ func (arrayType) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// consistent-indexed-object-style: `{ [key: string]: T }` vs
+// consistentIndexedObjectStyle: `{ [key: string]: T }` vs
 // `Record<string, T>`. ESLint default prefers `Record`.
 type consistentIndexedObjectStyle struct{}
 
-func (consistentIndexedObjectStyle) Name() string { return "consistent-indexed-object-style" }
+func (consistentIndexedObjectStyle) Name() string { return "consistentIndexedObjectStyle" }
 func (consistentIndexedObjectStyle) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindTypeLiteral}
 }
@@ -611,17 +611,17 @@ func (consistentIndexedObjectStyle) Check(ctx *Context, node *shimast.Node) {
 }
 
 // no-explicit-any-rest-parameter — keeping this distinct from
-// no-explicit-any: rest parameters typed `...args: any[]` are common
+// noExplicitAny: rest parameters typed `...args: any[]` are common
 // enough that users want to allow them; this rule lets them ban that
 // shape specifically.
 //
 // (Skipped: too narrow / overlaps with no-explicit-any.)
 
-// ban-tslint-comment: `// tslint:disable`. tslint is dead; comments
+// banTslintComment: `// tslint:disable`. tslint is dead; comments
 // referencing it should be cleaned up.
 type banTslintComment struct{}
 
-func (banTslintComment) Name() string           { return "ban-tslint-comment" }
+func (banTslintComment) Name() string           { return "banTslintComment" }
 func (banTslintComment) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindSourceFile} }
 func (banTslintComment) Check(ctx *Context, node *shimast.Node) {
   if ctx.File == nil {
@@ -644,12 +644,12 @@ func (banTslintComment) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// adjacent-overload-signatures: function/method overloads must be
+// adjacentOverloadSignatures: function/method overloads must be
 // declared next to each other. ESLint catches the visual confusion
 // when overloads are interleaved with other members.
 type adjacentOverloadSignatures struct{}
 
-func (adjacentOverloadSignatures) Name() string { return "adjacent-overload-signatures" }
+func (adjacentOverloadSignatures) Name() string { return "adjacentOverloadSignatures" }
 func (adjacentOverloadSignatures) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindInterfaceDeclaration, shimast.KindTypeLiteral, shimast.KindClassDeclaration, shimast.KindClassExpression, shimast.KindModuleBlock, shimast.KindSourceFile}
 }

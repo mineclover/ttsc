@@ -401,12 +401,8 @@ func stripDirectiveDescription(payload string) string {
   return payload
 }
 
-// normalizeDirectiveRuleName strips the common ESLint namespace prefixes so
-// both `@typescript-eslint/no-var` and `no-var` resolve to the same key.
+// normalizeDirectiveRuleName strips common ESLint namespace prefixes and maps
+// legacy kebab-case built-in names to the same camelCase key diagnostics use.
 func normalizeDirectiveRuleName(name string) string {
-  name = strings.TrimSpace(name)
-  name = strings.TrimPrefix(name, "@typescript-eslint/")
-  name = strings.TrimPrefix(name, "typescript-eslint/")
-  name = strings.TrimPrefix(name, "eslint/")
-  return name
+  return normalizeBuiltinRuleName(name)
 }

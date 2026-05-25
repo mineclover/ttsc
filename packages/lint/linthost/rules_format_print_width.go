@@ -7,7 +7,7 @@ import (
   shimscanner "github.com/microsoft/typescript-go/shim/scanner"
 )
 
-// format/print-width reflows expressions and declarations so they fit
+// formatPrintWidth reflows expressions and declarations so they fit
 // within a `printWidth`-column budget, mirroring Prettier's headline
 // formatting feature.
 //
@@ -56,7 +56,7 @@ type formatPrintWidth struct{}
 // TrailingComma reaches this rule because the printer's reflow decides
 // whether to emit a trailing comma on every multi-line list — and that
 // decision must match the user's `format.trailingComma` setting or the
-// reflow oscillates against `format/trailing-comma` on every cascade
+// reflow oscillates against `formatTrailingComma` on every cascade
 // pass. The config layer mirrors `format.trailingComma` into both
 // rules' option blobs (see `expandFormatBlock` in config_format.go).
 type formatPrintWidthOptions struct {
@@ -67,7 +67,7 @@ type formatPrintWidthOptions struct {
   TrailingComma *string `json:"trailingComma"`
 }
 
-func (formatPrintWidth) Name() string   { return "format/print-width" }
+func (formatPrintWidth) Name() string   { return "formatPrintWidth" }
 func (formatPrintWidth) IsFormat() bool { return true }
 
 func (formatPrintWidth) Visits() []shimast.Kind {
@@ -102,7 +102,7 @@ func (formatPrintWidth) Visits() []shimast.Kind {
 //     reflow surface.
 //
 // Both cases are tracked benchmark cases that forced
-// `format/print-width: 'off'` on the ttsc-lint branch. They are listed
+// `formatPrintWidth: 'off'` on the ttsc-lint branch. They are listed
 // here so a future slice can pick them up without rediscovering the
 // divergence.
 func (formatPrintWidth) Check(ctx *Context, node *shimast.Node) {
@@ -253,8 +253,8 @@ func (formatPrintWidth) Check(ctx *Context, node *shimast.Node) {
 }
 
 // trailingLineWidth returns the visual column width of src[end:] up to
-// the next newline, with trailing whitespace trimmed. The format/print-
-// width reflow replaces only the node's own byte range, so whatever
+// the next newline, with trailing whitespace trimmed. The formatPrintWidth
+// reflow replaces only the node's own byte range, so whatever
 // shares the node's last source line — a statement `;`, a `) {` header
 // tail, a `, nextArg)` continuation — stays put. Charging that width
 // against the budget keeps the rule from emitting a line that overflows
@@ -265,7 +265,7 @@ func (formatPrintWidth) Check(ctx *Context, node *shimast.Node) {
 // the reflowed node to make the comment fit cannot help — Prettier 3
 // keeps the node inline and lets the comment trail (see typeorm's
 // `comment.replaceAll(...) // Null bytes' shape that pushed
-// `format/print-width: 'off'` onto the ttsc-lint benchmark branch).
+// `formatPrintWidth: 'off'` onto the ttsc-lint benchmark branch).
 // Excluding the comment from `trailingLineWidth` matches that
 // behavior: the fast path sees just the un-movable punctuation suffix,
 // and the shrunk-budget re-render does not over-shrink and over-break.
@@ -457,7 +457,7 @@ func lineStartOffset(src string, pos int) int {
 
 // ternaryArmIndentBonus returns 2 when the line containing `pos` begins,
 // after its leading whitespace, with a `? ` or `: ` ternary-arm marker,
-// and 0 otherwise. format/print-width adds it to BaseIndent so a node
+// and 0 otherwise. formatPrintWidth adds it to BaseIndent so a node
 // reflowed inside a ternary arm indents its broken continuation under
 // the arm's expression rather than under the `?`/`:` token. In practice
 // only a ternary arm opens a reflow target's line with `? ` / `: `; the
@@ -475,7 +475,7 @@ func ternaryArmIndentBonus(src string, pos int) int {
 }
 
 // hasReflowAncestor reports whether any ancestor of `node` would also
-// match the format/print-width visitor. The rule uses this to suppress
+// match the formatPrintWidth visitor. The rule uses this to suppress
 // nested fires when an enclosing reflow target already covers the
 // child.
 func hasReflowAncestor(node *shimast.Node) bool {
@@ -491,7 +491,7 @@ func hasReflowAncestor(node *shimast.Node) bool {
 }
 
 // hasTemplateSubstitutionAncestor reports whether `node` sits inside a
-// template-literal substitution (`${…}`). format/print-width abstains
+// template-literal substitution (`${…}`). formatPrintWidth abstains
 // on such nodes: Prettier prints template interpolations at infinite
 // printWidth and only keeps a break the source already had, so a reflow
 // of a nested call or literal would split a one-line `${…}` and never
@@ -509,7 +509,7 @@ func hasTemplateSubstitutionAncestor(node *shimast.Node) bool {
 }
 
 // isReflowKind reports whether `k` is one of the node kinds the
-// format/print-width rule visits. Kept in sync with Visits() so
+// formatPrintWidth rule visits. Kept in sync with Visits() so
 // hasReflowAncestor does not need to call Visits() at runtime.
 func isReflowKind(k shimast.Kind) bool {
   switch k {
@@ -539,9 +539,9 @@ func isReflowKind(k shimast.Kind) bool {
 // inside an inter-child gap that the TS grammar would never tokenize
 // as a comment — effectively nil for valid TypeScript source.
 //
-// `format/sort-imports` chose the opposite path on a similar shape:
+// `formatSortImports` chose the opposite path on a similar shape:
 // it actively preserves inter-specifier comments by walking the
-// original byte ranges between elements. `format/print-width`
+// original byte ranges between elements. `formatPrintWidth`
 // abstains because the printer's separator (`,` + Line) is freshly
 // minted and has no carrier slot for trivia. Extending preservation
 // is a future slice; abstaining is byte-safe.

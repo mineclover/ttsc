@@ -5,7 +5,7 @@ import (
   shimscanner "github.com/microsoft/typescript-go/shim/scanner"
 )
 
-// format/jsdoc rewrites JSDoc blocks toward the prettier-plugin-jsdoc
+// formatJsdoc rewrites JSDoc blocks toward the prettier-plugin-jsdoc
 // canonical shape. The MVP implementation handles tag-synonym
 // normalization; future passes will fold in tag sorting, @param column
 // alignment, and description wrapping under the same rule name so
@@ -35,7 +35,7 @@ type formatJSDocOptions struct {
   SortTags    bool              `json:"sortTags"`
 }
 
-func (formatJSDoc) Name() string   { return "format/jsdoc" }
+func (formatJSDoc) Name() string   { return "formatJsdoc" }
 func (formatJSDoc) IsFormat() bool { return true }
 func (formatJSDoc) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindSourceFile}

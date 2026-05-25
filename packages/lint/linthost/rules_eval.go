@@ -2,13 +2,13 @@ package linthost
 
 import shimast "github.com/microsoft/typescript-go/shim/ast"
 
-// no-eval: forbid `eval(...)` calls. Members of nested namespaces (e.g.
+// noEval: forbid `eval(...)` calls. Members of nested namespaces (e.g.
 // `globalThis.eval(...)`) are not flagged here — that's
 // `no-implied-eval`, which we don't ship in v0.
 // https://eslint.org/docs/latest/rules/no-eval
 type noEval struct{}
 
-func (noEval) Name() string           { return "no-eval" }
+func (noEval) Name() string           { return "noEval" }
 func (noEval) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindCallExpression} }
 func (noEval) Check(ctx *Context, node *shimast.Node) {
   call := node.AsCallExpression()
@@ -20,12 +20,12 @@ func (noEval) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-script-url: forbid `"javascript:..."` literals. Often used to inject
+// noScriptUrl: forbid `"javascript:..."` literals. Often used to inject
 // inline JS via DOM `href`/`src`; legacy and dangerous.
 // https://eslint.org/docs/latest/rules/no-script-url
 type noScriptURL struct{}
 
-func (noScriptURL) Name() string { return "no-script-url" }
+func (noScriptURL) Name() string { return "noScriptUrl" }
 func (noScriptURL) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindStringLiteral, shimast.KindNoSubstitutionTemplateLiteral}
 }

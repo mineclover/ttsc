@@ -82,7 +82,7 @@ func FindLintEntry(entries []PluginEntry) (*PluginEntry, error) {
 }
 
 // RuleConfig captures the resolved per-rule severity. The map is keyed by
-// rule name (e.g. "no-var").
+// rule name (e.g. "noVar").
 type RuleConfig map[string]Severity
 
 // RuleOptionsMap captures the rule-specific options blob, keyed by rule
@@ -125,13 +125,13 @@ type RuleResolver interface {
 // ResolveRules implements RuleResolver. A flat RuleConfig has no glob scoping,
 // so every file receives the full map unchanged.
 func (c RuleConfig) ResolveRules(string) ResolvedRuleConfig {
-  return ResolvedRuleConfig{Rules: c}
+  return ResolvedRuleConfig{Rules: normalizeRuleConfigKeys(c)}
 }
 
 // ActiveRuleNames implements RuleResolver. Returns rule names whose severity
 // is not SeverityOff, sorted for deterministic engine dispatch-table construction.
 func (c RuleConfig) ActiveRuleNames() []string {
-  return sortedRuleNames(c, func(sev Severity) bool { return sev != SeverityOff })
+  return sortedRuleNames(normalizeRuleConfigKeys(c), func(sev Severity) bool { return sev != SeverityOff })
 }
 
 // EnabledRuleConfig implements RuleResolver. Returns a copy containing only the
@@ -140,7 +140,7 @@ func (c RuleConfig) EnabledRuleConfig() RuleConfig {
   out := RuleConfig{}
   for name, sev := range c {
     if sev != SeverityOff {
-      out[name] = sev
+      out[normalizeExternalRuleName(name)] = sev
     }
   }
   return out
@@ -150,6 +150,17 @@ func (c RuleConfig) EnabledRuleConfig() RuleConfig {
 // severity-only path used by Go unit tests and rule constructors that
 // predate option support.
 func (RuleConfig) RuleOptions(string) json.RawMessage { return nil }
+
+func normalizeRuleConfigKeys(c RuleConfig) RuleConfig {
+  if len(c) == 0 {
+    return c
+  }
+  out := RuleConfig{}
+  for name, sev := range c {
+    out[normalizeExternalRuleName(name)] = sev
+  }
+  return out
+}
 
 // InlineRuleResolver pairs a severity map with an options map. The fields
 // are public so tests can construct one without going through
@@ -162,7 +173,7 @@ type InlineRuleResolver struct {
 // ResolveRules implements RuleResolver. Inline rules have no glob scoping;
 // the full map applies to every file.
 func (r InlineRuleResolver) ResolveRules(string) ResolvedRuleConfig {
-  return ResolvedRuleConfig{Rules: r.Rules}
+  return ResolvedRuleConfig{Rules: normalizeRuleConfigKeys(r.Rules)}
 }
 
 // ActiveRuleNames implements RuleResolver by delegating to the inner RuleConfig.
@@ -182,7 +193,14 @@ func (r InlineRuleResolver) RuleOptions(name string) json.RawMessage {
   if r.Options == nil {
     return nil
   }
-  return r.Options[name]
+  if raw := r.Options[name]; len(raw) > 0 {
+    return raw
+  }
+  canonical := normalizeExternalRuleName(name)
+  if raw := r.Options[canonical]; len(raw) > 0 {
+    return raw
+  }
+  return r.Options[legacyRuleAlias(canonical)]
 }
 
 // ConfigStore holds the parsed representation of a lint config file. It
@@ -210,7 +228,14 @@ func (s *ConfigStore) RuleOptions(name string) json.RawMessage {
   if s == nil {
     return nil
   }
-  return s.options[name]
+  if raw := s.options[name]; len(raw) > 0 {
+    return raw
+  }
+  canonical := normalizeExternalRuleName(name)
+  if raw := s.options[canonical]; len(raw) > 0 {
+    return raw
+  }
+  return s.options[legacyRuleAlias(canonical)]
 }
 
 // ConfigEntry is the parsed form of one config file in the extends chain.
@@ -245,7 +270,7 @@ func (s *ConfigStore) ResolveRules(fileName string) ResolvedRuleConfig {
       continue
     }
     for name, sev := range entry.Rules {
-      out[name] = sev
+      out[normalizeExternalRuleName(name)] = sev
     }
   }
   return ResolvedRuleConfig{Rules: out}
@@ -266,7 +291,7 @@ func (s *ConfigStore) ActiveRuleNames() []string {
     }
     for name, sev := range entry.Rules {
       if sev != SeverityOff {
-        active[name] = sev
+        active[normalizeExternalRuleName(name)] = sev
       }
     }
   }
@@ -289,8 +314,9 @@ func (s *ConfigStore) EnabledRuleConfig() RuleConfig {
       if sev == SeverityOff {
         continue
       }
-      if out[name] != SeverityError {
-        out[name] = sev
+      canonical := normalizeExternalRuleName(name)
+      if out[canonical] != SeverityError {
+        out[canonical] = sev
       }
     }
   }
@@ -310,7 +336,7 @@ func (s *ConfigStore) Flatten() RuleConfig {
       continue
     }
     for name, sev := range entry.Rules {
-      out[name] = sev
+      out[normalizeExternalRuleName(name)] = sev
     }
   }
   return out
@@ -649,12 +675,10 @@ func rejectUnknownConfigKeys(value map[string]any, path string) error {
   return nil
 }
 
-// normalizeExternalRuleName strips the standard typescript-eslint namespace
-// prefixes so that rules like "@typescript-eslint/no-explicit-any" and the
-// bare "no-explicit-any" key both resolve to the same engine-internal name.
+// normalizeExternalRuleName strips standard TypeScript-ESLint namespaces and
+// maps legacy kebab-case built-in names onto the camelCase engine key.
 func normalizeExternalRuleName(name string) string {
-  name = strings.TrimPrefix(name, "@typescript-eslint/")
-  return strings.TrimPrefix(name, "typescript-eslint/")
+  return normalizeBuiltinRuleName(name)
 }
 
 // parsePatternList coerces a raw config value to a string slice for use as a
@@ -1704,5 +1728,15 @@ func (c RuleConfig) Severity(name string) Severity {
   if c == nil {
     return SeverityOff
   }
-  return c[name]
+  if sev, ok := c[name]; ok {
+    return sev
+  }
+  canonical := normalizeExternalRuleName(name)
+  if sev, ok := c[canonical]; ok {
+    return sev
+  }
+  if alias := legacyRuleAlias(canonical); alias != "" {
+    return c[alias]
+  }
+  return SeverityOff
 }

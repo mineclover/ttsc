@@ -10,11 +10,11 @@ import (
   shimscanner "github.com/microsoft/typescript-go/shim/scanner"
 )
 
-// no-alert: `alert()` / `confirm()` / `prompt()`. Rarely the right
+// noAlert: `alert()` / `confirm()` / `prompt()`. Rarely the right
 // answer in production code.
 type noAlert struct{}
 
-func (noAlert) Name() string           { return "no-alert" }
+func (noAlert) Name() string           { return "noAlert" }
 func (noAlert) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindCallExpression} }
 func (noAlert) Check(ctx *Context, node *shimast.Node) {
   call := node.AsCallExpression()
@@ -27,11 +27,11 @@ func (noAlert) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-bitwise: `&`, `|`, `^`, `~`, `<<`, `>>`, `>>>` — almost always a
+// noBitwise: `&`, `|`, `^`, `~`, `<<`, `>>`, `>>>` — almost always a
 // typo for the boolean-logic operators.
 type noBitwise struct{}
 
-func (noBitwise) Name() string { return "no-bitwise" }
+func (noBitwise) Name() string { return "noBitwise" }
 func (noBitwise) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindBinaryExpression, shimast.KindPrefixUnaryExpression}
 }
@@ -67,11 +67,11 @@ func (noBitwise) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-caller: `arguments.caller` / `arguments.callee` — strict-mode
+// noCaller: `arguments.caller` / `arguments.callee` — strict-mode
 // errors elsewhere; lint catches them earlier.
 type noCaller struct{}
 
-func (noCaller) Name() string           { return "no-caller" }
+func (noCaller) Name() string           { return "noCaller" }
 func (noCaller) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindPropertyAccessExpression} }
 func (noCaller) Check(ctx *Context, node *shimast.Node) {
   access := node.AsPropertyAccessExpression()
@@ -87,11 +87,11 @@ func (noCaller) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-case-declarations: `switch (x) { case 1: let y = 2; break; }` —
+// noCaseDeclarations: `switch (x) { case 1: let y = 2; break; }` —
 // block-scoped declarations leak across case labels.
 type noCaseDeclarations struct{}
 
-func (noCaseDeclarations) Name() string { return "no-case-declarations" }
+func (noCaseDeclarations) Name() string { return "noCaseDeclarations" }
 func (noCaseDeclarations) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindCaseClause, shimast.KindDefaultClause}
 }
@@ -118,20 +118,20 @@ func (noCaseDeclarations) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-continue: `continue` keyword. ESLint flags it as a code-smell
+// noContinue: `continue` keyword. ESLint flags it as a code-smell
 // (loop body should usually be reorganized).
 type noContinue struct{}
 
-func (noContinue) Name() string           { return "no-continue" }
+func (noContinue) Name() string           { return "noContinue" }
 func (noContinue) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindContinueStatement} }
 func (noContinue) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "Unexpected use of continue statement.")
 }
 
-// no-delete-var: `delete x` where `x` is a variable. Strict-mode error.
+// noDeleteVar: `delete x` where `x` is a variable. Strict-mode error.
 type noDeleteVar struct{}
 
-func (noDeleteVar) Name() string           { return "no-delete-var" }
+func (noDeleteVar) Name() string           { return "noDeleteVar" }
 func (noDeleteVar) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindDeleteExpression} }
 func (noDeleteVar) Check(ctx *Context, node *shimast.Node) {
   del := node.AsDeleteExpression()
@@ -143,11 +143,11 @@ func (noDeleteVar) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-eq-null: `x == null` — ambiguous with eqeqeq's `null` exception
+// noEqNull: `x == null` — ambiguous with eqeqeq's `null` exception
 // when developers want to also catch `undefined`.
 type noEqNull struct{}
 
-func (noEqNull) Name() string           { return "no-eq-null" }
+func (noEqNull) Name() string           { return "noEqNull" }
 func (noEqNull) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindBinaryExpression} }
 func (noEqNull) Check(ctx *Context, node *shimast.Node) {
   expr := node.AsBinaryExpression()
@@ -166,12 +166,12 @@ func isNullLiteral(node *shimast.Node) bool {
   return node != nil && node.Kind == shimast.KindNullKeyword
 }
 
-// no-extra-bind: `(function () {}).bind(this)` where `this` isn't used
+// noExtraBind: `(function () {}).bind(this)` where `this` isn't used
 // — only flag the case where the bind target is empty/parameterless,
 // keeping false-positives down.
 type noExtraBind struct{}
 
-func (noExtraBind) Name() string           { return "no-extra-bind" }
+func (noExtraBind) Name() string           { return "noExtraBind" }
 func (noExtraBind) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindCallExpression} }
 func (noExtraBind) Check(ctx *Context, node *shimast.Node) {
   call := node.AsCallExpression()
@@ -230,21 +230,21 @@ func bodyReferencesThis(node *shimast.Node) bool {
   return found
 }
 
-// no-labels: labels (`outer: for (...) { break outer; }`) are
+// noLabels: labels (`outer: for (...) { break outer; }`) are
 // confusing and rarely needed.
 type noLabels struct{}
 
-func (noLabels) Name() string           { return "no-labels" }
+func (noLabels) Name() string           { return "noLabels" }
 func (noLabels) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindLabeledStatement} }
 func (noLabels) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "Unexpected labeled statement.")
 }
 
-// no-lone-blocks: `{ doStuff(); }` outside a control flow context —
+// noLoneBlocks: `{ doStuff(); }` outside a control flow context —
 // the braces add no scope (in non-strict mode) and obscure intent.
 type noLoneBlocks struct{}
 
-func (noLoneBlocks) Name() string           { return "no-lone-blocks" }
+func (noLoneBlocks) Name() string           { return "noLoneBlocks" }
 func (noLoneBlocks) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindBlock} }
 func (noLoneBlocks) Check(ctx *Context, node *shimast.Node) {
   parent := node.Parent
@@ -270,7 +270,7 @@ func (noLoneBlocks) Check(ctx *Context, node *shimast.Node) {
   if block == nil || block.Statements == nil {
     return
   }
-  // Empty block is `no-empty`'s domain.
+  // Empty block is `noEmpty`'s domain.
   if len(block.Statements.Nodes) == 0 {
     return
   }
@@ -293,10 +293,10 @@ func (noLoneBlocks) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "Block is redundant.")
 }
 
-// no-lonely-if: `else { if (...) {...} }` should be `else if (...)`.
+// noLonelyIf: `else { if (...) {...} }` should be `else if (...)`.
 type noLonelyIf struct{}
 
-func (noLonelyIf) Name() string           { return "no-lonely-if" }
+func (noLonelyIf) Name() string           { return "noLonelyIf" }
 func (noLonelyIf) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindIfStatement} }
 func (noLonelyIf) Check(ctx *Context, node *shimast.Node) {
   parent := node.Parent
@@ -321,10 +321,10 @@ func (noLonelyIf) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "Unexpected if as the only statement in an else block.")
 }
 
-// no-multi-assign: `a = b = 1`. Confusing right-to-left chains.
+// noMultiAssign: `a = b = 1`. Confusing right-to-left chains.
 type noMultiAssign struct{}
 
-func (noMultiAssign) Name() string           { return "no-multi-assign" }
+func (noMultiAssign) Name() string           { return "noMultiAssign" }
 func (noMultiAssign) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindBinaryExpression} }
 func (noMultiAssign) Check(ctx *Context, node *shimast.Node) {
   expr := node.AsBinaryExpression()
@@ -342,11 +342,11 @@ func (noMultiAssign) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-negated-condition: `if (!x) {} else {}`. Easier to read with the
+// noNegatedCondition: `if (!x) {} else {}`. Easier to read with the
 // branches swapped.
 type noNegatedCondition struct{}
 
-func (noNegatedCondition) Name() string { return "no-negated-condition" }
+func (noNegatedCondition) Name() string { return "noNegatedCondition" }
 func (noNegatedCondition) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindIfStatement, shimast.KindConditionalExpression}
 }
@@ -397,10 +397,10 @@ func isNegatedExpression(node *shimast.Node) bool {
   return false
 }
 
-// no-nested-ternary: `a ? b : c ? d : e`.
+// noNestedTernary: `a ? b : c ? d : e`.
 type noNestedTernary struct{}
 
-func (noNestedTernary) Name() string { return "no-nested-ternary" }
+func (noNestedTernary) Name() string { return "noNestedTernary" }
 func (noNestedTernary) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindConditionalExpression}
 }
@@ -419,11 +419,11 @@ func hasConditional(node *shimast.Node) bool {
   return expr != nil && expr.Kind == shimast.KindConditionalExpression
 }
 
-// no-new: `new Foo()` whose result is discarded. Either store it or
+// noNew: `new Foo()` whose result is discarded. Either store it or
 // avoid the constructor.
 type noNew struct{}
 
-func (noNew) Name() string           { return "no-new" }
+func (noNew) Name() string           { return "noNew" }
 func (noNew) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindExpressionStatement} }
 func (noNew) Check(ctx *Context, node *shimast.Node) {
   stmt := node.AsExpressionStatement()
@@ -435,10 +435,10 @@ func (noNew) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-new-func: `new Function("...")` — a third form of dynamic eval.
+// noNewFunc: `new Function("...")` — a third form of dynamic eval.
 type noNewFunc struct{}
 
-func (noNewFunc) Name() string { return "no-new-func" }
+func (noNewFunc) Name() string { return "noNewFunc" }
 func (noNewFunc) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindNewExpression, shimast.KindCallExpression}
 }
@@ -454,11 +454,11 @@ func (noNewFunc) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-object-constructor: `new Object()` / `Object()` — same shape as
-// no-array-constructor but for objects.
+// noObjectConstructor: `new Object()` / `Object()` — same shape as
+// noArrayConstructor but for objects.
 type noObjectConstructor struct{}
 
-func (noObjectConstructor) Name() string { return "no-object-constructor" }
+func (noObjectConstructor) Name() string { return "noObjectConstructor" }
 func (noObjectConstructor) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindNewExpression, shimast.KindCallExpression}
 }
@@ -486,11 +486,11 @@ func (noObjectConstructor) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-octal-escape: `"\251"` — octal escapes in string literals are
+// noOctalEscape: `"\251"` — octal escapes in string literals are
 // deprecated and forbidden in template literals.
 type noOctalEscape struct{}
 
-func (noOctalEscape) Name() string { return "no-octal-escape" }
+func (noOctalEscape) Name() string { return "noOctalEscape" }
 func (noOctalEscape) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindStringLiteral, shimast.KindNoSubstitutionTemplateLiteral}
 }
@@ -524,11 +524,11 @@ func hasOctalEscape(src string) bool {
   return false
 }
 
-// no-plusplus: `++x` / `x++`. Equivalent to `x += 1`, considered less
+// noPlusplus: `++x` / `x++`. Equivalent to `x += 1`, considered less
 // clear in some style guides.
 type noPlusPlus struct{}
 
-func (noPlusPlus) Name() string { return "no-plusplus" }
+func (noPlusPlus) Name() string { return "noPlusplus" }
 func (noPlusPlus) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindPrefixUnaryExpression, shimast.KindPostfixUnaryExpression}
 }
@@ -545,11 +545,11 @@ func (noPlusPlus) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-regex-spaces: multiple spaces in a regex literal — confusing
+// noRegexSpaces: multiple spaces in a regex literal — confusing
 // because the count is invisible.
 type noRegexSpaces struct{}
 
-func (noRegexSpaces) Name() string { return "no-regex-spaces" }
+func (noRegexSpaces) Name() string { return "noRegexSpaces" }
 func (noRegexSpaces) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindRegularExpressionLiteral}
 }
@@ -597,10 +597,10 @@ func regexHasMultipleSpaces(src string) bool {
   return false
 }
 
-// no-return-assign: `return a = b` mixes assignment with return.
+// noReturnAssign: `return a = b` mixes assignment with return.
 type noReturnAssign struct{}
 
-func (noReturnAssign) Name() string { return "no-return-assign" }
+func (noReturnAssign) Name() string { return "noReturnAssign" }
 func (noReturnAssign) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindReturnStatement, shimast.KindArrowFunction}
 }
@@ -625,11 +625,11 @@ func (noReturnAssign) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-sequences: `(a, b)` — comma operator. Almost always a confusing
+// noSequences: `(a, b)` — comma operator. Almost always a confusing
 // pattern outside of `for` headers.
 type noSequences struct{}
 
-func (noSequences) Name() string           { return "no-sequences" }
+func (noSequences) Name() string           { return "noSequences" }
 func (noSequences) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindBinaryExpression} }
 func (noSequences) Check(ctx *Context, node *shimast.Node) {
   expr := node.AsBinaryExpression()
@@ -653,11 +653,11 @@ func (noSequences) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "Unexpected use of comma operator.")
 }
 
-// no-shadow-restricted-names: redeclaring `undefined`, `NaN`, `Infinity`,
+// noShadowRestrictedNames: redeclaring `undefined`, `NaN`, `Infinity`,
 // `arguments`, or `eval`.
 type noShadowRestrictedNames struct{}
 
-func (noShadowRestrictedNames) Name() string { return "no-shadow-restricted-names" }
+func (noShadowRestrictedNames) Name() string { return "noShadowRestrictedNames" }
 func (noShadowRestrictedNames) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindVariableDeclaration, shimast.KindParameter, shimast.KindFunctionDeclaration}
 }
@@ -681,11 +681,11 @@ func (noShadowRestrictedNames) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-undefined: literal `undefined` (vs `void 0`). Easier to misuse
+// noUndefined: literal `undefined` (vs `void 0`). Easier to misuse
 // because it's writable in older environments.
 type noUndefined struct{}
 
-func (noUndefined) Name() string           { return "no-undefined" }
+func (noUndefined) Name() string           { return "noUndefined" }
 func (noUndefined) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindIdentifier} }
 func (noUndefined) Check(ctx *Context, node *shimast.Node) {
   if identifierText(node) != "undefined" {
@@ -695,7 +695,7 @@ func (noUndefined) Check(ctx *Context, node *shimast.Node) {
   if parent == nil {
     return
   }
-  // Don't flag a declaration *named* `undefined` (no-shadow-restricted-names
+  // Don't flag a declaration *named* `undefined` (noShadowRestrictedNames
   // covers that), or a member-access / object-key position
   // (`x.undefined`, `{ undefined: 1 }`).
   switch parent.Kind {
@@ -734,10 +734,10 @@ func nodesShareLoc(a, b *shimast.Node) bool {
   return a == b || (a.Pos() == b.Pos() && a.End() == b.End())
 }
 
-// no-unneeded-ternary: `x ? true : false` → `Boolean(x)` / `!!x`.
+// noUnneededTernary: `x ? true : false` → `Boolean(x)` / `!!x`.
 type noUnneededTernary struct{}
 
-func (noUnneededTernary) Name() string { return "no-unneeded-ternary" }
+func (noUnneededTernary) Name() string { return "noUnneededTernary" }
 func (noUnneededTernary) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindConditionalExpression}
 }
@@ -790,7 +790,7 @@ func (noUnneededTernary) Check(ctx *Context, node *shimast.Node) {
 // needsParensForUnaryNegation reports whether `cond` must be wrapped in
 // parentheses before prefixing with `!`. Anything looser than a unary /
 // member / primary expression flips precedence when negated. Mirrors
-// ESLint's `no-unneeded-ternary` autofix safety check.
+// ESLint's `noUnneededTernary` autofix safety check.
 func needsParensForUnaryNegation(node *shimast.Node) bool {
   inner := stripParens(node)
   if inner == nil {
@@ -811,11 +811,11 @@ func needsParensForUnaryNegation(node *shimast.Node) bool {
   return false
 }
 
-// no-unused-expressions: an expression statement whose value isn't used.
+// noUnusedExpressions: an expression statement whose value isn't used.
 // Filtered down to common patterns ESLint flags by default.
 type noUnusedExpressions struct{}
 
-func (noUnusedExpressions) Name() string { return "no-unused-expressions" }
+func (noUnusedExpressions) Name() string { return "noUnusedExpressions" }
 func (noUnusedExpressions) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindExpressionStatement}
 }
@@ -879,11 +879,11 @@ func isProductiveExpression(node *shimast.Node) bool {
   return false
 }
 
-// no-useless-call: `func.call(undefined, ...args)` / `func.apply(undefined, args)`
+// noUselessCall: `func.call(undefined, ...args)` / `func.apply(undefined, args)`
 // — call/apply with no this binding is just a regular call.
 type noUselessCall struct{}
 
-func (noUselessCall) Name() string           { return "no-useless-call" }
+func (noUselessCall) Name() string           { return "noUselessCall" }
 func (noUselessCall) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindCallExpression} }
 func (noUselessCall) Check(ctx *Context, node *shimast.Node) {
   call := node.AsCallExpression()
@@ -908,10 +908,10 @@ func (noUselessCall) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-useless-computed-key: `{ ["foo"]: 1 }` could be `{ foo: 1 }`.
+// noUselessComputedKey: `{ ["foo"]: 1 }` could be `{ foo: 1 }`.
 type noUselessComputedKey struct{}
 
-func (noUselessComputedKey) Name() string { return "no-useless-computed-key" }
+func (noUselessComputedKey) Name() string { return "noUselessComputedKey" }
 func (noUselessComputedKey) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindPropertyAssignment, shimast.KindMethodDeclaration}
 }
@@ -943,11 +943,11 @@ func (noUselessComputedKey) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-useless-rename: `import { x as x } from ...` / `const { x: x } = obj`
+// noUselessRename: `import { x as x } from ...` / `const { x: x } = obj`
 // — the rename is a no-op.
 type noUselessRename struct{}
 
-func (noUselessRename) Name() string { return "no-useless-rename" }
+func (noUselessRename) Name() string { return "noUselessRename" }
 func (noUselessRename) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindImportSpecifier, shimast.KindExportSpecifier, shimast.KindBindingElement}
 }
@@ -1013,10 +1013,10 @@ func reportUselessRenameFix(ctx *Context, node, propertyName, name *shimast.Node
   )
 }
 
-// object-shorthand: `{ x: x }` → `{ x }`.
+// objectShorthand: `{ x: x }` → `{ x }`.
 type objectShorthand struct{}
 
-func (objectShorthand) Name() string           { return "object-shorthand" }
+func (objectShorthand) Name() string           { return "objectShorthand" }
 func (objectShorthand) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindPropertyAssignment} }
 func (objectShorthand) Check(ctx *Context, node *shimast.Node) {
   prop := node.AsPropertyAssignment()
@@ -1042,10 +1042,10 @@ func (objectShorthand) Check(ctx *Context, node *shimast.Node) {
   )
 }
 
-// operator-assignment: `x = x + 1` → `x += 1`.
+// operatorAssignment: `x = x + 1` → `x += 1`.
 type operatorAssignment struct{}
 
-func (operatorAssignment) Name() string { return "operator-assignment" }
+func (operatorAssignment) Name() string { return "operatorAssignment" }
 func (operatorAssignment) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindBinaryExpression}
 }
@@ -1082,10 +1082,10 @@ func isCompoundEligibleOperator(kind shimast.Kind) bool {
   return false
 }
 
-// prefer-exponentiation-operator: `Math.pow(a, b)` → `a ** b`.
+// preferExponentiationOperator: `Math.pow(a, b)` → `a ** b`.
 type preferExponentiationOperator struct{}
 
-func (preferExponentiationOperator) Name() string { return "prefer-exponentiation-operator" }
+func (preferExponentiationOperator) Name() string { return "preferExponentiationOperator" }
 func (preferExponentiationOperator) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindCallExpression}
 }
@@ -1100,10 +1100,10 @@ func (preferExponentiationOperator) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "Use the '**' operator instead of 'Math.pow'.")
 }
 
-// prefer-spread: `fn.apply(null, args)` → `fn(...args)`.
+// preferSpread: `fn.apply(null, args)` → `fn(...args)`.
 type preferSpread struct{}
 
-func (preferSpread) Name() string           { return "prefer-spread" }
+func (preferSpread) Name() string           { return "preferSpread" }
 func (preferSpread) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindCallExpression} }
 func (preferSpread) Check(ctx *Context, node *shimast.Node) {
   call := node.AsCallExpression()
@@ -1131,12 +1131,12 @@ func (preferSpread) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// prefer-template: string concatenation that would read better as a
+// preferTemplate: string concatenation that would read better as a
 // template literal — heuristic: any `+` involving a string literal AND
 // a non-literal.
 type preferTemplate struct{}
 
-func (preferTemplate) Name() string           { return "prefer-template" }
+func (preferTemplate) Name() string           { return "preferTemplate" }
 func (preferTemplate) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindBinaryExpression} }
 func (preferTemplate) Check(ctx *Context, node *shimast.Node) {
   expr := node.AsBinaryExpression()
@@ -1253,7 +1253,7 @@ func renderConcatAsTemplate(src string, operands []*shimast.Node) (string, bool)
 
 // escapeTemplateLiteralBody escapes the characters that would otherwise
 // terminate or interpolate a template literal body: backslash, backtick,
-// and the `${` sequence. Matches the canonical ESLint `prefer-template`
+// and the `${` sequence. Matches the canonical ESLint `preferTemplate`
 // fixer escape set.
 func escapeTemplateLiteralBody(text string) string {
   var sb strings.Builder
@@ -1277,11 +1277,11 @@ func escapeTemplateLiteralBody(text string) string {
   return sb.String()
 }
 
-// require-yield: `function* gen() { return 1; }` — generators that
+// requireYield: `function* gen() { return 1; }` — generators that
 // never yield are usually unintended.
 type requireYield struct{}
 
-func (requireYield) Name() string { return "require-yield" }
+func (requireYield) Name() string { return "requireYield" }
 func (requireYield) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindFunctionDeclaration, shimast.KindFunctionExpression, shimast.KindMethodDeclaration}
 }
@@ -1337,11 +1337,11 @@ func subtreeContainsYield(node *shimast.Node) bool {
   return found
 }
 
-// vars-on-top: `var` declarations should appear at the top of their
+// varsOnTop: `var` declarations should appear at the top of their
 // function/script scope.
 type varsOnTop struct{}
 
-func (varsOnTop) Name() string           { return "vars-on-top" }
+func (varsOnTop) Name() string           { return "varsOnTop" }
 func (varsOnTop) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindVariableStatement} }
 func (varsOnTop) Check(ctx *Context, node *shimast.Node) {
   stmt := node.AsVariableStatement()

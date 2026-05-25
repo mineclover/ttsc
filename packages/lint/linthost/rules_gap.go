@@ -13,11 +13,11 @@ import (
   shimscanner "github.com/microsoft/typescript-go/shim/scanner"
 )
 
-// no-empty-static-block: `class C { static {} }` has no effect.
+// noEmptyStaticBlock: `class C { static {} }` has no effect.
 // ESLint recommended: https://eslint.org/docs/latest/rules/no-empty-static-block
 type noEmptyStaticBlock struct{}
 
-func (noEmptyStaticBlock) Name() string { return "no-empty-static-block" }
+func (noEmptyStaticBlock) Name() string { return "noEmptyStaticBlock" }
 func (noEmptyStaticBlock) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindClassStaticBlockDeclaration}
 }
@@ -32,11 +32,11 @@ func (noEmptyStaticBlock) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-setter-return: setters must not return a value.
+// noSetterReturn: setters must not return a value.
 // ESLint recommended: https://eslint.org/docs/latest/rules/no-setter-return
 type noSetterReturn struct{}
 
-func (noSetterReturn) Name() string           { return "no-setter-return" }
+func (noSetterReturn) Name() string           { return "noSetterReturn" }
 func (noSetterReturn) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindReturnStatement} }
 func (noSetterReturn) Check(ctx *Context, node *shimast.Node) {
   ret := node.AsReturnStatement()
@@ -61,11 +61,11 @@ func isInsideDirectSetter(node *shimast.Node) bool {
   return false
 }
 
-// no-unused-labels: a label is useful only when a break/continue targets it.
+// noUnusedLabels: a label is useful only when a break/continue targets it.
 // ESLint recommended: https://eslint.org/docs/latest/rules/no-unused-labels
 type noUnusedLabels struct{}
 
-func (noUnusedLabels) Name() string           { return "no-unused-labels" }
+func (noUnusedLabels) Name() string           { return "noUnusedLabels" }
 func (noUnusedLabels) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindLabeledStatement} }
 func (noUnusedLabels) Check(ctx *Context, node *shimast.Node) {
   stmt := node.AsLabeledStatement()
@@ -95,11 +95,11 @@ func (noUnusedLabels) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-dynamic-delete: avoid deleting properties through dynamic keys.
+// noDynamicDelete: avoid deleting properties through dynamic keys.
 // typescript-eslint strict: https://typescript-eslint.io/rules/no-dynamic-delete/
 type noDynamicDelete struct{}
 
-func (noDynamicDelete) Name() string           { return "no-dynamic-delete" }
+func (noDynamicDelete) Name() string           { return "noDynamicDelete" }
 func (noDynamicDelete) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindDeleteExpression} }
 func (noDynamicDelete) Check(ctx *Context, node *shimast.Node) {
   del := node.AsDeleteExpression()
@@ -114,7 +114,7 @@ func (noDynamicDelete) Check(ctx *Context, node *shimast.Node) {
 }
 
 // isStaticPropertyKey reports whether node is a literal key that can
-// appear in a delete expression without triggering no-dynamic-delete:
+// appear in a delete expression without triggering noDynamicDelete:
 // string literals, no-substitution template literals, and numeric literals.
 func isStaticPropertyKey(node *shimast.Node) bool {
   node = stripParens(node)
@@ -130,12 +130,12 @@ func isStaticPropertyKey(node *shimast.Node) bool {
   return false
 }
 
-// no-non-null-asserted-nullish-coalescing: `foo! ?? bar` is contradictory.
+// noNonNullAssertedNullishCoalescing: `foo! ?? bar` is contradictory.
 // typescript-eslint strict: https://typescript-eslint.io/rules/no-non-null-asserted-nullish-coalescing/
 type noNonNullAssertedNullishCoalescing struct{}
 
 func (noNonNullAssertedNullishCoalescing) Name() string {
-  return "no-non-null-asserted-nullish-coalescing"
+  return "noNonNullAssertedNullishCoalescing"
 }
 func (noNonNullAssertedNullishCoalescing) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindBinaryExpression}
@@ -153,11 +153,11 @@ func (noNonNullAssertedNullishCoalescing) Check(ctx *Context, node *shimast.Node
   }
 }
 
-// no-unnecessary-type-constraint: `<T extends any>` / `<T extends unknown>`.
+// noUnnecessaryTypeConstraint: `<T extends any>` / `<T extends unknown>`.
 // typescript-eslint recommended: https://typescript-eslint.io/rules/no-unnecessary-type-constraint/
 type noUnnecessaryTypeConstraint struct{}
 
-func (noUnnecessaryTypeConstraint) Name() string { return "no-unnecessary-type-constraint" }
+func (noUnnecessaryTypeConstraint) Name() string { return "noUnnecessaryTypeConstraint" }
 func (noUnnecessaryTypeConstraint) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindTypeParameter}
 }
@@ -184,11 +184,11 @@ func (noUnnecessaryTypeConstraint) Check(ctx *Context, node *shimast.Node) {
   )
 }
 
-// no-unsafe-function-type: `Function` accepts any callable shape.
+// noUnsafeFunctionType: `Function` accepts any callable shape.
 // typescript-eslint recommended: https://typescript-eslint.io/rules/no-unsafe-function-type/
 type noUnsafeFunctionType struct{}
 
-func (noUnsafeFunctionType) Name() string           { return "no-unsafe-function-type" }
+func (noUnsafeFunctionType) Name() string           { return "noUnsafeFunctionType" }
 func (noUnsafeFunctionType) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindTypeReference} }
 func (noUnsafeFunctionType) Check(ctx *Context, node *shimast.Node) {
   ref := node.AsTypeReferenceNode()
@@ -198,12 +198,12 @@ func (noUnsafeFunctionType) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "The Function type is unsafe. Use a specific function type instead.")
 }
 
-// no-wrapper-object-types: prefer primitive type keywords over boxed object
+// noWrapperObjectTypes: prefer primitive type keywords over boxed object
 // type names such as `String` and `Boolean`.
 // typescript-eslint recommended: https://typescript-eslint.io/rules/no-wrapper-object-types/
 type noWrapperObjectTypes struct{}
 
-func (noWrapperObjectTypes) Name() string           { return "no-wrapper-object-types" }
+func (noWrapperObjectTypes) Name() string           { return "noWrapperObjectTypes" }
 func (noWrapperObjectTypes) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindTypeReference} }
 func (noWrapperObjectTypes) Check(ctx *Context, node *shimast.Node) {
   ref := node.AsTypeReferenceNode()
@@ -301,11 +301,11 @@ func wrapperPrimitive(name string) (string, bool) {
   return "", false
 }
 
-// no-useless-constructor: an empty constructor with no parameters is noise.
+// noUselessConstructor: an empty constructor with no parameters is noise.
 // typescript-eslint strict: https://typescript-eslint.io/rules/no-useless-constructor/
 type noUselessConstructor struct{}
 
-func (noUselessConstructor) Name() string           { return "no-useless-constructor" }
+func (noUselessConstructor) Name() string           { return "noUselessConstructor" }
 func (noUselessConstructor) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindConstructor} }
 func (noUselessConstructor) Check(ctx *Context, node *shimast.Node) {
   ctor := node.AsConstructorDeclaration()
@@ -321,11 +321,11 @@ func (noUselessConstructor) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// prefer-literal-enum-member: computed enum members are harder to inspect.
+// preferLiteralEnumMember: computed enum members are harder to inspect.
 // typescript-eslint strict: https://typescript-eslint.io/rules/prefer-literal-enum-member/
 type preferLiteralEnumMember struct{}
 
-func (preferLiteralEnumMember) Name() string           { return "prefer-literal-enum-member" }
+func (preferLiteralEnumMember) Name() string           { return "preferLiteralEnumMember" }
 func (preferLiteralEnumMember) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindEnumMember} }
 func (preferLiteralEnumMember) Check(ctx *Context, node *shimast.Node) {
   member := node.AsEnumMember()
@@ -335,11 +335,11 @@ func (preferLiteralEnumMember) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(member.Initializer, "Enum member initializer should be a literal value.")
 }
 
-// consistent-type-assertions: prefer `value as Type` over `<Type>value`.
+// consistentTypeAssertions: prefer `value as Type` over `<Type>value`.
 // typescript-eslint stylistic: https://typescript-eslint.io/rules/consistent-type-assertions/
 type consistentTypeAssertions struct{}
 
-func (consistentTypeAssertions) Name() string { return "consistent-type-assertions" }
+func (consistentTypeAssertions) Name() string { return "consistentTypeAssertions" }
 func (consistentTypeAssertions) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindTypeAssertionExpression}
 }
@@ -347,12 +347,12 @@ func (consistentTypeAssertions) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "Use `as` type assertions instead of angle-bracket assertions.")
 }
 
-// consistent-type-definitions: prefer interfaces for object-shaped public
+// consistentTypeDefinitions: prefer interfaces for object-shaped public
 // contracts. This mirrors typescript-eslint's default option.
 // typescript-eslint stylistic: https://typescript-eslint.io/rules/consistent-type-definitions/
 type consistentTypeDefinitions struct{}
 
-func (consistentTypeDefinitions) Name() string { return "consistent-type-definitions" }
+func (consistentTypeDefinitions) Name() string { return "consistentTypeDefinitions" }
 func (consistentTypeDefinitions) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindTypeAliasDeclaration}
 }
@@ -364,12 +364,12 @@ func (consistentTypeDefinitions) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "Use an interface instead of a type literal alias.")
 }
 
-// dot-notation: `obj["prop"]` should be `obj.prop` when the key is a valid
+// dotNotation: `obj["prop"]` should be `obj.prop` when the key is a valid
 // identifier.
 // ESLint canonical: https://eslint.org/docs/latest/rules/dot-notation
 type dotNotation struct{}
 
-func (dotNotation) Name() string { return "dot-notation" }
+func (dotNotation) Name() string { return "dotNotation" }
 func (dotNotation) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindElementAccessExpression}
 }
@@ -416,7 +416,7 @@ func (dotNotation) Check(ctx *Context, node *shimast.Node) {
 }
 
 // isReservedWord reports whether `value` is an ECMAScript reserved word. The
-// `dot-notation` autofix uses this to skip the rewrite even though modern
+// `dotNotation` autofix uses this to skip the rewrite even though modern
 // parsers accept reserved-word member names: leaving bracket access matches
 // the conservative branch ESLint takes when `allowKeywords: false`.
 func isReservedWord(value string) bool {
@@ -436,7 +436,7 @@ func isReservedWord(value string) bool {
 
 // isSimpleIdentifierName reports whether value is a valid bare identifier
 // (ASCII letters, digits, underscore, dollar sign; digits not first). Used
-// by dot-notation to decide whether bracket access can become dot access.
+// by dotNotation to decide whether bracket access can become dot access.
 func isSimpleIdentifierName(value string) bool {
   if value == "" {
     return false
@@ -453,12 +453,12 @@ func isSimpleIdentifierName(value string) bool {
   return true
 }
 
-// no-unsafe-declaration-merging: class/interface merging hides runtime vs type
+// noUnsafeDeclarationMerging: class/interface merging hides runtime vs type
 // surface differences.
 // typescript-eslint recommended: https://typescript-eslint.io/rules/no-unsafe-declaration-merging/
 type noUnsafeDeclarationMerging struct{}
 
-func (noUnsafeDeclarationMerging) Name() string { return "no-unsafe-declaration-merging" }
+func (noUnsafeDeclarationMerging) Name() string { return "noUnsafeDeclarationMerging" }
 func (noUnsafeDeclarationMerging) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindSourceFile}
 }

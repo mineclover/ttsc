@@ -16,8 +16,8 @@ import (
   shimdw "github.com/microsoft/typescript-go/shim/diagnosticwriter"
 )
 
-// maxFixPasses bounds the native fix cascade. Real-world cascades (no-var →
-// prefer-const → eqeqeq …) settle in a handful of passes; the cap exists so
+// maxFixPasses bounds the native fix cascade. Real-world cascades (noVar →
+// preferConst → eqeqeq …) settle in a handful of passes; the cap exists so
 // a buggy rule that re-reports its own edit cannot loop forever.
 const maxFixPasses = 10
 

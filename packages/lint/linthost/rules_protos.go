@@ -2,13 +2,13 @@ package linthost
 
 import shimast "github.com/microsoft/typescript-go/shim/ast"
 
-// no-iterator: accessing `obj.__iterator__` is a non-standard SpiderMonkey-era
+// noIterator: accessing `obj.__iterator__` is a non-standard SpiderMonkey-era
 // extension that predates `Symbol.iterator`. Modern code should use
 // `Symbol.iterator` and the iterable protocol instead.
 // https://eslint.org/docs/latest/rules/no-iterator
 type noIterator struct{}
 
-func (noIterator) Name() string { return "no-iterator" }
+func (noIterator) Name() string { return "noIterator" }
 func (noIterator) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindPropertyAccessExpression}
 }
@@ -22,12 +22,12 @@ func (noIterator) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-proto: `obj.__proto__` access is legacy. Use `Object.getPrototypeOf`
+// noProto: `obj.__proto__` access is legacy. Use `Object.getPrototypeOf`
 // / `Object.setPrototypeOf`.
 // https://eslint.org/docs/latest/rules/no-proto
 type noProto struct{}
 
-func (noProto) Name() string           { return "no-proto" }
+func (noProto) Name() string           { return "noProto" }
 func (noProto) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindPropertyAccessExpression} }
 func (noProto) Check(ctx *Context, node *shimast.Node) {
   access := node.AsPropertyAccessExpression()

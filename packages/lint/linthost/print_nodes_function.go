@@ -25,7 +25,7 @@ import (
 // the newlines live, so the body is dispatched through PrintNode and
 // re-indented by the Doc engine. Each printer ANDs the body's `covered`
 // flag into its own result: a body the dispatcher cannot fully control
-// taints the whole subtree and the format/print-width rule abstains.
+// taints the whole subtree and the formatPrintWidth rule abstains.
 //
 // The expression- and return-statement printers carry the same
 // discipline one level deeper: a callback body whose statements are
@@ -224,7 +224,7 @@ func blankLineBetweenStatements(src string, prevEnd, nextPos int) bool {
 // printer joins statements with bare Hardlines that have no slot for
 // inter-statement trivia, so a stray comment would be dropped by a
 // reflow. Detecting it lets printBlock report the block uncovered and
-// the format/print-width rule abstain.
+// the formatPrintWidth rule abstain.
 //
 // The scan mirrors rules_format_print_width.go::hasNonChildComments:
 // comment-shaped bytes inside a complete statement token range (string

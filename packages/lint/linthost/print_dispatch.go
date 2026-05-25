@@ -28,7 +28,7 @@ import (
 // indented, corrupt output. To prevent that, every printer reports a
 // `covered` boolean alongside its Doc: `true` means the whole printed
 // subtree is reflow-safe (no multi-line verbatim node), `false` means a
-// multi-line verbatim node is buried inside. The format/print-width
+// multi-line verbatim node is buried inside. The formatPrintWidth
 // rule abstains entirely when `covered` is false, so `ttsc format`
 // either reflows correctly or leaves the bytes untouched — it never
 // emits the half-reflowed shape. Single-line verbatim is always safe:
@@ -59,7 +59,7 @@ func NewPrintContext(file *shimast.SourceFile, opts PrintOptions) *PrintContext 
 // boolean: `true` when the whole printed subtree is reflow-safe,
 // `false` when a multi-line verbatim node is buried inside it.
 //
-// The format/print-width rule consults `covered` to decide whether to
+// The formatPrintWidth rule consults `covered` to decide whether to
 // emit an edit at all — see the coverage-signal note at the top of this
 // file. A `false` reading is a hard abstain, not a soft hint.
 func PrintNode(ctx *PrintContext, node *shimast.Node) (Doc, bool) {

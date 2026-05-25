@@ -3,7 +3,7 @@ export * from "./ITtscLintFormatConfig";
 export * from "./ITtscLintPlugin";
 export * from "./ITtscLintPluginConfig";
 export * from "./ITtscLintPluginMeta";
+export * from "./ITtscLintRules";
 export * from "./TtscLintRule";
-export * from "./TtscLintRuleMap";
 export * from "./TtscLintRuleOptions";
 export * from "./TtscLintSeverity";

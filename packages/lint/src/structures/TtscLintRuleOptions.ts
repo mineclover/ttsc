@@ -1,4 +1,4 @@
-/** `format/semi` rule options. */
+/** `formatSemi` rule options. */
 export interface ITtscLintSemiRuleOptions {
   /**
    * Whether trailing semicolons must be present on ASI statements.
@@ -8,7 +8,7 @@ export interface ITtscLintSemiRuleOptions {
   prefer?: "always" | "never";
 }
 
-/** `format/quotes` rule options. */
+/** `formatQuotes` rule options. */
 export interface ITtscLintQuotesRuleOptions {
   /**
    * Quote style for string literals. Template literals are always preserved
@@ -19,7 +19,7 @@ export interface ITtscLintQuotesRuleOptions {
   prefer?: "double" | "single";
 }
 
-/** `format/trailing-comma` rule options. */
+/** `formatTrailingComma` rule options. */
 export interface ITtscLintTrailingCommaRuleOptions {
   /**
    * Which multi-line lists receive a trailing comma. `"all"` matches prettier's
@@ -31,7 +31,7 @@ export interface ITtscLintTrailingCommaRuleOptions {
   mode?: "all" | "es5" | "none";
 }
 
-/** `format/sort-imports` rule options. */
+/** `formatSortImports` rule options. */
 export interface ITtscLintSortImportsRuleOptions {
   /**
    * Ordered list of regex strings (or the `<THIRD_PARTY_MODULES>` placeholder)
@@ -65,7 +65,7 @@ export interface ITtscLintSortImportsRuleOptions {
   importOrderCaseInsensitive?: boolean;
 }
 
-/** `format/print-width` rule options. */
+/** `formatPrintWidth` rule options. */
 export interface ITtscLintPrintWidthRuleOptions {
   /**
    * Maximum column width before broken-form layout is chosen. Mirrors
@@ -103,7 +103,7 @@ export interface ITtscLintPrintWidthRuleOptions {
   /**
    * Trailing-comma policy the reflow honors when it breaks a list across
    * lines. Mirrors prettier's `trailingComma` and must match the
-   * `format/trailing-comma` rule's `mode`; otherwise the two rules
+   * `formatTrailingComma` rule's `mode`; otherwise the two rules
    * disagree on every cascade pass and oscillate against each other.
    *
    * When a `format` block is configured, `format.trailingComma` is mirrored
@@ -116,7 +116,7 @@ export interface ITtscLintPrintWidthRuleOptions {
   trailingComma?: "all" | "es5" | "none";
 }
 
-/** `format/jsdoc` rule options. */
+/** `formatJsdoc` rule options. */
 export interface ITtscLintJsdocRuleOptions {
   /**
    * Extra `from -> to` tag rewrites layered on top of the built-in synonym
@@ -138,14 +138,15 @@ export interface ITtscLintJsdocRuleOptions {
 }
 
 /**
- * Index from rule name to its option object. `TtscLintRuleMap` uses this to
- * produce precise tuple types per rule.
+ * Index from format rule name to its option object. Kept as a public lookup
+ * type for consumers that want to derive option helpers from the same rule
+ * names accepted by `ITtscLintRules`.
  */
 export interface ITtscLintRuleOptionsMap {
-  "format/semi": ITtscLintSemiRuleOptions;
-  "format/quotes": ITtscLintQuotesRuleOptions;
-  "format/trailing-comma": ITtscLintTrailingCommaRuleOptions;
-  "format/sort-imports": ITtscLintSortImportsRuleOptions;
-  "format/jsdoc": ITtscLintJsdocRuleOptions;
-  "format/print-width": ITtscLintPrintWidthRuleOptions;
+  "formatSemi": ITtscLintSemiRuleOptions;
+  "formatQuotes": ITtscLintQuotesRuleOptions;
+  "formatTrailingComma": ITtscLintTrailingCommaRuleOptions;
+  "formatSortImports": ITtscLintSortImportsRuleOptions;
+  "formatJsdoc": ITtscLintJsdocRuleOptions;
+  "formatPrintWidth": ITtscLintPrintWidthRuleOptions;
 }

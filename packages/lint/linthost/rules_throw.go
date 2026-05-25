@@ -2,11 +2,11 @@ package linthost
 
 import shimast "github.com/microsoft/typescript-go/shim/ast"
 
-// no-throw-literal: throw should always pass an Error subclass.
+// noThrowLiteral: throw should always pass an Error subclass.
 // https://eslint.org/docs/latest/rules/no-throw-literal
 type noThrowLiteral struct{}
 
-func (noThrowLiteral) Name() string           { return "no-throw-literal" }
+func (noThrowLiteral) Name() string           { return "noThrowLiteral" }
 func (noThrowLiteral) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindThrowStatement} }
 func (noThrowLiteral) Check(ctx *Context, node *shimast.Node) {
   throw := node.AsThrowStatement()

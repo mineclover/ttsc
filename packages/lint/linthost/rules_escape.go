@@ -6,7 +6,7 @@ import (
   shimast "github.com/microsoft/typescript-go/shim/ast"
 )
 
-// no-useless-escape: flag backslashes that escape characters which do not
+// noUselessEscape: flag backslashes that escape characters which do not
 // require escaping. Inside string/template literals the meaningful
 // escapes are limited to a fixed set; everywhere else the backslash is
 // noise from a copy/paste accident or a confused author. ESLint
@@ -19,7 +19,7 @@ import (
 // would corrupt the file.
 type noUselessEscape struct{}
 
-func (noUselessEscape) Name() string { return "no-useless-escape" }
+func (noUselessEscape) Name() string { return "noUselessEscape" }
 func (noUselessEscape) Visits() []shimast.Kind {
   return []shimast.Kind{
     shimast.KindStringLiteral,
@@ -204,7 +204,7 @@ func isUselessStringEscape(ch byte, whitelist string) bool {
     return false
   }
   // ASCII letters that aren't in the whitelist are user-error escapes
-  // like `\a`, `\m`. Digits 1-9 are octal-shaped (`no-octal-escape`
+  // like `\a`, `\m`. Digits 1-9 are octal-shaped (`noOctalEscape`
   // owns those). `0` is in the whitelist. Punctuation that isn't in the
   // whitelist (e.g., `\.`) is also redundant.
   return true

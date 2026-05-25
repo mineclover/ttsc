@@ -4,7 +4,7 @@ import (
   shimast "github.com/microsoft/typescript-go/shim/ast"
 )
 
-// format/trailing-comma adds trailing commas to multi-line lists. Mirrors
+// formatTrailingComma adds trailing commas to multi-line lists. Mirrors
 // prettier's `trailingComma: "all"` default — *not* a tunable.
 //
 // Scope (intentionally narrower than the closing-brace surface of TS):
@@ -47,7 +47,7 @@ type formatTrailingCommaOptions struct {
   Mode string `json:"mode"`
 }
 
-func (formatTrailingComma) Name() string   { return "format/trailing-comma" }
+func (formatTrailingComma) Name() string   { return "formatTrailingComma" }
 func (formatTrailingComma) IsFormat() bool { return true }
 
 func (formatTrailingComma) Visits() []shimast.Kind {

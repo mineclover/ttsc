@@ -14,11 +14,11 @@ import (
   shimast "github.com/microsoft/typescript-go/shim/ast"
 )
 
-// no-dupe-else-if: `if (a) {} else if (a) {}` — the second branch is
+// noDupeElseIf: `if (a) {} else if (a) {}` — the second branch is
 // unreachable.
 type noDupeElseIf struct{}
 
-func (noDupeElseIf) Name() string           { return "no-dupe-else-if" }
+func (noDupeElseIf) Name() string           { return "noDupeElseIf" }
 func (noDupeElseIf) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindIfStatement} }
 func (noDupeElseIf) Check(ctx *Context, node *shimast.Node) {
   // Only fire on the *outermost* if; the recursion below scans the
@@ -50,11 +50,11 @@ func (noDupeElseIf) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-ex-assign: `try { } catch (e) { e = 1; }` — reassigning the catch
+// noExAssign: `try { } catch (e) { e = 1; }` — reassigning the catch
 // binding silently throws away the error.
 type noExAssign struct{}
 
-func (noExAssign) Name() string           { return "no-ex-assign" }
+func (noExAssign) Name() string           { return "noExAssign" }
 func (noExAssign) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindCatchClause} }
 func (noExAssign) Check(ctx *Context, node *shimast.Node) {
   clause := node.AsCatchClause()
@@ -75,8 +75,8 @@ func (noExAssign) Check(ctx *Context, node *shimast.Node) {
 }
 
 // walkAssignments invokes `report` on every `<name> = ...` shape inside
-// `root`. Used by no-ex-assign to scan a single catch block; the
-// file-wide no-func-assign / no-class-assign scans go through
+// `root`. Used by noExAssign to scan a single catch block; the
+// file-wide noFuncAssign / noClassAssign scans go through
 // reportAssignmentsToDeclarations instead.
 func walkAssignments(root *shimast.Node, name string, report func(*shimast.Node)) {
   if root == nil {
@@ -99,10 +99,10 @@ func walkAssignments(root *shimast.Node, name string, report func(*shimast.Node)
   })
 }
 
-// no-empty-character-class: `/[]/` matches nothing.
+// noEmptyCharacterClass: `/[]/` matches nothing.
 type noEmptyCharacterClass struct{}
 
-func (noEmptyCharacterClass) Name() string { return "no-empty-character-class" }
+func (noEmptyCharacterClass) Name() string { return "noEmptyCharacterClass" }
 func (noEmptyCharacterClass) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindRegularExpressionLiteral}
 }
@@ -134,10 +134,10 @@ func hasEmptyCharClass(src string) bool {
   return false
 }
 
-// no-misleading-character-class: `/[👍]/` — surrogate pairs in regex.
+// noMisleadingCharacterClass: `/[👍]/` — surrogate pairs in regex.
 type noMisleadingCharacterClass struct{}
 
-func (noMisleadingCharacterClass) Name() string { return "no-misleading-character-class" }
+func (noMisleadingCharacterClass) Name() string { return "noMisleadingCharacterClass" }
 func (noMisleadingCharacterClass) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindRegularExpressionLiteral}
 }
@@ -179,13 +179,13 @@ func regexHasSurrogatePair(src string) bool {
   return false
 }
 
-// no-loss-of-precision: `9007199254740993` — decimal numeric literal whose
+// noLossOfPrecision: `9007199254740993` — decimal numeric literal whose
 // source text changes when parsed as a JavaScript Number. We read the source
 // form instead of the parser's normalized .Text, which has already lost
 // precision.
 type noLossOfPrecision struct{}
 
-func (noLossOfPrecision) Name() string           { return "no-loss-of-precision" }
+func (noLossOfPrecision) Name() string           { return "noLossOfPrecision" }
 func (noLossOfPrecision) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindNumericLiteral} }
 func (noLossOfPrecision) Check(ctx *Context, node *shimast.Node) {
   source := strings.TrimSpace(nodeText(ctx.File, node))
@@ -239,19 +239,19 @@ func numericLiteralLosesPrecision(text string) bool {
   return strconv.FormatFloat(parsed, 'f', 0, 64) != trimmed
 }
 
-// no-class-assign: assigning to a class declaration's name.
+// noClassAssign: assigning to a class declaration's name.
 type noClassAssign struct{}
 
-func (noClassAssign) Name() string           { return "no-class-assign" }
+func (noClassAssign) Name() string           { return "noClassAssign" }
 func (noClassAssign) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindSourceFile} }
 func (noClassAssign) Check(ctx *Context, node *shimast.Node) {
   reportAssignmentsToDeclarations(ctx, node, shimast.KindClassDeclaration, "is a class.")
 }
 
-// no-func-assign: same idea, but for function declarations.
+// noFuncAssign: same idea, but for function declarations.
 type noFuncAssign struct{}
 
-func (noFuncAssign) Name() string           { return "no-func-assign" }
+func (noFuncAssign) Name() string           { return "noFuncAssign" }
 func (noFuncAssign) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindSourceFile} }
 func (noFuncAssign) Check(ctx *Context, node *shimast.Node) {
   reportAssignmentsToDeclarations(ctx, node, shimast.KindFunctionDeclaration, "is a function.")
@@ -319,11 +319,11 @@ func declarationName(n *shimast.Node) string {
   return ""
 }
 
-// no-prototype-builtins: `obj.hasOwnProperty(x)` — should be
+// noPrototypeBuiltins: `obj.hasOwnProperty(x)` — should be
 // `Object.prototype.hasOwnProperty.call(obj, x)` or `Object.hasOwn`.
 type noPrototypeBuiltins struct{}
 
-func (noPrototypeBuiltins) Name() string           { return "no-prototype-builtins" }
+func (noPrototypeBuiltins) Name() string           { return "noPrototypeBuiltins" }
 func (noPrototypeBuiltins) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindCallExpression} }
 func (noPrototypeBuiltins) Check(ctx *Context, node *shimast.Node) {
   call := node.AsCallExpression()
@@ -344,10 +344,10 @@ func (noPrototypeBuiltins) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-async-promise-executor: `new Promise(async (resolve) => {...})`.
+// noAsyncPromiseExecutor: `new Promise(async (resolve) => {...})`.
 type noAsyncPromiseExecutor struct{}
 
-func (noAsyncPromiseExecutor) Name() string { return "no-async-promise-executor" }
+func (noAsyncPromiseExecutor) Name() string { return "noAsyncPromiseExecutor" }
 func (noAsyncPromiseExecutor) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindNewExpression}
 }
@@ -371,11 +371,11 @@ func (noAsyncPromiseExecutor) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-promise-executor-return: `new Promise(() => 1)` — the value is
+// noPromiseExecutorReturn: `new Promise(() => 1)` — the value is
 // thrown away.
 type noPromiseExecutorReturn struct{}
 
-func (noPromiseExecutorReturn) Name() string { return "no-promise-executor-return" }
+func (noPromiseExecutorReturn) Name() string { return "noPromiseExecutorReturn" }
 func (noPromiseExecutorReturn) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindNewExpression}
 }
@@ -401,12 +401,12 @@ func (noPromiseExecutorReturn) Check(ctx *Context, node *shimast.Node) {
   }
 }
 
-// no-control-regex: `/\x00/` — control characters in regex are usually
+// noControlRegex: `/\x00/` — control characters in regex are usually
 // the result of accidentally typing the escape rather than the printable
 // counterpart.
 type noControlRegex struct{}
 
-func (noControlRegex) Name() string { return "no-control-regex" }
+func (noControlRegex) Name() string { return "noControlRegex" }
 func (noControlRegex) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindRegularExpressionLiteral}
 }
@@ -465,11 +465,11 @@ func hexDigit(b byte) int {
   return -1
 }
 
-// no-irregular-whitespace: zero-width spaces, NBSP, etc. The TS parser
+// noIrregularWhitespace: zero-width spaces, NBSP, etc. The TS parser
 // accepts them but copy-paste into source is almost always a mistake.
 type noIrregularWhitespace struct{}
 
-func (noIrregularWhitespace) Name() string           { return "no-irregular-whitespace" }
+func (noIrregularWhitespace) Name() string           { return "noIrregularWhitespace" }
 func (noIrregularWhitespace) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindSourceFile} }
 func (noIrregularWhitespace) Check(ctx *Context, node *shimast.Node) {
   if ctx.File == nil {
@@ -502,11 +502,11 @@ func isIrregularWhitespace(r rune) bool {
   return false
 }
 
-// no-fallthrough: `switch` cases that fall through to the next label
+// noFallthrough: `switch` cases that fall through to the next label
 // without an explicit `break` / `return` / `throw` / `continue`.
 type noFallthrough struct{}
 
-func (noFallthrough) Name() string           { return "no-fallthrough" }
+func (noFallthrough) Name() string           { return "noFallthrough" }
 func (noFallthrough) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindSwitchStatement} }
 func (noFallthrough) Check(ctx *Context, node *shimast.Node) {
   sw := node.AsSwitchStatement()
@@ -560,12 +560,12 @@ func isTerminating(stmt *shimast.Node) bool {
   return false
 }
 
-// no-inner-declarations: `function foo() { if (x) { function bar() {} } }`
+// noInnerDeclarations: `function foo() { if (x) { function bar() {} } }`
 // — inner function declarations are hoisted differently in strict mode
 // vs sloppy and are confusing.
 type noInnerDeclarations struct{}
 
-func (noInnerDeclarations) Name() string { return "no-inner-declarations" }
+func (noInnerDeclarations) Name() string { return "noInnerDeclarations" }
 func (noInnerDeclarations) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindFunctionDeclaration, shimast.KindVariableStatement}
 }
@@ -603,11 +603,11 @@ func (noInnerDeclarations) Check(ctx *Context, node *shimast.Node) {
   ctx.Report(node, "Move "+what+" declaration to the function scope.")
 }
 
-// no-obj-calls: `Math()`, `JSON()` — these globals are objects, not
+// noObjCalls: `Math()`, `JSON()` — these globals are objects, not
 // callables. ESLint catches a small list.
 type noObjCalls struct{}
 
-func (noObjCalls) Name() string { return "no-obj-calls" }
+func (noObjCalls) Name() string { return "noObjCalls" }
 func (noObjCalls) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindCallExpression, shimast.KindNewExpression}
 }

@@ -137,6 +137,17 @@ export interface ITtscLintJsdocRuleOptions {
   sortTags?: boolean;
 }
 
+/** `cypress/unsafe-to-chain-command` rule options. */
+export interface ITtscLintCypressUnsafeToChainCommandRuleOptions {
+  /**
+   * Additional Cypress command names that should be treated as unsafe action
+   * commands when another command is chained after them.
+   *
+   * @default []
+   */
+  methods?: readonly string[];
+}
+
 /** One source-path element used by the `boundaries/*` rules. */
 export interface ITtscLintBoundariesElement {
   /** Element type name used by `boundaries/element-types` policies. */
@@ -285,6 +296,7 @@ export interface ITtscLintReactRefreshOnlyExportComponentsRuleOptions {
  * names accepted by `ITtscLintRules`.
  */
 export interface ITtscLintRuleOptionsMap {
+  "cypress/unsafe-to-chain-command": ITtscLintCypressUnsafeToChainCommandRuleOptions;
   "boundaries/element-types": ITtscLintBoundariesElementTypesRuleOptions;
   "boundaries/entry-point": ITtscLintBoundariesEntryPointRuleOptions;
   "boundaries/external": ITtscLintBoundariesExternalRuleOptions;

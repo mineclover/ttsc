@@ -209,6 +209,19 @@ Most rule corpus cases live in `tests/test-lint/src/cases/*.ts`; source-path and
 - [`boundaries/external`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/boundaries/boundaries_external_rejects_disallowed_package_test.go): restricts external package imports by package/specifier pattern.
 - [`boundaries/no-private`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/boundaries/boundaries_no_private_rejects_cross_element_private_import_test.go): rejects imports of configured private files from outside their element.
 - [`boundaries/no-unknown`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/boundaries/boundaries_no_unknown_rejects_unknown_import_target_test.go): rejects relative imports whose resolved source file matches no configured element.
+- `cypress/assertion-before-screenshot`: requires a Cypress assertion before `cy.screenshot()`.
+- `cypress/no-and`: prefers `.should()` over `.and()` when starting Cypress assertion chains.
+- `cypress/no-assigning-return-values`: rejects assigning the return value of Cypress commands.
+- `cypress/no-async-before`: rejects async `before` and `beforeEach` callbacks.
+- `cypress/no-async-tests`: rejects async Cypress test callbacks.
+- `cypress/no-chained-get`: rejects chained `.get()` calls.
+- `cypress/no-debug`: rejects `cy.debug()` and chained `.debug()` commands.
+- `cypress/no-force`: rejects `{ force: true }` on Cypress action commands.
+- `cypress/no-pause`: rejects `cy.pause()` and chained `.pause()` commands.
+- `cypress/no-unnecessary-waiting`: rejects numeric `cy.wait(...)` sleeps.
+- `cypress/no-xpath`: rejects deprecated `cy.xpath()` selectors.
+- `cypress/require-data-selectors`: requires statically known `cy.get()` selectors to target `data-*` attributes.
+- `cypress/unsafe-to-chain-command`: rejects chaining more commands after Cypress action commands.
 - `eslint-comments/disable-enable-pair`: requires range `eslint-disable` directives to be paired with `eslint-enable`.
 - `eslint-comments/no-aggregating-enable`: rejects bare `eslint-enable` comments that re-enable named disables at once.
 - `eslint-comments/no-duplicate-disable`: rejects repeated disables for a rule that is already disabled.

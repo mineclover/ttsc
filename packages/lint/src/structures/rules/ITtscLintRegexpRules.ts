@@ -119,9 +119,6 @@ export interface ITtscLintRegexpRules {
    * string (`/(?:a+|b*)?/`), and quantifiers on non-consuming
    * atoms (`/(?:\b)+/`).
    *
-   * The autofix strips `{1}` directly; other shapes surface as
-   * manual suggestions because they often hint at a deeper bug.
-   *
    * @reference https://ota-meshi.github.io/eslint-plugin-regexp/rules/no-useless-quantifier.html
    */
   "regexp/no-useless-quantifier"?: TtscLintRuleSetting;
@@ -207,7 +204,7 @@ export interface ITtscLintRegexpRules {
    * (`dgimsuvy`).
    *
    * Stable ordering keeps diffs small and lets readers compare flag
-   * sets at a glance. The autofix rewrites the flag string in place.
+   * sets at a glance.
    *
    * @reference https://ota-meshi.github.io/eslint-plugin-regexp/rules/sort-flags.html
    */

@@ -23,10 +23,10 @@ export interface ITtscLintJsdocRules {
   "jsdoc/check-tag-names"?: TtscLintRuleSetting;
 
   /**
-   * Validate the value formats of tags that carry structured data
-   * — semver on `@version`/`@since`, SPDX identifiers on `@license`,
-   * the closed-set kinds on `@kind`, the ES-import shape on `@import`,
-   * and similar.
+   * Validate `@access` values against the closed set `public`,
+   * `protected`, `private`, `package`. (Upstream extends to
+   * `@version`/`@since`/`@license`/`@kind`/`@import` value checks;
+   * those shapes are not yet implemented in the native engine.)
    *
    * Catches typos and stale enum members that slip past doc tooling.
    *
@@ -135,10 +135,12 @@ export interface ITtscLintJsdocRules {
   "jsdoc/require-returns-description"?: TtscLintRuleSetting;
 
   /**
-   * Validate every documentation comment against the TSDoc grammar —
-   * closed-set tag names, balanced inline-tag braces (`{@link ...}`),
-   * supported escape sequences, absence of JSDoc-only `{Type}`
-   * annotations, fenced-code rules.
+   * Detect structural TSDoc problems in documentation comments:
+   * malformed top-level block tags (`@` followed by non-letter) and
+   * malformed or unclosed inline tags (`{@link ...}`). The broader
+   * TSDoc grammar — closed-set tag names, escape sequences,
+   * `{Type}`-annotation rejection, fenced-code rules — is not yet
+   * implemented.
    *
    * TSDoc is Microsoft's curated dialect that powers API Extractor and
    * the rest of the Microsoft TypeScript documentation pipeline.

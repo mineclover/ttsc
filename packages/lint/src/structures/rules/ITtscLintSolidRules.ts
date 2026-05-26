@@ -34,8 +34,6 @@ export interface ITtscLintSolidRules {
    * `solid-js/web`, or `solid-js/store`) and merge duplicate imports
    * from the same entry.
    *
-   * Auto-fixable.
-   *
    * @reference https://github.com/solidjs-community/eslint-plugin-solid/blob/main/packages/eslint-plugin-solid/docs/imports.md
    */
   "solid/imports"?: TtscLintRuleSetting;
@@ -141,7 +139,7 @@ export interface ITtscLintSolidRules {
    * Rewrite `class={cn({ ... })}` / `clsx(...)` / `classnames(...)`
    * calls to the reactive `classlist={{ ... }}` prop.
    *
-   * Deprecated and off by default upstream; auto-fixable.
+   * Deprecated and off by default upstream.
    *
    * @reference https://github.com/solidjs-community/eslint-plugin-solid/blob/main/packages/eslint-plugin-solid/docs/prefer-classlist.md
    */
@@ -152,8 +150,6 @@ export interface ITtscLintSolidRules {
    * component so the iteration stays keyed and reactive instead of
    * re-creating every child on each update.
    *
-   * Partially auto-fixable.
-   *
    * @reference https://github.com/solidjs-community/eslint-plugin-solid/blob/main/packages/eslint-plugin-solid/docs/prefer-for.md
    */
   "solid/prefer-for"?: TtscLintRuleSetting;
@@ -161,8 +157,7 @@ export interface ITtscLintSolidRules {
   /**
    * Rewrite `{cond && <JSX />}` short-circuits in JSX to `<Show
    * when={cond}>...</Show>`. Stylistic only — Solid's compiler
-   * already handles the boolean form — so it is off by default;
-   * auto-fixable.
+   * already handles the boolean form — so it is off by default.
    *
    * @reference https://github.com/solidjs-community/eslint-plugin-solid/blob/main/packages/eslint-plugin-solid/docs/prefer-show.md
    */
@@ -180,7 +175,7 @@ export interface ITtscLintSolidRules {
    * Collapse JSX elements with no children to the self-closing form
    * (`<Foo></Foo>` to `<Foo />`). Configurable per component vs HTML
    * element, including a `"void"` mode that only enforces it for void
-   * tags. Auto-fixable.
+   * tags.
    *
    * @reference https://github.com/solidjs-community/eslint-plugin-solid/blob/main/packages/eslint-plugin-solid/docs/self-closing-comp.md
    */
@@ -190,8 +185,6 @@ export interface ITtscLintSolidRules {
    * Require `style={{...}}` keys to be valid kebab-case CSS properties
    * (`"font-size"`, not React's `fontSize`) and dimensioned values to
    * be strings — Solid does not append implicit `px`.
-   *
-   * Auto-fixable.
    *
    * @reference https://github.com/solidjs-community/eslint-plugin-solid/blob/main/packages/eslint-plugin-solid/docs/style-prop.md
    */

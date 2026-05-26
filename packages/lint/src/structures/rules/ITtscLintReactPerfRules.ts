@@ -10,6 +10,10 @@ import type { TtscLintRuleOptionsSetting } from "../TtscLintRuleSetting";
  * render. Useful for performance-critical render paths; usually
  * unnecessary for top-level pages.
  *
+ * Diagnostics only fire on `.tsx` source files — JSX heuristics rely
+ * on the file extension, so `.ts` files are skipped even when they
+ * contain JSX-like syntax.
+ *
  * @reference https://github.com/cvazac/eslint-plugin-react-perf
  */
 export interface ITtscLintReactPerfRules {

@@ -27,7 +27,8 @@ export interface ITtscLintReactRules {
 
   /**
    * Detect high-confidence missing identifiers in React Hook
-   * dependency arrays (`useEffect`, `useMemo`, `useCallback`).
+   * dependency arrays (`useEffect`, `useLayoutEffect`,
+   * `useInsertionEffect`, `useMemo`, `useCallback`).
    *
    * @reference https://react.dev/reference/react/useEffect#specifying-reactive-dependencies
    */
@@ -47,8 +48,7 @@ export interface ITtscLintReactRules {
   /**
    * Require JSX `<iframe>` elements to declare a `sandbox` attribute,
    * which restricts what embedded content can do (scripts, forms,
-   * navigation). Also flags the `allow-scripts allow-same-origin`
-   * combination, which lets the frame escape the sandbox.
+   * navigation).
    *
    * @reference https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/iframe-missing-sandbox.md
    */
@@ -235,7 +235,8 @@ export interface ITtscLintReactRules {
   "react/set-state-in-render"?: TtscLintRuleSetting;
 
   /**
-   * Reject non-object values passed to the JSX `style` prop.
+   * Reject string-form `style` values such as `style="color: red"` or
+   * `style={\`...\`}`.
    *
    * React expects a `{ camelCaseProp: value }` object, not the
    * HTML-style CSS string, and the latter is silently coerced and

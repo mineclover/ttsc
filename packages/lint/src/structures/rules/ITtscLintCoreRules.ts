@@ -51,7 +51,7 @@ export interface ITtscLintCoreRules {
    *
    * @reference https://eslint.org/docs/latest/rules/eqeqeq
    */
-  eqeqeq?: TtscLintRuleSetting;
+  "eqeqeq"?: TtscLintRuleSetting;
 
   /**
    * Reject `for` statements whose update clause moves the counter away
@@ -654,10 +654,6 @@ export interface ITtscLintCoreRules {
   /**
    * Reject throwing non-Error operands (`throw "boom"`, `throw 1`).
    *
-   * See {@link ITtscLintTypeScriptRules} for the type-aware
-   * `typescript/no-throw-literal` variant when checker information
-   * should refine the analysis.
-   *
    * @reference https://eslint.org/docs/latest/rules/no-throw-literal
    */
   "no-throw-literal"?: TtscLintRuleSetting;
@@ -720,7 +716,7 @@ export interface ITtscLintCoreRules {
    * Reject labels that no `break` or `continue` statement references.
    *
    * Usually the targeted statement was renamed or removed but the label
-   * was left behind. Autofixable: removes the label.
+   * was left behind.
    *
    * @reference https://eslint.org/docs/latest/rules/no-unused-labels
    */
@@ -869,7 +865,7 @@ export interface ITtscLintCoreRules {
    *
    * @reference https://eslint.org/docs/latest/rules/radix
    */
-  radix?: TtscLintRuleSetting;
+  "radix"?: TtscLintRuleSetting;
 
   /**
    * Require generator functions to contain at least one `yield`. A
@@ -912,5 +908,5 @@ export interface ITtscLintCoreRules {
    *
    * @reference https://eslint.org/docs/latest/rules/yoda
    */
-  yoda?: TtscLintRuleSetting;
+  "yoda"?: TtscLintRuleSetting;
 }

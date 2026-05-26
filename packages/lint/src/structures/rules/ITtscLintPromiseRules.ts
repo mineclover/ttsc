@@ -25,11 +25,8 @@ export interface ITtscLintPromiseRules {
   "promise/always-return"?: TtscLintRuleSetting;
 
   /**
-   * Discourage direct `new Promise(...)` construction outside
-   * Promise adapters.
-   *
-   * Most modern code can use `async`/`await` or existing
-   * Promise-returning APIs.
+   * Reject every `new Promise(...)` construction. Most modern code
+   * can use `async`/`await` or existing Promise-returning APIs.
    *
    * @reference https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/avoid-new.md
    */
@@ -52,14 +49,19 @@ export interface ITtscLintPromiseRules {
    * guidance: defer via `setImmediate`/`process.nextTick` if a
    * callback bridge is genuinely required.
    *
+   * Also flags `.then(callback)` / `.catch(callback)` calls whose
+   * handler argument is a bare callback-shaped identifier
+   * (`callback`, `cb`, `next`, `done`).
+   *
    * @reference https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/no-callback-in-promise.md
    */
   "promise/no-callback-in-promise"?: TtscLintRuleSetting;
 
   /**
-   * Detect Promise executor bodies where more than one settlement
-   * call (`resolve`/`reject`) can run on the same code path —
-   * typically a missing `return` after `reject`.
+   * Detect Promise executor bodies with more than one resolve/reject
+   * call. The native rule does not yet model branch exclusivity —
+   * bodies whose calls are split across mutually exclusive branches
+   * will be flagged too.
    *
    * The second call is silently ignored, but the surrounding logic
    * almost always assumed short-circuit.

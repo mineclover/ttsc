@@ -106,10 +106,8 @@ export interface ITtscLintFunctionalRules {
   "functional/no-mixed-types"?: TtscLintRuleOptionsSetting<ITtscLintFunctionalNoMixedTypesRuleOptions>;
 
   /**
-   * Reject any call to `Promise.reject(...)` and any `throw` inside an
-   * `async` function (which compiles to the same rejection); resolve
-   * with an `Option` / `Result` shape so failures stay in the value
-   * channel.
+   * Reject any call to `Promise.reject(...)`; resolve with an
+   * `Option` / `Result` shape so failures stay in the value channel.
    *
    * @reference https://github.com/eslint-functional/eslint-plugin-functional/blob/main/docs/rules/no-promise-reject.md
    */

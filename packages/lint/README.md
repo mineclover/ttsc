@@ -11,7 +11,7 @@
 
 A linter and formatter. Co-protagonist of the [`ttsc`](https://ttsc.dev) toolchain — paired with `ttsc`, it replaces `eslint` and `prettier`.
 
-140+ rules. Lint violations surface as `error TSxxxxx` from a single compile pass; the formatter applies via `ttsc format`.
+150+ rules. Lint violations surface as `error TSxxxxx` from a single compile pass; the formatter applies via `ttsc format`.
 
 ## Demonstration
 
@@ -146,6 +146,41 @@ export default {
   rules: { "format/semi": "off" },
 } satisfies ITtscLintConfig;
 ```
+
+### Architecture boundaries
+
+The `boundaries/*` rules implement a conservative TypeScript source-path subset inspired by `eslint-plugin-boundaries`: static `import` and `export ... from` specifiers are resolved to source files, then classified with per-rule `elements` options.
+
+```ts
+// lint.config.ts
+export default {
+  rules: {
+    "boundaries/element-types": ["error", {
+      elements: [
+        { type: "app", pattern: "src/app/**" },
+        { type: "domain", pattern: "src/domain/**", entry: "index.ts", private: "internal/**" },
+      ],
+      rules: [{ from: "app", disallow: "domain" }],
+    }],
+    "boundaries/entry-point": ["error", {
+      elements: [{ type: "domain", pattern: "src/domain/**", entry: "index.ts" }],
+    }],
+    "boundaries/no-private": ["error", {
+      elements: [{ type: "domain", pattern: "src/domain/**", private: "internal/**" }],
+    }],
+    "boundaries/no-unknown": ["error", {
+      elements: [
+        { type: "app", pattern: "src/app/**" },
+        { type: "domain", pattern: "src/domain/**" },
+      ],
+    }],
+    "boundaries/external": ["error", { disallow: ["@legacy/sdk"] }],
+  },
+} satisfies ITtscLintConfig;
+```
+
+Boundary diagnostics do not offer autofixes. A violation usually needs an API or architecture decision, not a mechanical import rewrite.
+
 ### Rules
 
 Rules are off until you enable them:
@@ -162,13 +197,27 @@ export default {
 } satisfies ITtscLintConfig;
 ```
 
-The rule corpus is tested in `tests/test-lint/src/cases/*.ts`, which is the best place to check the exact patterns currently covered. Each rule below links to its tested fixture:
+Most rule corpus cases live in `tests/test-lint/src/cases/*.ts`; source-path and engine-focused families with package-local Go coverage, such as `boundaries/*` and `security/*`, link to their Go tests. Each rule below links to its tested fixture where one exists:
 
 - [`adjacent-overload-signatures`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/adjacent-overload-signatures.ts): keeps overload declarations for the same member adjacent.
 - [`array-type`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/array-type.ts): prefers `T[]` and `readonly T[]` over array helper types.
 - [`await-thenable`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/await-thenable.ts): rejects `await` on a value that is neither a Promise nor a thenable (type-aware).
 - [`ban-ts-comment`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/ban-ts-comment.ts): rejects TypeScript suppression comments such as `@ts-ignore`.
 - [`ban-tslint-comment`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/ban-tslint-comment.ts): rejects obsolete `tslint:` comments.
+- [`boundaries/element-types`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/boundaries/boundaries_element_types_rejects_disallowed_import_test.go): enforces allowed dependency directions between configured source-path element types.
+- [`boundaries/entry-point`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/boundaries/boundaries_entry_point_rejects_non_entry_import_test.go): requires imports into an element to target its configured public entry files.
+- [`boundaries/external`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/boundaries/boundaries_external_rejects_disallowed_package_test.go): restricts external package imports by package/specifier pattern.
+- [`boundaries/no-private`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/boundaries/boundaries_no_private_rejects_cross_element_private_import_test.go): rejects imports of configured private files from outside their element.
+- [`boundaries/no-unknown`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/boundaries/boundaries_no_unknown_rejects_unknown_import_target_test.go): rejects relative imports whose resolved source file matches no configured element.
+- `eslint-comments/disable-enable-pair`: requires range `eslint-disable` directives to be paired with `eslint-enable`.
+- `eslint-comments/no-aggregating-enable`: rejects bare `eslint-enable` comments that re-enable named disables at once.
+- `eslint-comments/no-duplicate-disable`: rejects repeated disables for a rule that is already disabled.
+- `eslint-comments/no-restricted-disable`: rejects disables for configured protected rules.
+- `eslint-comments/no-unlimited-disable`: rejects disable comments with no explicit rule list.
+- `eslint-comments/no-unused-disable`: rejects disable comments that suppress no diagnostic.
+- `eslint-comments/no-unused-enable`: rejects enable comments that do not re-enable anything.
+- `eslint-comments/no-use`: rejects lint directive comments entirely.
+- `eslint-comments/require-description`: requires directive comments to include a `--` description.
 - [`consistent-indexed-object-style`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/consistent-indexed-object-style.ts): prefers `Record` for single index-signature object types.
 - [`consistent-type-assertions`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/consistent-type-assertions.ts): prefers `as` type assertions over angle-bracket assertions.
 - [`consistent-type-definitions`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/consistent-type-definitions.ts): prefers interfaces for object-shaped type definitions.
@@ -303,6 +352,26 @@ The rule corpus is tested in `tests/test-lint/src/cases/*.ts`, which is the best
 - [`valid-typeof`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/valid-typeof.ts): restricts `typeof` comparisons to valid strings.
 - [`vars-on-top`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/vars-on-top.ts): requires `var` declarations at the top of their scope.
 - [`yoda`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/yoda.ts): rejects literal-first comparisons.
+- [`tsdoc/syntax`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/comments-directives/tsdoc_syntax_test.go): validates malformed TSDoc block tags and inline tags in `/** ... */` comments.
+
+### Security rules
+
+The `security/*` family ports the TypeScript-source-relevant `eslint-plugin-security@4.0.0` surface:
+
+- `security/detect-bidi-characters`: detects Trojan Source bidi control characters.
+- `security/detect-buffer-noassert`: detects Buffer reads/writes with `noAssert` set to true.
+- `security/detect-child-process`: detects child_process imports and non-literal `exec` commands.
+- `security/detect-disable-mustache-escape`: detects `escapeMarkup = false` on objects.
+- `security/detect-eval-with-expression`: detects `eval` fed by non-literal expressions.
+- `security/detect-new-buffer`: detects `new Buffer` with non-literal input.
+- `security/detect-no-csrf-before-method-override`: detects Express csrf middleware before methodOverride.
+- `security/detect-non-literal-fs-filename`: detects filesystem calls with non-literal filename arguments.
+- `security/detect-non-literal-regexp`: detects RegExp construction from non-literal patterns.
+- `security/detect-non-literal-require`: detects `require` calls with non-literal module specifiers.
+- `security/detect-object-injection`: detects dynamic bracket access sinks.
+- `security/detect-possible-timing-attacks`: detects direct equality comparisons involving secret-like identifiers.
+- `security/detect-pseudoRandomBytes`: detects `crypto.pseudoRandomBytes`.
+- `security/detect-unsafe-regex`: detects high-confidence catastrophic backtracking regex shapes.
 
 ## Third-party rule plugins
 

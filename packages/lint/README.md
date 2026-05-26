@@ -226,6 +226,18 @@ Most rule corpus cases live in `tests/test-lint/src/cases/*.ts`; source-path and
 
 Storybook projects can enable the `storybook/*` family on `*.stories.ts(x)` and `.storybook/main.ts` files. It covers CSF metadata shape, named story exports, deprecated `storiesOf`, interaction-test imports, direct renderer-package imports, and addon installation checks. `storybook/no-uninstalled-addons` accepts `{ packageJsonLocation?: string; ignore?: string[] }`; without an explicit path it walks upward from the linted Storybook config file to find `package.json`.
 
+### Testing Library
+
+`@ttsc/lint` also ships the `testing-library/*` family from `eslint-plugin-testing-library` for TS/TSX test files. These rules are AST-only and report only after a Testing Library import is present in the file.
+
+- `testing-library/await-async-events`, `testing-library/await-async-queries`, `testing-library/await-async-utils`: require handling Promise-returning user-event methods, `findBy*` queries, and async utilities.
+- `testing-library/no-await-sync-events`, `testing-library/no-await-sync-queries`: reject unnecessary `await` on synchronous `fireEvent`, `getBy*`, and `queryBy*` calls.
+- `testing-library/no-container`, `testing-library/no-node-access`, `testing-library/prefer-screen-queries`: prefer `screen.*` queries over container access, DOM traversal, and render-result query functions.
+- `testing-library/no-debugging-utils`, `testing-library/no-dom-import`, `testing-library/no-manual-cleanup`, `testing-library/no-test-id-queries`: catch committed debug helpers, direct DOM package imports, manual cleanup, and test-id queries.
+- `testing-library/no-wait-for-multiple-assertions`, `testing-library/no-wait-for-side-effects`, `testing-library/no-wait-for-snapshot`, `testing-library/prefer-find-by`, `testing-library/prefer-query-by-disappearance`: keep `waitFor` callbacks focused and prefer purpose-built queries.
+- `testing-library/prefer-user-event`, `testing-library/prefer-user-event-setup`, `testing-library/no-promise-in-fire-event`, `testing-library/no-render-in-lifecycle`, `testing-library/no-unnecessary-act`: catch common event, render, and `act()` anti-patterns.
+- `testing-library/consistent-data-testid`, `testing-library/prefer-explicit-assert`, `testing-library/prefer-implicit-assert`, `testing-library/prefer-presence-queries`, `testing-library/prefer-query-matchers`, `testing-library/render-result-naming-convention`: cover configured test-id naming, assertion style, presence matchers, and render result names.
+
 - [`adjacent-overload-signatures`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/adjacent-overload-signatures.ts): keeps overload declarations for the same member adjacent.
 - [`array-type`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/array-type.ts): prefers `T[]` and `readonly T[]` over array helper types.
 - [`await-thenable`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/await-thenable.ts): rejects `await` on a value that is neither a Promise nor a thenable (type-aware).

@@ -442,12 +442,30 @@ export interface ITtscLintReactRefreshOnlyExportComponentsRuleOptions {
   checkJS?: boolean;
 }
 
+/** `testing-library/consistent-data-testid` rule options.
+ */
+export interface ITtscLintTestingLibraryConsistentDataTestIdRuleOptions {
+  /**
+   * Regular expression string every configured test-id attribute value must
+   * match. `{fileName}` is replaced with the basename before the first dot.
+   */
+  testIdPattern: string;
+
+  /**
+   * Test-id attribute name, or names, to validate.
+   *
+   * @default "data-testid"
+   */
+  testIdAttribute?: string | readonly string[];
+}
+
 /**
  * Index from typed rule name to its option object. Kept as a public lookup
  * type for consumers that want to derive option helpers from the same rule
  * names accepted by `ITtscLintRules`.
  */
 export interface ITtscLintRuleOptionsMap {
+  "testing-library/consistent-data-testid": ITtscLintTestingLibraryConsistentDataTestIdRuleOptions;
   "functional/functional-parameters": ITtscLintFunctionalParametersRuleOptions;
   "functional/immutable-data": ITtscLintFunctionalImmutableDataRuleOptions;
   "functional/no-class-inheritance": ITtscLintFunctionalEmptyRuleOptions;

@@ -29,6 +29,7 @@ import type {
   ITtscLintSemiRuleOptions,
   ITtscLintSortImportsRuleOptions,
   ITtscLintStorybookNoUninstalledAddonsRuleOptions,
+  ITtscLintTestingLibraryConsistentDataTestIdRuleOptions,
   ITtscLintTrailingCommaRuleOptions,
 } from "./TtscLintRuleOptions";
 import type { TtscLintSeverity } from "./TtscLintSeverity";
@@ -888,6 +889,93 @@ export interface ITtscLintRules {
 
   /** rejects direct Testing Library imports in story files. */
   "storybook/use-storybook-testing-library"?: TtscLintRuleSetting;
+
+  /** require awaiting async user-event methods. */
+  "testing-library/await-async-events"?: TtscLintRuleSetting;
+
+  /** require awaiting `findBy*` and `findAllBy*` queries. */
+  "testing-library/await-async-queries"?: TtscLintRuleSetting;
+
+  /** require awaiting `waitFor` and other async Testing Library utilities. */
+  "testing-library/await-async-utils"?: TtscLintRuleSetting;
+
+  /** validate configured JSX test-id attribute values. */
+  "testing-library/consistent-data-testid"?: TtscLintRuleOptionsSetting<ITtscLintTestingLibraryConsistentDataTestIdRuleOptions>;
+
+  /** reject unnecessary `await` before synchronous event helpers. */
+  "testing-library/no-await-sync-events"?: TtscLintRuleSetting;
+
+  /** reject unnecessary `await` before synchronous queries. */
+  "testing-library/no-await-sync-queries"?: TtscLintRuleSetting;
+
+  /** reject `container` destructuring and DOM query methods. */
+  "testing-library/no-container"?: TtscLintRuleSetting;
+
+  /** reject `debug`, `prettyDOM`, and related debugging utilities. */
+  "testing-library/no-debugging-utils"?: TtscLintRuleSetting;
+
+  /** reject direct `@testing-library/dom` imports in framework tests. */
+  "testing-library/no-dom-import"?: TtscLintRuleSetting;
+
+  /** reject global RegExp flags in query text matchers. */
+  "testing-library/no-global-regexp-flag-in-query"?: TtscLintRuleSetting;
+
+  /** reject manual `cleanup()` calls. */
+  "testing-library/no-manual-cleanup"?: TtscLintRuleSetting;
+
+  /** reject direct DOM node traversal from query results. */
+  "testing-library/no-node-access"?: TtscLintRuleSetting;
+
+  /** reject Promise-producing expressions passed to `fireEvent`. */
+  "testing-library/no-promise-in-fire-event"?: TtscLintRuleSetting;
+
+  /** reject `render()` inside lifecycle hooks. */
+  "testing-library/no-render-in-lifecycle"?: TtscLintRuleSetting;
+
+  /** reject `*ByTestId` queries. */
+  "testing-library/no-test-id-queries"?: TtscLintRuleSetting;
+
+  /** reject `act()` wrappers around Testing Library helpers. */
+  "testing-library/no-unnecessary-act"?: TtscLintRuleSetting;
+
+  /** reject multiple assertions inside one `waitFor`. */
+  "testing-library/no-wait-for-multiple-assertions"?: TtscLintRuleSetting;
+
+  /** reject side effects inside `waitFor`. */
+  "testing-library/no-wait-for-side-effects"?: TtscLintRuleSetting;
+
+  /** reject snapshots inside `waitFor`. */
+  "testing-library/no-wait-for-snapshot"?: TtscLintRuleSetting;
+
+  /** require explicit assertions for standalone queries. */
+  "testing-library/prefer-explicit-assert"?: TtscLintRuleSetting;
+
+  /** prefer `findBy*` over `waitFor` plus `getBy*`. */
+  "testing-library/prefer-find-by"?: TtscLintRuleSetting;
+
+  /** avoid redundant `toBeInTheDocument` around throwing queries. */
+  "testing-library/prefer-implicit-assert"?: TtscLintRuleSetting;
+
+  /** match presence and absence assertions to `getBy*` or `queryBy*`. */
+  "testing-library/prefer-presence-queries"?: TtscLintRuleSetting;
+
+  /** prefer `queryBy*` when waiting for disappearance. */
+  "testing-library/prefer-query-by-disappearance"?: TtscLintRuleSetting;
+
+  /** prefer jest-dom document matchers for Testing Library queries. */
+  "testing-library/prefer-query-matchers"?: TtscLintRuleSetting;
+
+  /** prefer `screen.*` over render-result queries. */
+  "testing-library/prefer-screen-queries"?: TtscLintRuleSetting;
+
+  /** prefer `userEvent` over `fireEvent`. */
+  "testing-library/prefer-user-event"?: TtscLintRuleSetting;
+
+  /** prefer `userEvent.setup()` over direct `userEvent.*` calls. */
+  "testing-library/prefer-user-event-setup"?: TtscLintRuleSetting;
+
+  /** require conventional names for variables assigned from `render()`. */
+  "testing-library/render-result-naming-convention"?: TtscLintRuleSetting;
 
   /** Insert or remove trailing semicolons on ASI-terminated statements. */
   "format/semi"?: TtscLintRuleOptionsSetting<ITtscLintSemiRuleOptions>;

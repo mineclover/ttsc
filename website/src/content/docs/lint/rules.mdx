@@ -225,6 +225,42 @@ These diagnostics are not autofixable. A boundary violation usually needs a publ
 | `no-async-promise-executor` | Reject `new Promise(async (...) => ...)`. |
 | `no-promise-executor-return` | Reject `return` inside a Promise executor. |
 
+## Testing Library
+
+These rules mirror `eslint-plugin-testing-library` names under the `testing-library/*` namespace. They run from direct AST patterns in TS/TSX tests and require a Testing Library import before reporting framework-specific query, render, wait, and event patterns.
+
+| Rule | Effect |
+| ---- | ------ |
+| `testing-library/await-async-events` | Require handling Promises returned by async `userEvent` methods. |
+| `testing-library/await-async-queries` | Require handling `findBy*` and `findAllBy*` query Promises. |
+| `testing-library/await-async-utils` | Require handling `waitFor` and async utility Promises. |
+| `testing-library/consistent-data-testid` | Validate JSX test-id attributes against a configured `testIdPattern`. |
+| `testing-library/no-await-sync-events` | Reject unnecessary `await` before synchronous `fireEvent` calls. |
+| `testing-library/no-await-sync-queries` | Reject unnecessary `await` before `getBy*` and `queryBy*` calls. |
+| `testing-library/no-container` | Reject `container` destructuring and DOM query methods. |
+| `testing-library/no-debugging-utils` | Reject `debug`, `prettyDOM`, `logRoles`, and `logTestingPlaygroundURL`. |
+| `testing-library/no-dom-import` | Reject direct `@testing-library/dom` imports in framework tests. |
+| `testing-library/no-global-regexp-flag-in-query` | Reject `/g` regular expressions in query matchers. |
+| `testing-library/no-manual-cleanup` | Reject manual `cleanup()` calls. |
+| `testing-library/no-node-access` | Reject direct DOM node traversal from query results. |
+| `testing-library/no-promise-in-fire-event` | Reject Promise-producing expressions passed into `fireEvent`. |
+| `testing-library/no-render-in-lifecycle` | Reject `render()` inside lifecycle hooks. |
+| `testing-library/no-test-id-queries` | Reject `*ByTestId` queries when accessible queries should be used. |
+| `testing-library/no-unnecessary-act` | Reject `act()` wrappers around Testing Library helpers. |
+| `testing-library/no-wait-for-multiple-assertions` | Reject multiple assertions in one `waitFor` callback. |
+| `testing-library/no-wait-for-side-effects` | Reject side effects inside `waitFor`. |
+| `testing-library/no-wait-for-snapshot` | Reject snapshots inside `waitFor`. |
+| `testing-library/prefer-explicit-assert` | Require explicit assertions for standalone query calls. |
+| `testing-library/prefer-find-by` | Prefer `findBy*` over `waitFor` plus `getBy*`. |
+| `testing-library/prefer-implicit-assert` | Avoid redundant `toBeInTheDocument` around throwing queries. |
+| `testing-library/prefer-presence-queries` | Match presence and absence assertions to `getBy*` or `queryBy*`. |
+| `testing-library/prefer-query-by-disappearance` | Prefer `queryBy*` when waiting for disappearance. |
+| `testing-library/prefer-query-matchers` | Prefer jest-dom document matchers for Testing Library query results. |
+| `testing-library/prefer-screen-queries` | Prefer `screen.*` over render-result query functions. |
+| `testing-library/prefer-user-event` | Prefer `userEvent` over `fireEvent`. |
+| `testing-library/prefer-user-event-setup` | Prefer `userEvent.setup()` over direct `userEvent.*` calls. |
+| `testing-library/render-result-naming-convention` | Require conventional names for variables assigned from `render()`. |
+
 ## Throw and control flow
 
 | Rule | Effect |

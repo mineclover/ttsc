@@ -25,6 +25,7 @@ import type {
   ITtscLintNoUseRuleOptions,
   ITtscLintPrintWidthRuleOptions,
   ITtscLintQuotesRuleOptions,
+  ITtscLintReactPerfRuleOptions,
   ITtscLintReactRefreshOnlyExportComponentsRuleOptions,
   ITtscLintSemiRuleOptions,
   ITtscLintSortImportsRuleOptions,
@@ -733,6 +734,18 @@ export interface ITtscLintRules {
 
   /** requires a radix argument for `parseInt`. */
   radix?: TtscLintRuleSetting;
+
+  /** rejects freshly-created arrays passed as JSX props in TSX files. */
+  "react-perf/jsx-no-new-array-as-prop"?: TtscLintRuleOptionsSetting<ITtscLintReactPerfRuleOptions>;
+
+  /** rejects freshly-created functions passed as JSX props in TSX files. */
+  "react-perf/jsx-no-new-function-as-prop"?: TtscLintRuleOptionsSetting<ITtscLintReactPerfRuleOptions>;
+
+  /** rejects freshly-created objects passed as JSX props in TSX files. */
+  "react-perf/jsx-no-new-object-as-prop"?: TtscLintRuleOptionsSetting<ITtscLintReactPerfRuleOptions>;
+
+  /** rejects freshly-created JSX elements/fragments passed as JSX props in TSX files. */
+  "react-perf/jsx-no-jsx-as-prop"?: TtscLintRuleOptionsSetting<ITtscLintReactPerfRuleOptions>;
 
   /** enforces the Rules of Hooks in components and custom Hooks. */
   "react-hooks/rules-of-hooks"?: TtscLintRuleSetting;

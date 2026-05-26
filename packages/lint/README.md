@@ -447,6 +447,10 @@ Storybook projects can enable the `storybook/*` family on `*.stories.ts(x)` and 
 - [`prefer-spread`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-spread.ts): prefers spread arguments over `.apply`.
 - [`prefer-template`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-template.ts): prefers template literals over string concatenation.
 - [`radix`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/radix.ts): requires a radix argument for `parseInt`.
+- [`react-perf/jsx-no-new-array-as-prop`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/react-perf/react_perf_jsx_no_new_array_as_prop_test.go): rejects freshly-created arrays passed as JSX props in TSX files.
+- [`react-perf/jsx-no-new-function-as-prop`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/react-perf/react_perf_jsx_no_new_function_as_prop_test.go): rejects freshly-created functions passed as JSX props in TSX files.
+- [`react-perf/jsx-no-new-object-as-prop`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/react-perf/react_perf_jsx_no_new_object_as_prop_test.go): rejects freshly-created objects passed as JSX props in TSX files.
+- [`react-perf/jsx-no-jsx-as-prop`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/react-perf/react_perf_jsx_no_jsx_as_prop_test.go): rejects freshly-created JSX elements or fragments passed as JSX props in TSX files.
 - [`react-refresh/only-export-components`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/react-refresh/only_export_components_reports_non_component_export_test.go): keeps React Fast Refresh component modules from exporting non-components.
 - [`require-yield`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/require-yield.ts): requires generator functions to contain `yield`.
 - [`triple-slash-reference`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/triple-slash-reference/violation.ts): rejects triple-slash reference directives.

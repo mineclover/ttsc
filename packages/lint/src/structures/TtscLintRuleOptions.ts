@@ -220,6 +220,32 @@ export type ITtscLintBoundariesNoPrivateRuleOptions =
 export type ITtscLintBoundariesNoUnknownRuleOptions =
   ITtscLintBoundariesElementsOptions;
 
+/** `eslint-comments/disable-enable-pair` rule options. */
+export interface ITtscLintDisableEnablePairRuleOptions {
+  /**
+   * Allow a file-leading range disable to stay open through the end of the file.
+   *
+   * @default false
+   */
+  allowWholeFile?: boolean;
+}
+
+/** `eslint-comments/no-restricted-disable` rule options. */
+export interface ITtscLintNoRestrictedDisableRuleOptions {
+  /** Rule names that inline disable comments may not suppress. */
+  rules?: readonly string[];
+}
+
+/** `eslint-comments/no-use` rule options. */
+export interface ITtscLintNoUseRuleOptions {
+  /**
+   * Directive markers that remain allowed, such as `"eslint-disable-next-line"`.
+   *
+   * @default []
+   */
+  allow?: readonly string[];
+}
+
 /** `react-refresh/only-export-components` rule options. */
 export interface ITtscLintReactRefreshOnlyExportComponentsRuleOptions {
   /**
@@ -264,6 +290,9 @@ export interface ITtscLintRuleOptionsMap {
   "boundaries/external": ITtscLintBoundariesExternalRuleOptions;
   "boundaries/no-private": ITtscLintBoundariesNoPrivateRuleOptions;
   "boundaries/no-unknown": ITtscLintBoundariesNoUnknownRuleOptions;
+  "eslint-comments/disable-enable-pair": ITtscLintDisableEnablePairRuleOptions;
+  "eslint-comments/no-restricted-disable": ITtscLintNoRestrictedDisableRuleOptions;
+  "eslint-comments/no-use": ITtscLintNoUseRuleOptions;
   "format/semi": ITtscLintSemiRuleOptions;
   "format/quotes": ITtscLintQuotesRuleOptions;
   "format/trailing-comma": ITtscLintTrailingCommaRuleOptions;

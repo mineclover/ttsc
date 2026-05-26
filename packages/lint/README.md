@@ -209,6 +209,15 @@ Most rule corpus cases live in `tests/test-lint/src/cases/*.ts`; source-path rul
 - [`boundaries/external`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/boundaries/boundaries_external_rejects_disallowed_package_test.go): restricts external package imports by package/specifier pattern.
 - [`boundaries/no-private`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/boundaries/boundaries_no_private_rejects_cross_element_private_import_test.go): rejects imports of configured private files from outside their element.
 - [`boundaries/no-unknown`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/boundaries/boundaries_no_unknown_rejects_unknown_import_target_test.go): rejects relative imports whose resolved source file matches no configured element.
+- `eslint-comments/disable-enable-pair`: requires range `eslint-disable` directives to be paired with `eslint-enable`.
+- `eslint-comments/no-aggregating-enable`: rejects bare `eslint-enable` comments that re-enable named disables at once.
+- `eslint-comments/no-duplicate-disable`: rejects repeated disables for a rule that is already disabled.
+- `eslint-comments/no-restricted-disable`: rejects disables for configured protected rules.
+- `eslint-comments/no-unlimited-disable`: rejects disable comments with no explicit rule list.
+- `eslint-comments/no-unused-disable`: rejects disable comments that suppress no diagnostic.
+- `eslint-comments/no-unused-enable`: rejects enable comments that do not re-enable anything.
+- `eslint-comments/no-use`: rejects lint directive comments entirely.
+- `eslint-comments/require-description`: requires directive comments to include a `--` description.
 - [`consistent-indexed-object-style`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/consistent-indexed-object-style.ts): prefers `Record` for single index-signature object types.
 - [`consistent-type-assertions`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/consistent-type-assertions.ts): prefers `as` type assertions over angle-bracket assertions.
 - [`consistent-type-definitions`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/consistent-type-definitions.ts): prefers interfaces for object-shaped type definitions.

@@ -137,6 +137,22 @@ export interface ITtscLintJsdocRuleOptions {
   sortTags?: boolean;
 }
 
+/** `storybook/no-uninstalled-addons` rule options. */
+export interface ITtscLintStorybookNoUninstalledAddonsRuleOptions {
+  /**
+   * Explicit package.json path used to validate configured Storybook addons.
+   * When omitted, the rule walks upward from the linted config file.
+   */
+  packageJsonLocation?: string;
+
+  /**
+   * Addon package names to skip when checking installation status.
+   *
+   * @default []
+   */
+  ignore?: readonly string[];
+}
+
 /** Shared pattern option accepted by several `functional/*` rules. */
 export interface ITtscLintFunctionalPatternOptions {
   /** Identifier regex string(s) the rule should skip. */
@@ -467,5 +483,6 @@ export interface ITtscLintRuleOptionsMap {
   "format/sort-imports": ITtscLintSortImportsRuleOptions;
   "format/jsdoc": ITtscLintJsdocRuleOptions;
   "format/print-width": ITtscLintPrintWidthRuleOptions;
+  "storybook/no-uninstalled-addons": ITtscLintStorybookNoUninstalledAddonsRuleOptions;
   "react-refresh/only-export-components": ITtscLintReactRefreshOnlyExportComponentsRuleOptions;
 }

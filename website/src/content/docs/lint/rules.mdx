@@ -225,6 +225,33 @@ These diagnostics are not autofixable. A boundary violation usually needs a publ
 | `no-async-promise-executor` | Reject `new Promise(async (...) => ...)`. |
 | `no-promise-executor-return` | Reject `return` inside a Promise executor. |
 
+## Solid
+
+The `solid/*` family mirrors `eslint-plugin-solid` rule names for TSX files. The native implementation uses direct AST patterns and activates Solid-specific reports after Solid imports are present; `solid/jsx-uses-vars` is registered for config compatibility but does not emit diagnostics because @ttsc/lint does not run ESLint's unused-variable scope marker.
+
+| Rule | Effect |
+| ---- | ------ |
+| `solid/components-return-once` | Reject early and conditional returns from Solid components. |
+| `solid/event-handlers` | Enforce Solid DOM event handler naming. |
+| `solid/imports` | Enforce canonical imports from `solid-js`, `solid-js/web`, and `solid-js/store`. |
+| `solid/jsx-no-duplicate-props` | Reject duplicate JSX props. |
+| `solid/jsx-no-script-url` | Reject `javascript:` URLs in JSX attributes. |
+| `solid/jsx-no-undef` | Reject JSX component names that are not declared or imported. |
+| `solid/jsx-uses-vars` | Registered for ESLint config compatibility; emits no native diagnostics. |
+| `solid/no-array-handlers` | Reject array values passed as Solid event handlers. |
+| `solid/no-destructure` | Reject destructured component props. |
+| `solid/no-innerhtml` | Reject `innerHTML` and `dangerouslySetInnerHTML`. |
+| `solid/no-proxy-apis` | Reject Proxy-backed Solid APIs for proxy-free targets. |
+| `solid/no-react-deps` | Reject React-style dependency arrays in Solid tracked scopes. |
+| `solid/no-react-specific-props` | Reject React-specific JSX props such as `className`, `htmlFor`, and DOM `key`. |
+| `solid/no-unknown-namespaces` | Reject unknown or component-level JSX namespaces. |
+| `solid/prefer-classlist` | Prefer Solid `classList` over classnames helpers. |
+| `solid/prefer-for` | Prefer `<For>` over array `.map()` inside JSX. |
+| `solid/prefer-show` | Prefer `<Show>` over conditional JSX expressions. |
+| `solid/reactivity` | Reject common Solid reactivity breakages such as async tracked scopes and bare signal accessors in JSX. |
+| `solid/self-closing-comp` | Reject empty non-self-closing JSX elements. |
+| `solid/style-prop` | Enforce Solid style prop object and kebab-case conventions. |
+
 ## Testing Library
 
 These rules mirror `eslint-plugin-testing-library` names under the `testing-library/*` namespace. They run from direct AST patterns in TS/TSX tests and require a Testing Library import before reporting framework-specific query, render, wait, and event patterns.

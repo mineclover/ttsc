@@ -938,6 +938,66 @@ export interface ITtscLintRules {
    */
   "security/detect-unsafe-regex"?: TtscLintRuleSetting;
 
+  /** reject early and conditional returns from Solid components. */
+  "solid/components-return-once"?: TtscLintRuleSetting;
+
+  /** enforce Solid DOM event handler naming. */
+  "solid/event-handlers"?: TtscLintRuleSetting;
+
+  /** enforce canonical imports from `solid-js`, `solid-js/web`, and `solid-js/store`. */
+  "solid/imports"?: TtscLintRuleSetting;
+
+  /** reject duplicate JSX props. */
+  "solid/jsx-no-duplicate-props"?: TtscLintRuleSetting;
+
+  /** reject `javascript:` URLs in JSX attributes. */
+  "solid/jsx-no-script-url"?: TtscLintRuleSetting;
+
+  /** reject JSX component names that are not declared or imported. */
+  "solid/jsx-no-undef"?: TtscLintRuleSetting;
+
+  /** scope-marker compatibility rule; the native engine emits no diagnostics. */
+  "solid/jsx-uses-vars"?: TtscLintRuleSetting;
+
+  /** reject array values passed as Solid event handlers. */
+  "solid/no-array-handlers"?: TtscLintRuleSetting;
+
+  /** reject destructured component props. */
+  "solid/no-destructure"?: TtscLintRuleSetting;
+
+  /** reject `innerHTML` and `dangerouslySetInnerHTML`. */
+  "solid/no-innerhtml"?: TtscLintRuleSetting;
+
+  /** reject Proxy-backed Solid APIs for proxy-free targets. */
+  "solid/no-proxy-apis"?: TtscLintRuleSetting;
+
+  /** reject React-style dependency arrays in Solid tracked scopes. */
+  "solid/no-react-deps"?: TtscLintRuleSetting;
+
+  /** reject React-specific JSX props such as `className` and `htmlFor`. */
+  "solid/no-react-specific-props"?: TtscLintRuleSetting;
+
+  /** reject unknown or component-level JSX namespaces. */
+  "solid/no-unknown-namespaces"?: TtscLintRuleSetting;
+
+  /** prefer Solid `classList` over classnames helpers. */
+  "solid/prefer-classlist"?: TtscLintRuleSetting;
+
+  /** prefer `<For>` over array `.map()` inside JSX. */
+  "solid/prefer-for"?: TtscLintRuleSetting;
+
+  /** prefer `<Show>` over conditional JSX expressions. */
+  "solid/prefer-show"?: TtscLintRuleSetting;
+
+  /** reject common Solid reactivity breakages. */
+  "solid/reactivity"?: TtscLintRuleSetting;
+
+  /** reject empty non-self-closing JSX elements. */
+  "solid/self-closing-comp"?: TtscLintRuleSetting;
+
+  /** enforce Solid style prop object and kebab-case conventions. */
+  "solid/style-prop"?: TtscLintRuleSetting;
+
   /** requires awaited Storybook interaction helpers in play functions. */
   "storybook/await-interactions"?: TtscLintRuleSetting;
 

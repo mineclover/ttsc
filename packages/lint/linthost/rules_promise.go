@@ -221,7 +221,7 @@ func (promiseSpecOnly) Visits() []shimast.Kind {
 	return []shimast.Kind{shimast.KindPropertyAccessExpression}
 }
 func (promiseSpecOnly) Check(ctx *Context, node *shimast.Node) {
-	obj, prop, ok := propertyAccessParts(node)
+	obj, prop, ok := promisePropertyAccessParts(node)
 	if !ok {
 		return
 	}
@@ -234,7 +234,7 @@ func (promiseSpecOnly) Check(ctx *Context, node *shimast.Node) {
 		}
 		return
 	}
-	base, baseProp, baseOK := propertyAccessParts(obj)
+	base, baseProp, baseOK := promisePropertyAccessParts(obj)
 	if baseOK && identifierText(base) == "Promise" && baseProp == "prototype" && !isPromiseInstanceMethod(prop) {
 		ctx.Report(node, "Avoid using non-standard Promise.prototype."+prop+".")
 	}
@@ -263,7 +263,7 @@ func (promiseNoNative) Check(ctx *Context, node *shimast.Node) {
 				ctx.Report(ne.Expression, "\"Promise\" is not defined in ES5 environments.")
 			}
 		case shimast.KindPropertyAccessExpression:
-			obj, _, ok := propertyAccessParts(child)
+			obj, _, ok := promisePropertyAccessParts(child)
 			if ok && identifierText(obj) == "Promise" {
 				reported = true
 				ctx.Report(obj, "\"Promise\" is not defined in ES5 environments.")
@@ -540,7 +540,7 @@ func parameterIdentifierName(node *shimast.Node) string {
 	return identifierText(param.Name())
 }
 
-func propertyAccessParts(node *shimast.Node) (*shimast.Node, string, bool) {
+func promisePropertyAccessParts(node *shimast.Node) (*shimast.Node, string, bool) {
 	node = stripParens(node)
 	if node == nil || node.Kind != shimast.KindPropertyAccessExpression {
 		return nil, "", false
@@ -557,7 +557,7 @@ func promiseCallMethod(call *shimast.CallExpression) (*shimast.Node, string, boo
 	if call == nil || call.Expression == nil {
 		return nil, "", false
 	}
-	object, method, ok := propertyAccessParts(call.Expression)
+	object, method, ok := promisePropertyAccessParts(call.Expression)
 	if !ok {
 		return nil, "", false
 	}
@@ -568,7 +568,7 @@ func promiseCallMethod(call *shimast.CallExpression) (*shimast.Node, string, boo
 }
 
 func promiseStaticMethod(node *shimast.Node) (string, bool) {
-	object, method, ok := propertyAccessParts(node)
+	object, method, ok := promisePropertyAccessParts(node)
 	if !ok || identifierText(object) != "Promise" || !isPromiseStaticMethod(method) {
 		return "", false
 	}

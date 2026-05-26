@@ -296,6 +296,18 @@ Storybook projects can enable the `storybook/*` family on `*.stories.ts(x)` and 
 - [`dot-notation`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/dot-notation.ts): prefers dot property access when a string-literal key is a valid identifier.
 - [`eqeqeq`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/eqeqeq.ts): requires strict equality operators.
 - [`for-direction`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/for-direction.ts): catches loop counters updated in the wrong direction.
+- `jsdoc/check-tag-names`: rejects unknown JSDoc block tag names.
+- `jsdoc/check-values`: validates closed-set JSDoc tag values such as `@access`.
+- `jsdoc/empty-tags`: rejects content on marker-only JSDoc tags such as `@async`.
+- `jsdoc/no-types`: rejects redundant JSDoc type braces in TypeScript source comments.
+- `jsdoc/reject-any-type`: rejects `any` and `*` inside JSDoc type braces.
+- `jsdoc/reject-function-type`: rejects the unsafe `Function` type inside JSDoc type braces.
+- `jsdoc/require-description`: requires JSDoc blocks to include block-level description text.
+- `jsdoc/require-param-description`: requires every `@param` tag with a name to include a description.
+- `jsdoc/require-param-name`: requires every `@param` tag to include a parameter name.
+- `jsdoc/require-property-description`: requires every `@property` tag with a name to include a description.
+- `jsdoc/require-property-name`: requires every `@property` tag to include a property name.
+- `jsdoc/require-returns-description`: requires every `@returns` tag to include a description.
 - [`functional/functional-parameters`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/functional/functional_parameters_rejects_rest_parameter_test.go): rejects rest parameters, `arguments`, and optionally zero-parameter functions.
 - [`functional/immutable-data`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/functional/functional_immutable_data_rejects_property_assignment_test.go): rejects writes through object/array members and mutable collection methods.
 - [`functional/no-class-inheritance`](https://github.com/samchon/ttsc/blob/master/packages/lint/test/rules/functional/functional_no_class_inheritance_rejects_extends_test.go): rejects class inheritance and abstract classes.

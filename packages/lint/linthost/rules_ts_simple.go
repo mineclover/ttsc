@@ -229,8 +229,159 @@ func isValidVoidPosition(node *shimast.Node) bool {
 	return false
 }
 
+// explicitMemberAccessibility requires every class member declaration
+// to carry a `public` / `private` / `protected` modifier. Implicit
+// public is permitted by TypeScript but obscures intent — explicit
+// keywords make the encapsulation contract self-documenting and
+// catch the common bug of "I forgot to make this private."
+// https://typescript-eslint.io/rules/explicit-member-accessibility/
+//
+// Class fields whose name starts with `#` are exempt — the private
+// hash already carries the same meaning. The constructor is exempt;
+// upstream allows omitting accessibility on the constructor itself.
+type explicitMemberAccessibility struct{}
+
+func (explicitMemberAccessibility) Name() string {
+	return "typescript/explicit-member-accessibility"
+}
+func (explicitMemberAccessibility) Visits() []shimast.Kind {
+	return []shimast.Kind{
+		shimast.KindMethodDeclaration,
+		shimast.KindPropertyDeclaration,
+		shimast.KindGetAccessor,
+		shimast.KindSetAccessor,
+	}
+}
+func (explicitMemberAccessibility) Check(ctx *Context, node *shimast.Node) {
+	// Skip non-class-scoped members.
+	parent := node.Parent
+	if parent == nil ||
+		(parent.Kind != shimast.KindClassDeclaration && parent.Kind != shimast.KindClassExpression) {
+		return
+	}
+	// Skip private hash identifiers.
+	if name := node.Name(); name != nil && name.Kind == shimast.KindPrivateIdentifier {
+		return
+	}
+	if classMemberHasAccessibility(node) {
+		return
+	}
+	ctx.Report(node, "Class member is missing an explicit accessibility modifier (`public`, `private`, or `protected`).")
+}
+
+// classMemberHasAccessibility reports whether the member carries an
+// explicit `public` / `private` / `protected` modifier.
+func classMemberHasAccessibility(node *shimast.Node) bool {
+	if node == nil {
+		return false
+	}
+	mods := node.Modifiers()
+	if mods == nil {
+		return false
+	}
+	for _, m := range mods.Nodes {
+		if m == nil {
+			continue
+		}
+		switch m.Kind {
+		case shimast.KindPublicKeyword,
+			shimast.KindPrivateKeyword,
+			shimast.KindProtectedKeyword:
+			return true
+		}
+	}
+	return false
+}
+
+// consistentGenericConstructors reports the redundant pattern where a
+// variable is annotated with a generic type AND the same generic
+// arguments are repeated on the constructor call:
+//
+//	const m: Map<string, number> = new Map<string, number>();
+//
+// One of the two type-argument lists is enough. The upstream default
+// prefers the constructor form; the annotation form is also valid but
+// stating both is noise.
+// https://typescript-eslint.io/rules/consistent-generic-constructors/
+type consistentGenericConstructors struct{}
+
+func (consistentGenericConstructors) Name() string {
+	return "typescript/consistent-generic-constructors"
+}
+func (consistentGenericConstructors) Visits() []shimast.Kind {
+	return []shimast.Kind{shimast.KindVariableDeclaration}
+}
+func (consistentGenericConstructors) Check(ctx *Context, node *shimast.Node) {
+	decl := node.AsVariableDeclaration()
+	if decl == nil || decl.Type == nil || decl.Initializer == nil {
+		return
+	}
+	if decl.Type.Kind != shimast.KindTypeReference {
+		return
+	}
+	typeRef := decl.Type.AsTypeReferenceNode()
+	if typeRef == nil || typeRef.TypeArguments == nil {
+		return
+	}
+	initializer := stripParens(decl.Initializer)
+	if initializer == nil || initializer.Kind != shimast.KindNewExpression {
+		return
+	}
+	ne := initializer.AsNewExpression()
+	if ne == nil || ne.TypeArguments == nil {
+		return
+	}
+	ctx.Report(initializer, "Redundant generic arguments — the annotation already pins the type parameters; drop them from the constructor or vice versa.")
+}
+
+// preferNumericLiterals reports `parseInt(literal, radix)` calls that
+// could be written as an ES2015+ numeric literal (binary `0b…`, octal
+// `0o…`, hex `0x…`). The literal form is shorter, type-safe, and not
+// subject to runtime radix mismatches.
+// https://eslint.org/docs/latest/rules/prefer-numeric-literals
+type preferNumericLiterals struct{}
+
+func (preferNumericLiterals) Name() string { return "prefer-numeric-literals" }
+func (preferNumericLiterals) Visits() []shimast.Kind {
+	return []shimast.Kind{shimast.KindCallExpression}
+}
+func (preferNumericLiterals) Check(ctx *Context, node *shimast.Node) {
+	call := node.AsCallExpression()
+	if call == nil || call.Expression == nil || call.Arguments == nil {
+		return
+	}
+	calleeName := identifierText(call.Expression)
+	if calleeName != "parseInt" && calleeName != "Number" {
+		return
+	}
+	args := call.Arguments.Nodes
+	if calleeName == "parseInt" && len(args) != 2 {
+		return
+	}
+	if calleeName == "Number" && len(args) != 1 {
+		return
+	}
+	first := stripParens(args[0])
+	if first == nil || first.Kind != shimast.KindStringLiteral {
+		return
+	}
+	if calleeName == "parseInt" {
+		radix := stripParens(args[1])
+		if radix == nil || radix.Kind != shimast.KindNumericLiteral {
+			return
+		}
+		switch numericLiteralText(radix) {
+		case "2", "8", "16":
+			ctx.Report(node, "Use a numeric literal (`0b…` / `0o…` / `0x…`) instead of `parseInt(\""+stringLiteralText(first)+"\", "+numericLiteralText(radix)+")`.")
+		}
+	}
+}
+
 func init() {
 	Register(noArrayForEach{})
 	Register(noExtraneousClass{})
 	Register(noInvalidVoidType{})
+	Register(explicitMemberAccessibility{})
+	Register(consistentGenericConstructors{})
+	Register(preferNumericLiterals{})
 }

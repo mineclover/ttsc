@@ -88,6 +88,16 @@ export interface ITtscLintTypeScriptRules {
   "typescript/consistent-type-assertions"?: TtscLintRuleSetting;
 
   /**
+   * Reject the redundant pattern where a variable is annotated with a
+   * generic type AND the same generic arguments are repeated on the
+   * constructor: `const m: Map<K, V> = new Map<K, V>()`. One of the
+   * two type-argument lists carries the binding; stating both is noise.
+   *
+   * @reference https://typescript-eslint.io/rules/consistent-generic-constructors
+   */
+  "typescript/consistent-generic-constructors"?: TtscLintRuleSetting;
+
+  /**
    * Enforce one consistent shape for object types.
    *
    * By default the rule prefers `interface` over `type` aliases for
@@ -104,6 +114,17 @@ export interface ITtscLintTypeScriptRules {
    * @reference https://typescript-eslint.io/rules/consistent-type-imports
    */
   "typescript/consistent-type-imports"?: TtscLintRuleSetting;
+
+  /**
+   * Require an explicit accessibility modifier (`public`, `private`,
+   * or `protected`) on every class member declaration. Implicit
+   * public is permitted by TypeScript but obscures intent — the
+   * modifier makes the encapsulation contract self-documenting.
+   * Members declared with the `#name` private-hash form are exempt.
+   *
+   * @reference https://typescript-eslint.io/rules/explicit-member-accessibility
+   */
+  "typescript/explicit-member-accessibility"?: TtscLintRuleSetting;
 
   /**
    * Prefer a function-property signature (`f: () => void`) over a

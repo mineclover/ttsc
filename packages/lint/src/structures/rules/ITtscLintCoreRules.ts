@@ -954,6 +954,15 @@ export interface ITtscLintCoreRules {
   "prefer-object-spread"?: TtscLintRuleSetting;
 
   /**
+   * Prefer ES2015+ numeric literal forms (`0b…`, `0o…`, `0x…`) over
+   * `parseInt(string, 2 | 8 | 16)`. The literal form is shorter, type-
+   * safe at lint time, and not subject to runtime radix mismatches.
+   *
+   * @reference https://eslint.org/docs/latest/rules/prefer-numeric-literals
+   */
+  "prefer-numeric-literals"?: TtscLintRuleSetting;
+
+  /**
    * Prefer spread arguments `f(...args)` over `f.apply(null, args)`.
    *
    * Only flags `apply` calls whose `this` argument is provably the

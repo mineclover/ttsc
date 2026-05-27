@@ -2,24 +2,25 @@ declare const names: string[];
 
 // Positive: the accumulator is annotated only via `as` on the initial
 // value — `reduce<T>(...)` would lock the accumulator type at the call
-// site instead.
-// expect: typescript/prefer-reduce-type-parameter error
+// site instead. The rule reports on the `as` expression itself, so the
+// expect annotation anchors to the initial-value line.
 const intoSet = names.reduce(
   (acc, name) => {
     acc.add(name);
     return acc;
   },
+  // expect: typescript/prefer-reduce-type-parameter error
   new Set<string>() as Set<string>,
 );
 
 // Positive: the same shape with a plain `as` cast on an object literal
 // initial value.
-// expect: typescript/prefer-reduce-type-parameter error
 const intoMap = names.reduce(
   (acc, name) => {
     acc[name] = name.length;
     return acc;
   },
+  // expect: typescript/prefer-reduce-type-parameter error
   {} as Record<string, number>,
 );
 

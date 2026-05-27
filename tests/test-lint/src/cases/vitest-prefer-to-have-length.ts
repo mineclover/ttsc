@@ -8,6 +8,7 @@ declare const beforeAll: any;
 declare const afterAll: any;
 declare const vi: any;
 declare const process: any;
+declare const items: any;
 // expect: vitest/prefer-to-have-length error
 test("length", () => {
   expect(items.length).toBe(3);

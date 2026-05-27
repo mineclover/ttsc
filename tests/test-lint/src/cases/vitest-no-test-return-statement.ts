@@ -8,6 +8,7 @@ declare const beforeAll: any;
 declare const afterAll: any;
 declare const vi: any;
 declare const process: any;
+declare const buildValue: any;
 // expect: vitest/no-test-return-statement error
 test("returns", () => {
   return buildValue();

@@ -8,6 +8,7 @@ declare const beforeAll: any;
 declare const afterAll: any;
 declare const vi: any;
 declare const process: any;
+declare const add: any;
 // expect: vitest/no-identical-title error
 describe("math", () => {
   test("adds", () => expect(add()).toBe(1));

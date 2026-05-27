@@ -9,8 +9,8 @@ const num: number = anyValue;
 const str: string = anyValue;
 
 // Positive: same hazard via a reassignment to a typed binding.
-// expect: typescript/no-unsafe-assignment error
 let label: string = "ok";
+// expect: typescript/no-unsafe-assignment error
 label = anyValue;
 
 // Negative: a properly typed initializer is fine.

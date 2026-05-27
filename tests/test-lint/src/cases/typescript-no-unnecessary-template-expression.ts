@@ -1,4 +1,4 @@
-declare const name: string;
+declare const label: string;
 declare const count: number;
 
 // Positive: a single string-literal interpolation collapses to the
@@ -7,9 +7,9 @@ declare const count: number;
 const a = `${"abc"}`;
 
 // Positive: a single string-typed interpolation with empty surrounding
-// text — `${name}` coerces a known-string value for no reason.
+// text — `${label}` coerces a known-string value for no reason.
 // expect: typescript/no-unnecessary-template-expression error
-const b = `${name}`;
+const b = `${label}`;
 
 // Positive: a no-substitution template literal with no escaped backticks
 // is just a regular string literal written in backtick form.
@@ -17,15 +17,15 @@ const b = `${name}`;
 const c = `plain text`;
 
 // Negative: surrounding head text forces the template form.
-const d = `prefix${name}`;
+const d = `prefix${label}`;
 
 // Negative: the interpolated value is a number — coercion is meaningful.
 const e = `${count}`;
 
 // Negative: multiple spans cannot collapse to a single literal.
-const f = `${name}-${count}`;
+const f = `${label}-${count}`;
 
 // Negative: tagged templates must preserve the raw payload for the tag.
-const g = String.raw`${name}`;
+const g = String.raw`${label}`;
 
 JSON.stringify({ a, b, c, d, e, f, g });

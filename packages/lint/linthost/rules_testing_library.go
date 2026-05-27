@@ -453,6 +453,9 @@ func (s *testingLibraryState) reportPromiseInFireEvent(ctx *Context) {
         if child.Kind == shimast.KindAwaitExpression {
           return true
         }
+        if child.Kind != shimast.KindCallExpression {
+          return false
+        }
         inner := child.AsCallExpression()
         return inner != nil && (s.isQueryCall(inner, queryAsync) || s.isAsyncUtilCall(inner) || s.isUserEventCall(inner))
       }) {
@@ -494,6 +497,9 @@ func (s *testingLibraryState) reportUnnecessaryAct(ctx *Context) {
     }
     callback := call.Arguments.Nodes[0]
     if containsNode(callback, func(child *shimast.Node) bool {
+      if child == nil || child.Kind != shimast.KindCallExpression {
+        return false
+      }
       inner := child.AsCallExpression()
       return inner != nil && (s.isRenderCall(child) || s.isFireEventCall(inner) || s.isUserEventCall(inner))
     }) {
@@ -516,6 +522,9 @@ func (s *testingLibraryState) reportWaitForMultipleAssertions(ctx *Context) {
 func (s *testingLibraryState) reportWaitForSideEffects(ctx *Context) {
   s.forEachWaitFor(func(_, body *shimast.Node) {
     if containsNode(body, func(child *shimast.Node) bool {
+      if child == nil || child.Kind != shimast.KindCallExpression {
+        return false
+      }
       call := child.AsCallExpression()
       if call == nil {
         return false
@@ -965,6 +974,9 @@ func containsNode(node *shimast.Node, match func(*shimast.Node) bool) bool {
 
 func containsCall(node *shimast.Node, match func(*shimast.CallExpression) bool) bool {
   return containsNode(node, func(child *shimast.Node) bool {
+    if child == nil || child.Kind != shimast.KindCallExpression {
+      return false
+    }
     call := child.AsCallExpression()
     return call != nil && match(call)
   })
@@ -973,6 +985,9 @@ func containsCall(node *shimast.Node, match func(*shimast.CallExpression) bool) 
 func countCalls(node *shimast.Node, match func(*shimast.CallExpression) bool) int {
   count := 0
   walkDescendants(node, func(child *shimast.Node) {
+    if child == nil || child.Kind != shimast.KindCallExpression {
+      return
+    }
     call := child.AsCallExpression()
     if call != nil && match(call) {
       count++

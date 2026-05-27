@@ -1,6 +1,6 @@
 declare const obj: { id: number };
 declare const maybe: string | null;
-declare const name: string;
+declare const label: string;
 declare const count: number;
 
 // expect: typescript/restrict-template-expressions error
@@ -13,6 +13,6 @@ const c = `value=${undefined}`;
 const d = `value=${maybe}`;
 
 // String / number / boolean / bigint interpolations are fine.
-const e = `${name}-${count}-${true}-${1n}`;
+const e = `${label}-${count}-${true}-${1n}`;
 
 JSON.stringify({ a, b, c, d, e });

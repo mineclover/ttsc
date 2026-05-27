@@ -8,6 +8,8 @@ declare const beforeAll: any;
 declare const afterAll: any;
 declare const vi: any;
 declare const process: any;
+declare const ready: any;
+declare const value: any;
 // expect: vitest/no-conditional-expect error
 it("checks conditionally", () => {
   if (ready) {

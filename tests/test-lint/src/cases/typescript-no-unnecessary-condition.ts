@@ -1,6 +1,10 @@
 declare const obj: { value: number };
 declare const maybe: { value: number } | null;
 declare const dyn: string;
+declare const alwaysNull: null;
+declare const emptyString: "";
+declare const zero: 0;
+declare const ready: "ready";
 declare function sideEffect(value: unknown): void;
 
 // Positive: a non-nullable object in `if` is always truthy.
@@ -9,29 +13,33 @@ if (obj) {
   sideEffect(obj);
 }
 
-// Positive: `null` literal in a ternary is always falsy.
+// Positive: a `null`-typed binding in a ternary is always falsy. The
+// literal `null` would be pre-flagged by the type-checker as TS2873, so
+// we route the value through a named declaration to keep the rule the
+// sole reporter.
 // expect: typescript/no-unnecessary-condition error
-const fromNull = null ? "yes" : "no";
+const fromNull = alwaysNull ? "yes" : "no";
 
-// Positive: `""` in a `while` is always falsy.
+// Positive: an `""`-typed binding in a `while` is always falsy.
 // expect: typescript/no-unnecessary-condition error
-while ("") {
+while (emptyString) {
   break;
 }
 
-// Positive: `0` in a `do ... while` is always falsy.
+// Positive: a `0`-typed binding in a `do ... while` is always falsy.
 // expect: typescript/no-unnecessary-condition error
 do {
   break;
-} while (0);
+} while (zero);
 
 // Positive: `!` on a non-nullable object — always-truthy operand.
 // expect: typescript/no-unnecessary-condition error
 const negated = !obj;
 
-// Positive: `&&` left operand is a non-empty string literal — always truthy.
+// Positive: `&&` left operand is a non-empty string-literal binding —
+// always truthy.
 // expect: typescript/no-unnecessary-condition error
-const guarded = "ready" && sideEffect("go");
+const guarded = ready && sideEffect("go");
 
 // Negative: nullable object — `obj` could be `null`, the guard is meaningful.
 if (maybe) {

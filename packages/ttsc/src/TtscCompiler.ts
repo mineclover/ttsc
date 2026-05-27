@@ -246,6 +246,7 @@ function runProject(task: () => ProjectResult): ITtscCompilerResult {
   } catch (error) {
     return {
       error: normalizeError(error),
+      kind: classifyException(error),
       type: "exception",
     };
   }
@@ -259,9 +260,37 @@ function runTransformation(
   } catch (error) {
     return {
       error: normalizeError(error),
+      kind: classifyException(error),
       type: "exception",
     };
   }
+}
+
+/**
+ * Best-effort classifier for the `kind` field of `IException`. The error
+ * messages thrown inside this package follow stable prefixes — plugin build
+ * failures start with `ttsc-plugin:` (buildSourcePlugin.ts), tsconfig /
+ * project setup failures start with `ttsc:` (readProjectConfig.ts), and Go
+ * toolchain failures share the `goToolchainNotFoundMessage` envelope.
+ * Anything else falls back to `"unknown"` so embedders always see the field
+ * set per the documented contract.
+ */
+function classifyException(
+  error: unknown,
+): "plugin" | "host" | "unknown" {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+  if (/^ttsc-plugin:|plugin build|go toolchain/i.test(message)) {
+    return "plugin";
+  }
+  if (/^ttsc:|tsconfig|extended tsconfig|TypeScript-Go/i.test(message)) {
+    return "host";
+  }
+  return "unknown";
 }
 
 function toCompilerResult(project: ProjectResult): ITtscCompilerResult {

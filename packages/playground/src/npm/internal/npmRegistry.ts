@@ -218,8 +218,13 @@ export function enqueuePackageDependencies(
   )) {
     const optional =
       packageJson.peerDependenciesMeta?.[name]?.optional === true;
+    // Truly optional peers (peerDependenciesMeta[name].optional === true)
+    // are never enqueued. Required peers MUST propagate optional: false so
+    // a 404 on the registry surfaces as an install failure instead of a
+    // silent skip that leaves the wasm-side compile reporting a generic
+    // "Cannot find module" with no breadcrumb back to the dep installer.
     if (!optional && isRegistryRange(range))
-      enqueue({ name, range, optional: true });
+      enqueue({ name, range, optional: false });
   }
 }
 

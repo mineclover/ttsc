@@ -87,19 +87,25 @@ export function createWorkerCompiler(
     compilerOptions: extraCompilerOptions,
   });
 
+  // Cache the boot promise across calls. If the boot rejects we clear the
+  // cache so the next call retries — otherwise every later compile/bundle/
+  // lint would replay the same rejection forever (page reload required).
+  // Mirrors the createCompilerClient (UI-side) pattern.
   let boot: Promise<IBootResult> | null = null;
   function getBoot(): Promise<IBootResult> {
-    if (!boot) {
-      boot = (async () => {
-        const result = await bootTtsc({
-          wasmUrl: options.wasmUrl,
-          wasmExecUrl: options.wasmExecUrl,
-          apiName: options.apiName,
-        });
-        if (typiaPlugin?.mount) await typiaPlugin.mount(result.host);
-        return result;
-      })();
-    }
+    if (boot) return boot;
+    boot = (async () => {
+      const result = await bootTtsc({
+        wasmUrl: options.wasmUrl,
+        wasmExecUrl: options.wasmExecUrl,
+        apiName: options.apiName,
+      });
+      if (typiaPlugin?.mount) await typiaPlugin.mount(result.host, workDir);
+      return result;
+    })().catch((err) => {
+      boot = null;
+      throw err;
+    });
     return boot;
   }
 

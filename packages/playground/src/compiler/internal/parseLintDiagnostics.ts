@@ -5,7 +5,12 @@ import type { ICompilerService } from "../../structures/ICompilerService";
 // so the matcher works on the exact text rendered in the Lint tab.
 const LINT_LINE_REGEXP =
   /([^\s:]+):(\d+):(\d+)\s+-\s+(error|warning)\s+TS(\d+):\s+(?:\[([^\]]+)\]\s+)?(.*)$/;
-const ANSI_REGEXP = /\[[0-9;]*m/g;
+// Strip real ANSI SGR sequences, which always start with ESC (0x1b). The
+// leading ESC byte is required — `/\[[0-9;]*m/g` would also chew innocuous
+// substrings like "[m" or "[0;1m" inside diagnostic messages, and would
+// fail to actually strip the ESC bytes tsgo writes, leaving the
+// LINT_LINE_REGEXP unable to anchor on the filename column.
+const ANSI_REGEXP = /\x1b\[[0-9;]*m/g;
 
 /**
  * Parse the lint plugin's stderr (tsgo-style pretty diagnostics) into the

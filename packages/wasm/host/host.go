@@ -27,6 +27,10 @@ var (
   date    = "unknown"
 )
 
+// exposed gates Expose so a duplicate call panics instead of leaking the
+// previous batch of js.Funcs + spawning a second keepalive goroutine.
+var exposed atomic.Bool
+
 // API stability: experimental until v1.0; signatures may change between
 // minor releases. Pin exact versions in production playgrounds.
 //
@@ -48,6 +52,13 @@ var (
 // A matching readiness resolver is invoked: `globalThis[`${apiName}Ready`]`.
 // JS callers register this BEFORE go.run begins so they can await wasm boot.
 func Expose(apiName string, cfg Config) {
+  // Refuse double-Expose: the second call would leak every js.FuncOf from
+  // the first batch (Go pins js.Funcs and they're not GC'd), spin a second
+  // keepalive goroutine forever, and overwrite the ready resolver so JS
+  // may await against a different generation than the api globals.
+  if !exposed.CompareAndSwap(false, true) {
+    panic("host.Expose: must be called at most once per wasm instance")
+  }
   plugins := map[string]Plugin{}
   pluginNames := make([]string, 0, len(cfg.Plugins))
   for _, p := range cfg.Plugins {

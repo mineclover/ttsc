@@ -180,6 +180,10 @@ func jsSnapshot(this js.Value, args []js.Value) any {
 // `released=false` indicates the handle was not present (already released or
 // never created). The endpoint never errors on unknown handles so callers can
 // release idempotently.
+//
+// Holds the write lock for the full delete+Close so any in-flight read
+// (withSnapshot's RLock) finishes before the Program is closed. This is the
+// pair of the TOCTOU guarantee documented on withSnapshot.
 func jsReleaseSnapshot(this js.Value, args []js.Value) any {
 	opts := optionsArg(args)
 	return makePromise(func() any {
@@ -188,16 +192,20 @@ func jsReleaseSnapshot(this js.Value, args []js.Value) any {
 			return errorResponse(2, "host.releaseSnapshot: \"handle\" is required")
 		}
 		snapshotsMu.Lock()
+		defer snapshotsMu.Unlock()
 		entry, ok := snapshots[handle]
-		if ok {
-			delete(snapshots, handle)
-		}
-		snapshotsMu.Unlock()
 		if !ok {
 			return fountainOK(ReleaseSnapshotResult{Released: false})
 		}
+		delete(snapshots, handle)
 		if entry.prog != nil {
-			_ = entry.prog.Close()
+			// Recover from any panic inside Close so the rest of the wasm
+			// instance survives; the entry has already been removed from
+			// the table so the handle is effectively released either way.
+			func() {
+				defer func() { _ = recover() }()
+				_ = entry.prog.Close()
+			}()
 		}
 		return fountainOK(ReleaseSnapshotResult{Released: true})
 	})
@@ -221,12 +229,7 @@ func jsListSnapshots(this js.Value, args []js.Value) any {
 // declaration source files in the program, keyed by project-relative path
 // (same convention as build/transform output).
 func jsGetSourceFiles(this js.Value, args []js.Value) any {
-	opts := optionsArg(args)
-	return makePromise(func() any {
-		entry, errResp := resolveSnapshot(opts)
-		if errResp != nil {
-			return errResp
-		}
+	return withSnapshot(args, func(entry *snapshotEntry, _ js.Value) any {
 		files := entry.prog.SourceFiles()
 		out := make([]string, 0, len(files))
 		for _, f := range files {
@@ -240,12 +243,7 @@ func jsGetSourceFiles(this js.Value, args []js.Value) any {
 // current source text the Program is holding for the file. After transform
 // plugins have run, this reflects the post-transform text.
 func jsGetSourceFileText(this js.Value, args []js.Value) any {
-	opts := optionsArg(args)
-	return makePromise(func() any {
-		entry, errResp := resolveSnapshot(opts)
-		if errResp != nil {
-			return errResp
-		}
+	return withSnapshot(args, func(entry *snapshotEntry, opts js.Value) any {
 		path := stringProp(opts, "path")
 		if path == "" {
 			return errorResponse(2, "host.getSourceFileText: \"path\" is required")
@@ -262,12 +260,7 @@ func jsGetSourceFileText(this js.Value, args []js.Value) any {
 // diagnostic shape as build/check/transform. When `file` is set, results are
 // filtered to that project-relative path.
 func jsGetDiagnostics(this js.Value, args []js.Value) any {
-	opts := optionsArg(args)
-	return makePromise(func() any {
-		entry, errResp := resolveSnapshot(opts)
-		if errResp != nil {
-			return errResp
-		}
+	return withSnapshot(args, func(entry *snapshotEntry, opts js.Value) any {
 		filter := stringProp(opts, "file")
 		diags := entry.prog.Diagnostics()
 		out := make([]CompileDiagnostic, 0, len(diags))
@@ -294,16 +287,7 @@ func jsGetDiagnostics(this js.Value, args []js.Value) any {
 // should resolve it to a byte offset before calling (the @ttsc/playground
 // helper does this).
 func jsGetNodeAtPosition(this js.Value, args []js.Value) any {
-	opts := optionsArg(args)
-	return makePromise(func() any {
-		entry, errResp := resolveSnapshot(opts)
-		if errResp != nil {
-			return errResp
-		}
-		file, pos, errResp := resolveSnapshotPosition(entry, opts)
-		if errResp != nil {
-			return errResp
-		}
+	return withSnapshotPosition(args, func(_ *snapshotEntry, file *ast.SourceFile, pos int) any {
 		node := ast.GetNodeAtPosition(file, pos, false)
 		return fountainOK(GetNodeAtPositionResult{Node: nodeInfoOf(node)})
 	})
@@ -314,16 +298,7 @@ func jsGetNodeAtPosition(this js.Value, args []js.Value) any {
 // pinned single checker for its type. Returns `{type: null}` when there is no
 // node at that position or no checker is available.
 func jsGetTypeAtPosition(this js.Value, args []js.Value) any {
-	opts := optionsArg(args)
-	return makePromise(func() any {
-		entry, errResp := resolveSnapshot(opts)
-		if errResp != nil {
-			return errResp
-		}
-		file, pos, errResp := resolveSnapshotPosition(entry, opts)
-		if errResp != nil {
-			return errResp
-		}
+	return withSnapshotPosition(args, func(entry *snapshotEntry, file *ast.SourceFile, pos int) any {
 		node := ast.GetNodeAtPosition(file, pos, false)
 		if node == nil || entry.prog.Checker == nil {
 			return fountainOK(GetTypeAtPositionResult{Type: nil})
@@ -345,16 +320,7 @@ func jsGetTypeAtPosition(this js.Value, args []js.Value) any {
 // Returns `{symbol: null}` when the node at position has no associated
 // symbol (e.g. punctuation, whitespace).
 func jsGetSymbolAtPosition(this js.Value, args []js.Value) any {
-	opts := optionsArg(args)
-	return makePromise(func() any {
-		entry, errResp := resolveSnapshot(opts)
-		if errResp != nil {
-			return errResp
-		}
-		file, pos, errResp := resolveSnapshotPosition(entry, opts)
-		if errResp != nil {
-			return errResp
-		}
+	return withSnapshotPosition(args, func(entry *snapshotEntry, file *ast.SourceFile, pos int) any {
 		node := ast.GetNodeAtPosition(file, pos, false)
 		if node == nil || entry.prog.Checker == nil {
 			return fountainOK(GetSymbolAtPositionResult{Symbol: nil})
@@ -367,44 +333,57 @@ func jsGetSymbolAtPosition(this js.Value, args []js.Value) any {
 	})
 }
 
-// resolveSnapshot reads {handle} from opts and looks up the entry. The
-// returned errResp is non-nil when the caller should propagate it as the
-// promise result.
-func resolveSnapshot(opts js.Value) (*snapshotEntry, any) {
-	handle := stringProp(opts, "handle")
-	if handle == "" {
-		return nil, errorResponse(2, "host: \"handle\" is required")
-	}
-	snapshotsMu.RLock()
-	entry := snapshots[handle]
-	snapshotsMu.RUnlock()
-	if entry == nil {
-		return nil, errorResponse(2, fmt.Sprintf("host: snapshot %q not found (already released or never created)", handle))
-	}
-	return entry, nil
+// withSnapshot is the shared envelope for every read-only fountain verb. It
+// parses the JS arg, resolves the handle, and runs `fn` under the snapshot
+// table's read lock — so a concurrent jsReleaseSnapshot's write lock waits
+// for the in-flight operation to finish before it can prog.Close(). This
+// is the lifecycle guarantee that prevents the prior TOCTOU window between
+// "found the entry" and "used entry.prog".
+func withSnapshot(args []js.Value, fn func(*snapshotEntry, js.Value) any) any {
+	opts := optionsArg(args)
+	return makePromise(func() any {
+		handle := stringProp(opts, "handle")
+		if handle == "" {
+			return errorResponse(2, "host: \"handle\" is required")
+		}
+		snapshotsMu.RLock()
+		defer snapshotsMu.RUnlock()
+		entry := snapshots[handle]
+		if entry == nil {
+			return errorResponse(2, fmt.Sprintf("host: snapshot %q not found (already released or never created)", handle))
+		}
+		return fn(entry, opts)
+	})
 }
 
-// resolveSnapshotPosition reads {path, position} and finds the matching
-// SourceFile from the snapshot. Returns the file and byte offset, or an
-// error response.
-func resolveSnapshotPosition(entry *snapshotEntry, opts js.Value) (*ast.SourceFile, int, any) {
-	path := stringProp(opts, "path")
-	if path == "" {
-		return nil, 0, errorResponse(2, "host: \"path\" is required")
-	}
-	posVal := opts.Get("position")
-	if posVal.Type() != js.TypeNumber {
-		return nil, 0, errorResponse(2, "host: \"position\" must be a number (byte offset)")
-	}
-	pos := posVal.Int()
-	if pos < 0 {
-		return nil, 0, errorResponse(2, "host: \"position\" must be non-negative")
-	}
-	file := resolveSnapshotFile(entry, path)
-	if file == nil {
-		return nil, 0, errorResponse(2, fmt.Sprintf("host: file %q not found in snapshot", path))
-	}
-	return file, pos, nil
+// withSnapshotPosition is the shared envelope for the 3 position-bound
+// fountain verbs. Same read-lock lifecycle as withSnapshot, plus parses
+// {path, position} and bounds-checks position against the file length so an
+// out-of-range offset reaches `ast.GetNodeAtPosition` only as a clean
+// error response instead of an internal panic.
+func withSnapshotPosition(args []js.Value, fn func(*snapshotEntry, *ast.SourceFile, int) any) any {
+	return withSnapshot(args, func(entry *snapshotEntry, opts js.Value) any {
+		path := stringProp(opts, "path")
+		if path == "" {
+			return errorResponse(2, "host: \"path\" is required")
+		}
+		posVal := opts.Get("position")
+		if posVal.Type() != js.TypeNumber {
+			return errorResponse(2, "host: \"position\" must be a number (byte offset)")
+		}
+		pos := posVal.Int()
+		if pos < 0 {
+			return errorResponse(2, "host: \"position\" must be non-negative")
+		}
+		file := resolveSnapshotFile(entry, path)
+		if file == nil {
+			return errorResponse(2, fmt.Sprintf("host: file %q not found in snapshot", path))
+		}
+		if pos > len(file.Text()) {
+			return errorResponse(2, fmt.Sprintf("host: \"position\" %d exceeds file length %d", pos, len(file.Text())))
+		}
+		return fn(entry, file, pos)
+	})
 }
 
 // resolveSnapshotFile finds a SourceFile by path, accepting either an

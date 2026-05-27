@@ -13,8 +13,14 @@ import { installTypiaSourcePack } from "./installTypiaSourcePack";
  */
 export function createTypiaSourcePackMount(
   options: IInstallTypiaSourcePackOptions,
-): (host: IMemFSHost) => Promise<void> {
-  return async (host: IMemFSHost) => {
-    await installTypiaSourcePack(host, options);
+): (host: IMemFSHost, workDir: string) => Promise<void> {
+  return async (host: IMemFSHost, workDir: string) => {
+    // Honor the caller's workDir when the site did not pin mountRoot
+    // explicitly. Otherwise a `createWorkerCompiler({workDir: '/foo'})`
+    // would still mount typia under `/work/node_modules/` and tsgo would
+    // never resolve `typia` from the project root.
+    const mountRoot =
+      options.mountRoot ?? `${workDir.replace(/\/+$/, "")}/node_modules`;
+    await installTypiaSourcePack(host, { ...options, mountRoot });
   };
 }

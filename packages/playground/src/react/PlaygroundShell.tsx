@@ -91,6 +91,12 @@ export function PlaygroundShell({
   const installedDependencyNames = useRef<Set<string>>(
     new Set<string>(preinstalledPackages),
   );
+  // Accumulated runtime-file map produced by every successful
+  // installPlaygroundDependencies call. Threaded through to executeBundle so
+  // the in-page Execute sandbox's require can resolve any npm package the
+  // user installed (without it, `import {v4} from "uuid"` compiles fine but
+  // Execute throws because the worker mounts uuid into the wasm MemFS only).
+  const runtimeDependencyFiles = useRef<Record<string, string>>({});
   const sourceVersion = useRef(0);
   const latestSource = useRef(source);
   // Race guard: every `run` call bumps this epoch; only the call whose epoch
@@ -207,6 +213,12 @@ export function PlaygroundShell({
               ...installed.editorLibs,
             }));
           }
+          // Accumulate runtime files so the in-page Execute sandbox can
+          // resolve every package the user installed across this session.
+          runtimeDependencyFiles.current = {
+            ...runtimeDependencyFiles.current,
+            ...installed.runtimeFiles,
+          };
           dependencyProgressTimer.current = window.setTimeout(() => {
             setDependencyProgress(null);
             setDependencyPackageNames([]);
@@ -285,8 +297,18 @@ export function PlaygroundShell({
         void mode;
       } catch (err) {
         if (runEpoch.current !== epoch) return;
-        setBootError(err);
-        setBootPhase("failed");
+        // Surface the error in the diagnostics pane via an error result —
+        // a transient compile/lint/install rejection (tgrid timeout,
+        // message-channel disconnect) must NOT tear the playground into
+        // the fatal boot-error screen and force a worker rebuild. Only
+        // the eager boot useEffect at line 130 may flip bootPhase to
+        // "failed".
+        setResult({
+          type: "error",
+          target: "javascript",
+          value: normalizeClientError(err),
+        });
+        setLintDiagnostics([]);
       } finally {
         if (runEpoch.current === epoch) setRunning(false);
       }
@@ -357,10 +379,15 @@ export function PlaygroundShell({
 
   const onExecute = useCallback(async () => {
     if (!executeBundle) return;
+    // Bump the run epoch so a second Execute click (or an edit that
+    // started a compile) invalidates the in-flight pipeline; later state
+    // writes from the previous run are gated on this epoch matching.
+    const epoch = ++runEpoch.current;
     setExecuting(true);
     setBundleError(null);
     const messages: IConsoleMessage[] = [];
     const push = (type: IConsoleMessage["type"], args: unknown[]) => {
+      if (runEpoch.current !== epoch) return;
       messages.push({ type, value: args });
       setConsoleMessages([...messages]);
     };
@@ -369,12 +396,14 @@ export function PlaygroundShell({
         source,
         sourceVersion.current,
       );
+      if (runEpoch.current !== epoch) return;
       if (dependencyError) {
         push("error", [dependencyError]);
         return;
       }
       const service = await createCompilerService();
       const compiled = await service.bundle({ source, options });
+      if (runEpoch.current !== epoch) return;
       if (compiled.type === "error") {
         const message =
           typeof compiled.value === "string"
@@ -396,14 +425,18 @@ export function PlaygroundShell({
         table: (...args: unknown[]) => push("table", args),
       };
       try {
-        await executeBundle(code, { console: sandboxConsole });
+        await executeBundle(code, {
+          console: sandboxConsole,
+          runtimeFiles: runtimeDependencyFiles.current,
+        });
       } catch (error) {
         push("error", [error]);
       }
     } catch (error) {
+      if (runEpoch.current !== epoch) return;
       push("error", [error]);
     } finally {
-      setExecuting(false);
+      if (runEpoch.current === epoch) setExecuting(false);
     }
   }, [
     createCompilerService,

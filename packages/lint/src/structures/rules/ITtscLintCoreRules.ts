@@ -21,6 +21,39 @@ import type { TtscLintRuleSetting } from "../TtscLintRuleSetting";
  */
 export interface ITtscLintCoreRules {
   /**
+   * Require `switch` statements to include a `default` clause.
+   *
+   * A switch without `default` silently drops every discriminant value
+   * that no `case` label matched. The rule forces the catch-all branch
+   * to be written out so unhandled cases become an intentional decision
+   * instead of a hidden fall-through.
+   *
+   * @reference https://eslint.org/docs/latest/rules/default-case
+   */
+  "default-case"?: TtscLintRuleSetting;
+
+  /**
+   * Require the `default` clause of a `switch` statement to appear
+   * after every explicit `case` label.
+   *
+   * Placing `default` ahead of a `case` reverses the visual order of
+   * the labels and changes the fall-through path — running `default`
+   * and then falling into the next `case` is almost always a
+   * misordering rather than intent.
+   *
+   * @reference https://eslint.org/docs/latest/rules/default-case-last
+   */
+  "default-case-last"?: TtscLintRuleSetting;
+
+  /**
+   * Reject functions where some `return` statements return a value and
+   * others (explicit bare `return;` or implicit fall-through) do not.
+   *
+   * @reference https://eslint.org/docs/latest/rules/consistent-return
+   */
+  "consistent-return"?: TtscLintRuleSetting;
+
+  /**
    * Reject `(req, opt = 1, req2)` and similar parameter lists where a
    * required parameter follows an optional or default-valued one.
    *
@@ -71,6 +104,51 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/getter-return
    */
   "getter-return"?: TtscLintRuleSetting;
+
+  /**
+   * Require the `get` and `set` accessors of a single property to be
+   * declared adjacent in the class body.
+   *
+   * When the read and write halves of a property are split apart by
+   * unrelated members, a reader scanning the class has to chase the
+   * pair across the body — and patches to one half are easy to make
+   * without noticing the other.
+   *
+   * @reference https://eslint.org/docs/latest/rules/grouped-accessor-pairs
+   */
+  "grouped-accessor-pairs"?: TtscLintRuleSetting;
+
+  /**
+   * Require the body of every `for (key in obj)` loop to begin with a
+   * guard against inherited keys: `Object.hasOwn(obj, key)` or the
+   * older `Object.prototype.hasOwnProperty.call(obj, key)`. The
+   * inverted-guard early-skip shape `if (!Object.hasOwn(...))
+   * continue;` is also accepted.
+   *
+   * Without the guard the loop processes every enumerable name on the
+   * prototype chain — including monkey-patches someone else attached
+   * to `Object.prototype` — so an unguarded body silently leaks work
+   * onto inherited entries.
+   *
+   * @reference https://eslint.org/docs/latest/rules/guard-for-in
+   */
+  "guard-for-in"?: TtscLintRuleSetting;
+
+  /**
+   * Reject function declarations whose parameter list grows beyond
+   * three. Long parameter lists are hard to read at the call site
+   * because positional arguments lose their names; folding them into
+   * an options object recovers the names and lets callers pass a
+   * subset.
+   *
+   * Every function-like declaration is checked: function declarations,
+   * function expressions, arrow functions, methods, accessors, and
+   * constructors. The threshold is fixed at three to match the ESLint
+   * default; rule options are deferred.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-params
+   */
+  "max-params"?: TtscLintRuleSetting;
 
   /**
    * Reject calls to `alert`, `confirm`, and `prompt`.
@@ -337,6 +415,22 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/no-empty-function
    */
   "no-empty-function"?: TtscLintRuleSetting;
+
+  /**
+   * Reject empty named import or export clauses — `import {} from "x"`,
+   * `import name, {} from "x"`, and `export {}` — which bind nothing.
+   *
+   * The empty-only import shape leaves just the side-effect load and is
+   * better written as `import "x"`; the default-plus-empty form should
+   * drop the empty clause; and a bare `export {}` either restates
+   * module-ness redundantly or marks an otherwise non-module file in
+   * a way that has cleaner alternatives. The stricter sibling rule
+   * `typescript/no-useless-empty-export` fires only when another
+   * module-syntax statement is already present.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-empty-named-blocks
+   */
+  "no-empty-named-blocks"?: TtscLintRuleSetting;
 
   /**
    * Reject empty destructuring patterns (`const {} = obj`, `function
@@ -770,6 +864,14 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/no-setter-return
    */
   "no-setter-return"?: TtscLintRuleSetting;
+
+  /**
+   * Reject a variable declaration that shadows a same-name binding in
+   * an enclosing scope.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-shadow
+   */
+  "no-shadow"?: TtscLintRuleSetting;
 
   /**
    * Reject redeclaring restricted globals (`NaN`, `Infinity`,

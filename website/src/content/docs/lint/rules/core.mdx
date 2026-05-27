@@ -4,11 +4,16 @@ Generic ESLint-compatible rules that apply to both JavaScript and TypeScript sou
 
 Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 
+- `default-case` — Require `switch` statements to include a `default` clause so unhandled discriminants surface explicitly instead of silently falling through.
+- `default-case-last` — Require the `default` clause of a `switch` statement to appear last, so the fall-through path matches the visual order of the labels.
 - `default-param-last` — Reject `(req, opt = 1, req2)` and similar parameter lists where a required parameter follows an optional or default-valued one.
 - `dot-notation` — Prefer dot access (`obj.value`) over bracket access (`obj["value"]`) when the string key is a valid JavaScript identifier.
 - `eqeqeq` — Require strict equality operators `===` / `!==` over `==` / `!=`.
 - `for-direction` — Reject `for` statements whose update clause moves the counter away from the termination condition, such as `for (let i = 0; i < 10; i--)`.
 - `getter-return` — Require a `get` accessor's body to return a value on every reachable exit.
+- `grouped-accessor-pairs` — Require the `get` and `set` accessors of a single property to be declared adjacent in the class body so readers see the read/write pair together.
+- `guard-for-in` — Require `for (key in obj)` bodies to immediately guard against inherited keys with `Object.hasOwn(obj, key)` or `Object.prototype.hasOwnProperty.call(obj, key)`, so the loop body never silently processes a prototype-chain entry.
+- `max-params` — Reject function declarations whose parameter list grows beyond three, since long parameter lists usually want to be folded into an options object.
 - `no-alert` — Reject calls to `alert`, `confirm`, and `prompt`.
 - `no-array-constructor` — Reject `Array(...)` and `new Array(...)` constructor calls in favor of array literals.
 - `no-async-promise-executor` — Reject `new Promise(async (resolve, reject) => { ... })`.
@@ -35,6 +40,7 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 - `no-empty` — Reject empty blocks (`if (x) {}`, `while (x) {}`, `try {} catch (e) {}` etc.) that almost always indicate forgotten code.
 - `no-empty-character-class` — Reject empty regex character classes (`[]`).
 - `no-empty-function` — Reject empty function and method bodies (`function f() {}`, `() => {}`).
+- `no-empty-named-blocks` — Reject empty named import/export clauses (`import {} from "x"`, `import name, {} from "x"`, `export {}`), which bind nothing and either dead-load the module or restate module-ness redundantly.
 - `no-empty-pattern` — Reject empty destructuring patterns (`const {} = obj`, `function f([]) {}`), which bind nothing and are usually mid-edit typos.
 - `no-empty-static-block` — Reject empty `static {}` class initialization blocks.
 - `no-eq-null` — Reject loose null comparisons (`x == null`).

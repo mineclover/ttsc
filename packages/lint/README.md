@@ -11,7 +11,7 @@
 
 A linter and formatter. Co-protagonist of the [`ttsc`](https://ttsc.dev) toolchain — paired with `ttsc`, it replaces `eslint` and `prettier`.
 
-470+ rules. Lint violations surface as `error TSxxxxx` from a single compile pass; the formatter applies via `ttsc format`.
+530+ rules. Lint violations surface as `error TSxxxxx` from a single compile pass; the formatter applies via `ttsc format`.
 
 ## Demonstration
 
@@ -166,6 +166,7 @@ Generic ESLint-compatible rules that apply to both JavaScript and TypeScript sou
 
 Source: [ESLint core rules](https://eslint.org/docs/latest/rules/).
 
+- [`consistent-return`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/consistent-return.ts): reject functions where some `return` statements return a value and others fall through without one.
 - [`default-param-last`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/default-param-last.ts): keeps parameters with default values at the end of the list.
 - [`dot-notation`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/dot-notation.ts): prefers dot property access when a string-literal key is a valid identifier.
 - [`eqeqeq`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/eqeqeq.ts): requires strict equality operators.

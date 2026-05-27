@@ -107,6 +107,18 @@ export interface ITtscLintReactRules {
   "react/jsx-no-target-blank"?: TtscLintRuleSetting;
 
   /**
+   * Reject JSX fragments that wrap exactly one element child or have
+   * no meaningful content — the child (or nothing) can be returned
+   * directly.
+   *
+   * Covers both the short `<>...</>` form and explicit
+   * `<Fragment>` / `<React.Fragment>` elements.
+   *
+   * @reference https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-useless-fragment.md
+   */
+  "react/jsx-no-useless-fragment"?: TtscLintRuleSetting;
+
+  /**
    * Reject `key={index}` patterns inside JSX lists — array index
    * keys reorder incorrectly on insertion.
    *

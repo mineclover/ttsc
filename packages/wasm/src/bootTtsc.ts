@@ -27,7 +27,24 @@ declare const importScripts: (...urls: string[]) => void;
 const bootsInFlight = new Map<string, Promise<IBootResult>>();
 
 function bootKey(apiName: string, wasmUrl: string): string {
-  return `${apiName}|${wasmUrl}`;
+  return `${apiName}|${resolveWasmUrl(wasmUrl)}`;
+}
+
+/**
+ * Resolve `wasmUrl` against the current document base before keying so
+ * that `./playground.wasm`, `/compiler/playground.wasm`, and the fully
+ * qualified absolute href all collapse to the same cache entry instead
+ * of spawning duplicate boots. Falls back to the raw string when no
+ * base is available (Node-side tests, non-DOM workers).
+ */
+function resolveWasmUrl(wasmUrl: string): string {
+  try {
+    const base =
+      typeof location !== "undefined" ? location.href : "http://local/";
+    return new URL(wasmUrl, base).href;
+  } catch {
+    return wasmUrl;
+  }
 }
 
 /**

@@ -35,7 +35,16 @@ import (
 
 // snapshotEntry pairs a Program with the cwd it was loaded against so we can
 // rewrite file paths to project-relative keys uniformly across all queries.
+//
+// `mu` serializes Checker-touching paths. driver.LoadProgram pins one
+// Checker via forceSingleChecker, and TypeScript-Go's Checker is not
+// documented thread-safe. On js/wasm cooperative scheduling normally
+// prevents two goroutines from running concurrently, but any Go→JS bridge
+// call (file read, Promise await) can yield mid-operation; without `mu`
+// two fountain verbs invoked in the same frame could land their Checker
+// reads on opposite sides of an internal mutation and corrupt state.
 type snapshotEntry struct {
+	mu   sync.Mutex
 	prog *driver.Program
 	cwd  string
 }
@@ -334,11 +343,16 @@ func jsGetSymbolAtPosition(this js.Value, args []js.Value) any {
 }
 
 // withSnapshot is the shared envelope for every read-only fountain verb. It
-// parses the JS arg, resolves the handle, and runs `fn` under the snapshot
-// table's read lock — so a concurrent jsReleaseSnapshot's write lock waits
-// for the in-flight operation to finish before it can prog.Close(). This
-// is the lifecycle guarantee that prevents the prior TOCTOU window between
-// "found the entry" and "used entry.prog".
+// parses the JS arg, resolves the handle, holds the snapshot table's read
+// lock + the per-entry mutex, and runs `fn`. Two layered locks:
+//
+//   - snapshotsMu (RLock): pairs with jsReleaseSnapshot's write lock so
+//     the entry's prog isn't Close()d under the caller. Closes the prior
+//     TOCTOU between "found the entry" and "used entry.prog".
+//   - entry.mu: serializes Checker-touching paths. TS-Go's Checker is
+//     single-instance (forceSingleChecker) and not documented
+//     thread-safe; two fountain verbs invoked in the same frame could
+//     otherwise interleave Checker state mutations.
 func withSnapshot(args []js.Value, fn func(*snapshotEntry, js.Value) any) any {
 	opts := optionsArg(args)
 	return makePromise(func() any {
@@ -352,6 +366,8 @@ func withSnapshot(args []js.Value, fn func(*snapshotEntry, js.Value) any) any {
 		if entry == nil {
 			return errorResponse(2, fmt.Sprintf("host: snapshot %q not found (already released or never created)", handle))
 		}
+		entry.mu.Lock()
+		defer entry.mu.Unlock()
 		return fn(entry, opts)
 	})
 }

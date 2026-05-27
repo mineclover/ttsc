@@ -182,11 +182,21 @@ export default config;
 ```css
 @import "tailwindcss";
 
-/* Tell Tailwind 4 to scan @ttsc/playground's compiled output for utility classes. */
-@source "../../node_modules/@ttsc/playground/lib/**/*.js";
+/* Tell Tailwind 4 to scan @ttsc/playground's compiled output for utility
+   classes. The package-name form delegates resolution to Node, so it
+   works under pnpm's symlinked layout, npm hoisting, yarn berry PnP,
+   and arbitrary monorepo depths — no need to spell the node_modules
+   path or worry about how deep the host site lives in the tree. */
+@source "@ttsc/playground";
 ```
 
 Then `import "./global.css"` from the root layout.
+
+**`@ttsc/playground` must be a direct dependency** of the consuming
+package. Tailwind 4's package-source resolution starts from the file
+declaring the `@source` directive and walks up; transitively-installed
+copies (where @ttsc/playground is only a dependency of another package)
+won't resolve cleanly.
 
 ## Booting a custom wasm
 

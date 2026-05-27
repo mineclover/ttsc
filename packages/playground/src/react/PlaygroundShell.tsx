@@ -112,6 +112,11 @@ export function PlaygroundShell({
   // compile but does not interrupt a click-driven Execute.
   const compileEpoch = useRef(0);
   const executeEpoch = useRef(0);
+  // Retry epoch: each Retry click bumps it; only the latest retry's
+  // async block is allowed to write boot state. Prior retries' bodies
+  // bail on epoch mismatch so a fast double-Retry can't leave a stale
+  // `setBootPhase("ready")` chasing a torn-down connection.
+  const retryEpoch = useRef(0);
 
   const mergedExtraLibs = useMemo(
     () => ({ ...staticEditorLibs, ...editorExtraLibs }),
@@ -387,6 +392,17 @@ export function PlaygroundShell({
     [],
   );
 
+  // Tear down the Worker (+ its wasm instance) when the component
+  // unmounts or workerUrl changes. Without this an SPA navigation away
+  // from the playground leaks one Worker per mount; a workerUrl swap
+  // leaks the previous Worker forever.
+  useEffect(
+    () => () => {
+      void client.reset();
+    },
+    [client],
+  );
+
   const onPickExample = useCallback(
     (id: string) => {
       const example = examples.find((e) => e.id === id);
@@ -418,9 +434,17 @@ export function PlaygroundShell({
       setConsoleMessages([...messages]);
     };
     try {
+      // Snapshot source + version atomically from the always-fresh refs.
+      // Reading `source` (React state) here can be stale within a batch
+      // — installDependenciesForSource would compare against the fresh
+      // ref and bail, while bundle would still run against the stale
+      // source so newly-needed deps stay un-mounted. latestSource is
+      // updated synchronously by updateSource alongside sourceVersion.
+      const currentSource = latestSource.current;
+      const currentVersion = sourceVersion.current;
       const dependencyError = await installDependenciesForSource(
-        source,
-        sourceVersion.current,
+        currentSource,
+        currentVersion,
       );
       if (executeEpoch.current !== epoch) return;
       if (dependencyError) {
@@ -428,7 +452,10 @@ export function PlaygroundShell({
         return;
       }
       const service = await createCompilerService();
-      const compiled = await service.bundle({ source, options });
+      const compiled = await service.bundle({
+        source: currentSource,
+        options,
+      });
       if (executeEpoch.current !== epoch) return;
       if (compiled.type === "error") {
         const message =
@@ -547,31 +574,26 @@ export function PlaygroundShell({
         </pre>
         <button
           onClick={() => {
-            let cancelled = false;
+            // Each click bumps retryEpoch; only the latest retry's body
+            // writes boot state. A double-click cancels the prior retry's
+            // pending writes so it can't flip bootPhase to "ready"
+            // against a connection the new retry has already torn down.
+            const epoch = ++retryEpoch.current;
             void (async () => {
               await client.reset();
-              if (cancelled) return;
+              if (retryEpoch.current !== epoch) return;
               setBootError(null);
               setBootPhase("booting");
               try {
                 await createCompilerService();
-                if (!cancelled) setBootPhase("ready");
+                if (retryEpoch.current !== epoch) return;
+                setBootPhase("ready");
               } catch (err) {
-                if (cancelled) return;
+                if (retryEpoch.current !== epoch) return;
                 setBootError(err);
                 setBootPhase("failed");
               }
             })();
-            // Cancel the in-flight retry when the user navigates away
-            // from the failure screen before it resolves; matches the
-            // eager-boot useEffect's cleanup at the top of the component.
-            window.addEventListener(
-              "beforeunload",
-              () => {
-                cancelled = true;
-              },
-              { once: true },
-            );
           }}
           className="px-5 py-2 text-xs font-mono text-neutral-900 bg-white rounded-md hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-shadow"
         >

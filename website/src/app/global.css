@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "nextra-theme-docs/style.css";
 
+/* Scan @ttsc/playground's compiled output so Tailwind 4 finds the utility
+   classes baked into the shared PlaygroundShell / SourceEditor / etc.
+   The package-name form delegates resolution to Node and works under
+   pnpm's symlinked layout regardless of monorepo depth. */
+@source "@ttsc/playground";
+
 /* ── Landing page: full-bleed canvas ── */
 :has(.ttsc-landing) article {
   max-width: 100% !important;

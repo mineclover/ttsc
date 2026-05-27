@@ -95,6 +95,18 @@ export interface ITtscLintCoreRules {
   "no-async-promise-executor"?: TtscLintRuleSetting;
 
   /**
+   * Reject `await` expressions evaluated inside a loop body. The loop
+   * runs strictly serially because each iteration blocks on the
+   * previous one's microtask hop; when the operations are independent
+   * the equivalent `Promise.all([…])` is dramatically faster. The rule
+   * intentionally exempts `for await … of` because the awaitable
+   * iterator is the loop's whole reason for existing.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-await-in-loop
+   */
+  "no-await-in-loop"?: TtscLintRuleSetting;
+
+  /**
    * Reject bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`, `>>>`).
    *
    * Bitwise operators are almost always typos for the logical operators
@@ -230,6 +242,17 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/no-dupe-args
    */
   "no-dupe-args"?: TtscLintRuleSetting;
+
+  /**
+   * Reject two declarations of the same member on a single class. The
+   * later declaration silently overwrites the earlier one at runtime;
+   * the syntax permits it but the result is never what the author
+   * intended. A getter and a setter for the same property coexist; an
+   * instance member and a static member with the same name coexist.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-dupe-class-members
+   */
+  "no-dupe-class-members"?: TtscLintRuleSetting;
 
   /**
    * Reject `if (a) {} else if (a) {}` — the second branch is
@@ -652,6 +675,17 @@ export interface ITtscLintCoreRules {
   "no-template-curly-in-string"?: TtscLintRuleSetting;
 
   /**
+   * Reject `this` (or `super.x`) references that precede the first
+   * `super()` call in a derived constructor. The runtime throws a
+   * ReferenceError on the first such access; catching it at lint time
+   * avoids a class of bugs that only surface after the constructor is
+   * actually called.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-this-before-super
+   */
+  "no-this-before-super"?: TtscLintRuleSetting;
+
+  /**
    * Reject throwing non-Error operands (`throw "boom"`, `throw 1`).
    *
    * @reference https://eslint.org/docs/latest/rules/no-throw-literal
@@ -837,6 +871,16 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/prefer-for-of
    */
   "prefer-for-of"?: TtscLintRuleSetting;
+
+  /**
+   * Prefer object-spread `{ ...a, ...b }` over `Object.assign({}, a, b)`.
+   * Only fires when the first argument is an empty object literal —
+   * mutating `Object.assign(target, …)` calls are left alone because
+   * the spread form does not preserve their observable side effects.
+   *
+   * @reference https://eslint.org/docs/latest/rules/prefer-object-spread
+   */
+  "prefer-object-spread"?: TtscLintRuleSetting;
 
   /**
    * Prefer spread arguments `f(...args)` over `f.apply(null, args)`.

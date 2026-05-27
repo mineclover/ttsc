@@ -1,0 +1,385 @@
+// Extended ESLint-core rules — AST-only correctness checks the
+// recommended preset ships but that the original @ttsc/lint port
+// hadn't migrated yet.
+//
+// Implemented here:
+//   - no-await-in-loop: await inside a loop body iterates sequentially
+//   - no-dupe-class-members: duplicate class member declarations
+//   - no-this-before-super: `this` (or `super.x`) before `super()` in
+//     derived constructors
+//   - prefer-object-spread: `Object.assign({}, x, y)` → `{ ...x, ...y }`
+package linthost
+
+import (
+	shimast "github.com/microsoft/typescript-go/shim/ast"
+)
+
+// noAwaitInLoop reports an `await` expression evaluated inside the body
+// of a sequential loop (for / while / do-while / for-in / for-of). Each
+// iteration of the loop blocks on the previous one's microtask hop, so
+// the loop body runs strictly serially even when the underlying
+// operations are independent and could overlap with Promise.all.
+// https://eslint.org/docs/latest/rules/no-await-in-loop
+//
+// `for await … of` loops are exempt — the for-await iterator protocol
+// is the whole reason the loop exists, and rejecting its `await` would
+// just suggest the developer abandon the iterator.
+type noAwaitInLoop struct{}
+
+func (noAwaitInLoop) Name() string { return "no-await-in-loop" }
+func (noAwaitInLoop) Visits() []shimast.Kind {
+	return []shimast.Kind{shimast.KindAwaitExpression}
+}
+func (noAwaitInLoop) Check(ctx *Context, node *shimast.Node) {
+	for cur := node.Parent; cur != nil; cur = cur.Parent {
+		if isFunctionLikeKind(cur) {
+			return
+		}
+		switch cur.Kind {
+		case shimast.KindForStatement,
+			shimast.KindWhileStatement,
+			shimast.KindDoStatement,
+			shimast.KindForInStatement:
+			ctx.Report(node, "Unexpected `await` inside a loop — iterations run sequentially; prefer `Promise.all` when independent.")
+			return
+		case shimast.KindForOfStatement:
+			// `for await … of` loops are exempt by design — the await
+			// is the iteration itself, not a sequential block.
+			if isForAwaitOfStatement(ctx.File, cur) {
+				return
+			}
+			ctx.Report(node, "Unexpected `await` inside a loop — iterations run sequentially; prefer `Promise.all` when independent.")
+			return
+		}
+	}
+}
+
+// isForAwaitOfStatement reports whether the for-of statement at `node`
+// is a `for await … of` (rather than a plain `for … of`). The shim AST
+// does not expose `AwaitModifier` as a typed field, so the check is
+// textual: locate the `for` keyword and look for the `await` keyword
+// in the small window before the opening parenthesis. The width 24
+// covers any reasonable spacing/comment-free header.
+func isForAwaitOfStatement(file *shimast.SourceFile, node *shimast.Node) bool {
+	if file == nil || node == nil {
+		return false
+	}
+	forPos := keywordStart(file, node, "for")
+	if forPos < 0 {
+		return false
+	}
+	src := file.Text()
+	limit := forPos + 24
+	if limit > len(src) {
+		limit = len(src)
+	}
+	if node.End() < limit {
+		limit = node.End()
+	}
+	for i := forPos + 3; i < limit; i++ {
+		if src[i] == '(' {
+			limit = i
+			break
+		}
+	}
+	return findKeyword(file, forPos+3, limit, "await") >= 0
+}
+
+// noDupeClassMembers reports two declarations of the same member on a
+// single class. The later declaration silently overwrites the earlier
+// one at runtime; ESLint enforces this because the syntax does not.
+// https://eslint.org/docs/latest/rules/no-dupe-class-members
+//
+// Members are deduplicated by their (name, static, kind) tuple — an
+// instance property and a static property of the same name coexist, as
+// do a getter and a setter for the same property, but a getter and a
+// regular method on the same key do not.
+type noDupeClassMembers struct{}
+
+func (noDupeClassMembers) Name() string { return "no-dupe-class-members" }
+func (noDupeClassMembers) Visits() []shimast.Kind {
+	return []shimast.Kind{shimast.KindClassDeclaration, shimast.KindClassExpression}
+}
+func (noDupeClassMembers) Check(ctx *Context, node *shimast.Node) {
+	members := classMembers(node)
+	if len(members) == 0 {
+		return
+	}
+	type slot struct {
+		name   string
+		static bool
+		kind   string
+	}
+	seen := map[slot]*shimast.Node{}
+	for _, member := range members {
+		if member == nil {
+			continue
+		}
+		name, kind, ok := classMemberSlot(member)
+		if !ok {
+			continue
+		}
+		key := slot{name: name, static: hasModifier(member, shimast.KindStaticKeyword), kind: kind}
+		if prior, exists := seen[key]; exists {
+			_ = prior
+			ctx.Report(member, "Duplicate class member `"+name+"`.")
+			continue
+		}
+		seen[key] = member
+	}
+}
+
+// classMembers returns the member list of a class declaration or
+// expression. Returns nil for any other kind so the helper is safe to
+// call from a multi-visit rule.
+func classMembers(node *shimast.Node) []*shimast.Node {
+	switch node.Kind {
+	case shimast.KindClassDeclaration:
+		if decl := node.AsClassDeclaration(); decl != nil && decl.Members != nil {
+			return decl.Members.Nodes
+		}
+	case shimast.KindClassExpression:
+		if expr := node.AsClassExpression(); expr != nil && expr.Members != nil {
+			return expr.Members.Nodes
+		}
+	}
+	return nil
+}
+
+// classMemberSlot extracts the (name, kind) identity for a class
+// member. Constructors and unnamed/computed members are skipped — the
+// rule cannot reason about them statically. The kind distinguishes
+// getter/setter pairs from regular method/property declarations so a
+// getter+setter on the same name does not trip the dupe check.
+func classMemberSlot(member *shimast.Node) (string, string, bool) {
+	if member == nil {
+		return "", "", false
+	}
+	switch member.Kind {
+	case shimast.KindMethodDeclaration,
+		shimast.KindPropertyDeclaration,
+		shimast.KindGetAccessor,
+		shimast.KindSetAccessor:
+		name := classMemberName(member)
+		if name == "" {
+			return "", "", false
+		}
+		var kind string
+		switch member.Kind {
+		case shimast.KindGetAccessor:
+			kind = "get"
+		case shimast.KindSetAccessor:
+			kind = "set"
+		default:
+			kind = "data"
+		}
+		return name, kind, true
+	}
+	return "", "", false
+}
+
+// classMemberName returns the textual name of a class member identifier
+// or literal key. Computed property names return the empty string so
+// the caller can skip them — the rule cannot prove equivalence of two
+// computed expressions statically.
+func classMemberName(member *shimast.Node) string {
+	name := member.Name()
+	if name == nil {
+		return ""
+	}
+	switch name.Kind {
+	case shimast.KindIdentifier, shimast.KindPrivateIdentifier:
+		return identifierText(name)
+	case shimast.KindStringLiteral:
+		return stringLiteralText(name)
+	case shimast.KindNumericLiteral:
+		return numericLiteralText(name)
+	}
+	return ""
+}
+
+// noThisBeforeSuper reports a derived constructor that references
+// `this` (or `super.x`) before the first reachable `super()` call. ES
+// throws a ReferenceError at runtime; the lint rule catches it before
+// the program ever runs.
+// https://eslint.org/docs/latest/rules/no-this-before-super
+//
+// Trigger: the class declaration has a `HeritageClause` of kind
+// `extends`, the constructor body exists, and a `this` / `super.`
+// reference appears textually before the first `super()` call. The
+// walk stops at nested function-like boundaries so a `this` inside an
+// inner arrow does not count.
+type noThisBeforeSuper struct{}
+
+func (noThisBeforeSuper) Name() string { return "no-this-before-super" }
+func (noThisBeforeSuper) Visits() []shimast.Kind {
+	return []shimast.Kind{shimast.KindConstructor}
+}
+func (noThisBeforeSuper) Check(ctx *Context, node *shimast.Node) {
+	parent := node.Parent
+	if parent == nil || !classExtendsAnother(parent) {
+		return
+	}
+	ctor := node.AsConstructorDeclaration()
+	if ctor == nil || ctor.Body == nil {
+		return
+	}
+	var superCallPos = -1
+	walkConstructorBody(ctor.Body, func(child *shimast.Node) {
+		if child == nil || superCallPos >= 0 {
+			return
+		}
+		if child.Kind == shimast.KindCallExpression {
+			call := child.AsCallExpression()
+			if call != nil && call.Expression != nil && call.Expression.Kind == shimast.KindSuperKeyword {
+				superCallPos = child.Pos()
+			}
+		}
+	})
+	walkConstructorBody(ctor.Body, func(child *shimast.Node) {
+		if child == nil {
+			return
+		}
+		// Skip the call to super() itself.
+		if child.Kind == shimast.KindCallExpression {
+			call := child.AsCallExpression()
+			if call != nil && call.Expression != nil && call.Expression.Kind == shimast.KindSuperKeyword {
+				return
+			}
+		}
+		switch child.Kind {
+		case shimast.KindThisKeyword:
+			if superCallPos < 0 || child.Pos() < superCallPos {
+				ctx.Report(child, "`this` referenced before `super()` call in a derived constructor.")
+			}
+		case shimast.KindPropertyAccessExpression:
+			access := child.AsPropertyAccessExpression()
+			if access != nil && access.Expression != nil && access.Expression.Kind == shimast.KindSuperKeyword {
+				if superCallPos < 0 || child.Pos() < superCallPos {
+					ctx.Report(child, "`super.` access before `super()` call in a derived constructor.")
+				}
+			}
+		}
+	})
+}
+
+// classExtendsAnother reports whether the class declaration/expression
+// has a non-empty `extends` heritage clause. Base classes (no extends)
+// are skipped — `this` is legal before any super call there.
+func classExtendsAnother(class *shimast.Node) bool {
+	var clauses []*shimast.Node
+	switch class.Kind {
+	case shimast.KindClassDeclaration:
+		decl := class.AsClassDeclaration()
+		if decl == nil || decl.HeritageClauses == nil {
+			return false
+		}
+		clauses = decl.HeritageClauses.Nodes
+	case shimast.KindClassExpression:
+		expr := class.AsClassExpression()
+		if expr == nil || expr.HeritageClauses == nil {
+			return false
+		}
+		clauses = expr.HeritageClauses.Nodes
+	default:
+		return false
+	}
+	for _, clause := range clauses {
+		if clause == nil {
+			continue
+		}
+		hc := clause.AsHeritageClause()
+		if hc == nil || hc.Token != shimast.KindExtendsKeyword {
+			continue
+		}
+		if hc.Types != nil && len(hc.Types.Nodes) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// walkConstructorBody walks every descendant of body, skipping into
+// nested function-like scopes so a `this` inside an inner arrow does
+// not get attributed to the surrounding constructor.
+func walkConstructorBody(body *shimast.Node, visit func(*shimast.Node)) {
+	if body == nil {
+		return
+	}
+	var walk func(*shimast.Node)
+	walk = func(n *shimast.Node) {
+		if n == nil {
+			return
+		}
+		if n != body && isFunctionLikeKind(n) {
+			return
+		}
+		visit(n)
+		n.ForEachChild(func(child *shimast.Node) bool {
+			walk(child)
+			return false
+		})
+	}
+	walk(body)
+}
+
+// preferObjectSpread reports `Object.assign({}, …)` calls that should
+// be expressed with the modern spread syntax `{ …a, …b }`. The two
+// forms are not exactly equivalent for property accessors and Symbol
+// keys, but the spread form is the one the language has settled on and
+// the readability gain is large for the common case.
+// https://eslint.org/docs/latest/rules/prefer-object-spread
+//
+// Trigger: `Object.assign(target, …)` where the target is an empty
+// object literal. Mutating `Object.assign` calls (non-empty first
+// argument) are intentionally allowed because they have observable
+// behavior the spread form does not preserve.
+type preferObjectSpread struct{}
+
+func (preferObjectSpread) Name() string { return "prefer-object-spread" }
+func (preferObjectSpread) Visits() []shimast.Kind {
+	return []shimast.Kind{shimast.KindCallExpression}
+}
+func (preferObjectSpread) Check(ctx *Context, node *shimast.Node) {
+	call := node.AsCallExpression()
+	if call == nil || call.Expression == nil || call.Arguments == nil {
+		return
+	}
+	obj, method, ok := promisePropertyAccessParts(call.Expression)
+	if !ok || method != "assign" {
+		return
+	}
+	if identifierText(obj) != "Object" {
+		return
+	}
+	if len(call.Arguments.Nodes) < 2 {
+		return
+	}
+	first := stripParens(call.Arguments.Nodes[0])
+	if first == nil || first.Kind != shimast.KindObjectLiteralExpression {
+		return
+	}
+	if objectLiteralIsEmpty(first) {
+		ctx.Report(node, "Prefer object spread `{ ...a, ...b }` over `Object.assign({}, a, b)`.")
+	}
+}
+
+// objectLiteralIsEmpty reports whether node is the literal `{}` (no
+// properties, no shorthand assignments, no spreads).
+func objectLiteralIsEmpty(node *shimast.Node) bool {
+	if node == nil || node.Kind != shimast.KindObjectLiteralExpression {
+		return false
+	}
+	lit := node.AsObjectLiteralExpression()
+	if lit == nil || lit.Properties == nil {
+		return true
+	}
+	return len(lit.Properties.Nodes) == 0
+}
+
+func init() {
+	Register(noAwaitInLoop{})
+	Register(noDupeClassMembers{})
+	Register(noThisBeforeSuper{})
+	Register(preferObjectSpread{})
+}

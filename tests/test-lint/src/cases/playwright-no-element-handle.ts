@@ -1,3 +1,6 @@
+declare const test: any;
+declare const expect: any;
+declare const page: any;
 import { test } from "@playwright/test";
 
 test("gets a handle", async ({ page }) => {

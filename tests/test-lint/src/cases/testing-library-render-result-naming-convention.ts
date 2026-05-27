@@ -1,3 +1,10 @@
+declare const render: any;
+declare const screen: any;
+declare const fireEvent: any;
+declare const waitFor: any;
+declare const userEvent: any;
+declare const cleanup: any;
+declare const act: any;
 /**
  * Verifies testing-library/render-result-naming-convention: render results must be named `view`, `utils`, or destructured.
  *

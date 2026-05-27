@@ -1,0 +1,18 @@
+/**
+ * Verifies testing-library/no-node-access: DOM traversal off a query result is rejected.
+ *
+ * Pins the AST check for `.parentElement` (and siblings) chained off any
+ * Testing Library query — direct DOM walking defeats accessible queries.
+ *
+ * 1. Import `screen` from Testing Library.
+ * 2. Read `.parentElement` off a `screen.getBy*` result.
+ * 3. Assert the matching diagnostic.
+ */
+import { screen } from "@testing-library/react";
+
+function testCase() {
+  // expect: testing-library/no-node-access error
+  return screen.getByText("Save").parentElement;
+}
+
+void testCase;

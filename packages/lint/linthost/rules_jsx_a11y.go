@@ -1161,8 +1161,71 @@ func (jsxA11yTabindexNoPositive) Check(ctx *Context, node *shimast.Node) {
 	}
 }
 
+// jsxA11yAnchorAmbiguousText reports `<a>` elements whose visible text
+// is one of a small set of phrases that carry no information out of
+// context. Screen-reader users frequently navigate by listing all
+// links; "click here" / "more" / "read more" turn that list into
+// uninformative noise.
+// https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/main/docs/rules/anchor-ambiguous-text.md
+type jsxA11yAnchorAmbiguousText struct{}
+
+func (jsxA11yAnchorAmbiguousText) Name() string { return "jsx-a11y/anchor-ambiguous-text" }
+func (jsxA11yAnchorAmbiguousText) Visits() []shimast.Kind {
+	return []shimast.Kind{shimast.KindJsxElement}
+}
+func (jsxA11yAnchorAmbiguousText) Check(ctx *Context, node *shimast.Node) {
+	info := jsxElementFromNode(node)
+	if info.tag != "a" {
+		return
+	}
+	text := strings.ToLower(strings.TrimSpace(jsxAnchorText(info.children)))
+	if text == "" {
+		return
+	}
+	switch text {
+	case "click here", "here", "link", "a link", "click", "more", "read more":
+		ctx.Report(info.opening, "Anchor text \""+text+"\" is too ambiguous out of context; describe the destination.")
+	}
+}
+
+// jsxAnchorText concatenates the visible text content of a JSX
+// element's children. Nested JSX is recursively concatenated. JSX
+// expressions that wrap a plain string literal contribute their literal
+// text; other expression shapes are skipped because their runtime value
+// is not known at lint time.
+func jsxAnchorText(children *shimast.NodeList) string {
+	if children == nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, child := range children.Nodes {
+		if child == nil {
+			continue
+		}
+		switch child.Kind {
+		case shimast.KindJsxText:
+			t := child.AsJsxText()
+			if t != nil && !t.ContainsOnlyTriviaWhiteSpaces {
+				b.WriteString(t.Text)
+			}
+		case shimast.KindJsxExpression:
+			expr := child.AsJsxExpression()
+			if expr != nil && expr.Expression != nil {
+				if s := stringLiteralText(expr.Expression); s != "" {
+					b.WriteString(s)
+				}
+			}
+		case shimast.KindJsxElement:
+			inner := jsxElementFromNode(child)
+			b.WriteString(jsxAnchorText(inner.children))
+		}
+	}
+	return b.String()
+}
+
 func init() {
 	Register(jsxA11yAltText{})
+	Register(jsxA11yAnchorAmbiguousText{})
 	Register(jsxA11yAnchorHasContent{})
 	Register(jsxA11yAnchorIsValid{})
 	Register(jsxA11yAriaActivedescendantHasTabindex{})

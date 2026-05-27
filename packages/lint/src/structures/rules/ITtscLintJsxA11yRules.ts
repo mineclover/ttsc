@@ -23,6 +23,16 @@ export interface ITtscLintJsxA11yRules {
   "jsx-a11y/alt-text"?: TtscLintRuleSetting;
 
   /**
+   * Reject `<a>` elements whose visible text is one of a small set of
+   * phrases that carry no information out of context. Screen-reader
+   * users navigate by listing links — "click here" / "more" / "read
+   * more" turn that list into noise.
+   *
+   * @reference https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/main/docs/rules/anchor-ambiguous-text.md
+   */
+  "jsx-a11y/anchor-ambiguous-text"?: TtscLintRuleSetting;
+
+  /**
    * Reject empty JSX anchors with no accessible content (text,
    * `aria-label`, or labelled child).
    *

@@ -4,6 +4,7 @@ Architecture-boundary rules enforce import direction and module visibility betwe
 
 Source: ported from [`eslint-plugin-boundaries`](https://github.com/javierbrea/eslint-plugin-boundaries) (MIT).
 
+- `boundaries/dependencies` — unified dependency-direction rule from upstream `eslint-plugin-boundaries`, intended to replace `element-types` / `entry-point` / `external` / `no-private` / `no-unknown` with a single policy block.
 - `boundaries/element-types` — Enforce allowed dependency directions between configured source-path element types.
 - `boundaries/entry-point` — Require imports that cross element boundaries to target the importee element's configured public entry files (typically `index.ts`), so the public surface of each element is explicit.
 - `boundaries/external` — Restrict external package imports by package or specifier pattern.

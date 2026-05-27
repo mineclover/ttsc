@@ -40,6 +40,7 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 - `no-eq-null` — Reject loose null comparisons (`x == null`).
 - `no-eval` — Reject `eval(...)` and indirect `eval` calls — almost always a security or correctness bug.
 - `no-ex-assign` — Reject reassigning the parameter of a `catch` clause (`catch (e) { e = ... }`), which loses the original error reference.
+- `no-extend-native` — reject assignments to a built-in prototype such as `Array.prototype.foo = bar`.
 - `no-extra-bind` — Reject unnecessary `Function.prototype.bind()` calls — for example, binding without arguments or binding an arrow function (which ignores `this`).
 - `no-extra-boolean-cast` — Reject redundant boolean casts such as `!!Boolean(x)`, `if (Boolean(x))`, or `Boolean(!!x)`.
 - `no-fallthrough` — Reject `switch` case fall-through unless preceded by an explicit `// falls through` comment.
@@ -52,6 +53,7 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 - `no-labels` — Reject labeled statements (`outer: for (...) { break outer; }`).
 - `no-lone-blocks` — Reject standalone `{ ... }` blocks that introduce no lexical scope distinct from the surrounding block.
 - `no-lonely-if` — Reject `if (cond) { if (...) { ... } }` where the inner `if` is the only statement in an `else` — prefer `else if`.
+- `no-loop-func` — reject function declarations defined inside the body of a loop.
 - `no-loss-of-precision` — Reject numeric literals whose source text cannot round-trip through `Number` without losing digits, including overflow.
 - `no-misleading-character-class` — Reject regex character classes that contain combined Unicode sequences (e.g. surrogate pairs) which most readers will not realize represent multiple code units.
 - `no-mixed-operators` — Reject mixing operators of different precedence families (`a && b || c`, `a | b && c`) without explicit parentheses around the inner sub-expression.
@@ -67,10 +69,12 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 - `no-object-constructor` — Reject `new Object()` and `Object()` constructor calls; use an object literal `{}` instead.
 - `no-octal` — Reject legacy octal literals (`0123`).
 - `no-octal-escape` — Reject octal escape sequences in string literals (`"\251"`, `"\07"`).
+- `no-param-reassign` — reject reassigning a function parameter inside the body of the function it belongs to.
 - `no-plusplus` — Reject `++` and `--` operators.
 - `no-promise-executor-return` — Reject `return` inside the Promise executor function — the value is ignored.
 - `no-proto` — Reject access to `obj.__proto__`; use `Object.getPrototypeOf` / `Object.setPrototypeOf`.
 - `no-prototype-builtins` — Reject `obj.hasOwnProperty(key)` and other direct `Object.prototype` builtins on user objects, since the property may be shadowed.
+- `no-redeclare` — reject declaring the same binding more than once in the same scope (`var x = 1; var x = 2;`, two `function foo()` declarations side by side, or a parameter rebound by a later `var` in the body).
 - `no-regex-spaces` — Reject more than one consecutive literal space in a regex; use `{N}` quantifiers for clarity.
 - `no-return-assign` — Reject assignment expressions used as the operand of `return` (`return x = 1`) — almost always a typo for `===`.
 - `no-script-url` — Reject `javascript:` URLs in string literals — they execute their body as code on browser navigation, and security scanners treat them as an `eval` equivalent.
@@ -86,11 +90,13 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 - `no-undef-init` — Reject initializing a variable to the literal `undefined` (`let x = undefined`) — declaring without an initializer has the same effect.
 - `no-undefined` — Reject use of the global `undefined` identifier; use the `void 0` expression or omit the value.
 - `no-unneeded-ternary` — Reject `cond ? true : false` and similar ternaries that can be simplified to a boolean coercion or the condition itself.
+- `no-unreachable` — reject statements that follow an unconditional `return`, `throw`, `break`, or `continue` in the same block — control flow has already left the block, so any later statement is dead code.
 - `no-unsafe-finally` — Reject `return` and `throw` inside a `finally` block, which override any earlier `return`/`throw` from the corresponding `try`/`catch`.
 - `no-unsafe-negation` — Reject `!key in obj` and `!a instanceof B` where the `!` binds tighter than the relational operator and silently coerces the left operand to a boolean.
 - `no-unsafe-optional-chaining` — Reject member access or call expressions that chain off an optional chain without continuing the chain.
 - `no-unused-expressions` — Reject expression statements with no observable effect, like a bare `x;` or `'use strict' && f();`.
 - `no-unused-labels` — Reject labels that no `break` or `continue` statement references.
+- `no-useless-assignment` — reject an assignment whose value is immediately overwritten by the very next statement without an intervening read of the same identifier.
 - `no-useless-call` — Reject unnecessary `.call()` / `.apply()` calls (such as `f.call(undefined, x)`).
 - `no-useless-catch` — Reject `catch (e) { throw e }` patterns that only rethrow the caught error without adding context or handling.
 - `no-useless-computed-key` — Reject computed property keys whose expression is a literal identifier (`{ ["foo"]: 1 }`).
@@ -98,6 +104,7 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 - `no-useless-constructor` — Reject empty constructor bodies (`class X { constructor() {} }`) that add nothing over the implicit constructor.
 - `no-useless-escape` — Reject unnecessary escape sequences in strings and regex literals, such as `"\."` or `/\,/`.
 - `no-useless-rename` — Reject `{ x: x }` destructuring renames that bind back to the same name.
+- `no-useless-return` — reject a bare `return;` whose only effect is to end a function body that would have returned anyway.
 - `no-var` — Reject `var` declarations.
 - `no-with` — Reject `with (...)` statements.
 - `object-shorthand` — Reject `{ foo: foo }` and similar object-literal shorthand candidates in favor of `{ foo }`.

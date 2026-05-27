@@ -24,3 +24,4 @@ Source: [`eslint-plugin-solid`](https://github.com/solidjs-community/eslint-plug
 - `solid/reactivity` — Reject common Solid reactivity breakages — reading a signal outside a tracking scope, destructuring a `Store`, etc.
 - `solid/self-closing-comp` — Collapse JSX elements with no children to the self-closing form (`<Foo></Foo>` to `<Foo />`).
 - `solid/style-prop` — Require `style={{...}}` keys to be valid kebab-case CSS properties (`"font-size"`, not React's `fontSize`) and dimensioned values to be strings — Solid does not append implicit `px`.
+- `solid/validate-jsx-nesting` — reject JSX nestings that the HTML parser would silently restructure at runtime — `<p>` cannot contain block-level children, `<a>` cannot contain another `<a>`, and `<button>` cannot contain other interactive elements.

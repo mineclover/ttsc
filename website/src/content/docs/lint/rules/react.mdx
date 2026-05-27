@@ -6,6 +6,7 @@ Source: [`eslint-plugin-react`](https://github.com/jsx-eslint/eslint-plugin-reac
 
 - `react/button-has-type` — Require explicit, valid `type` values on JSX `<button>` elements (`"button"`, `"submit"`, `"reset"`) — the HTML default of `"submit"` causes accidental form submissions.
 - `react/component-hook-factories` — Reject declaring a component or custom Hook inside another component or Hook body.
+- `react/display-name` — require components wrapped in `React.memo(...)` or `React.forwardRef(...)` to be named — either by passing a named function, assigning the call to a named binding, or setting an explicit `displayName`.
 - `react/exhaustive-deps` — Detect high-confidence missing identifiers in React Hook dependency arrays (`useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`).
 - `react/iframe-missing-sandbox` — Require JSX `<iframe>` elements to declare a `sandbox` attribute, which restricts what embedded content can do (scripts, forms, navigation).
 - `react/immutability` — Reject mutating props, state, or Hook return values inside a component or Hook.
@@ -13,6 +14,8 @@ Source: [`eslint-plugin-react`](https://github.com/jsx-eslint/eslint-plugin-reac
 - `react/jsx-no-duplicate-props` — Reject duplicate JSX prop names on the same element — later occurrences silently overwrite earlier ones.
 - `react/jsx-no-script-url` — Reject `javascript:` URLs in JSX URL-like props such as `href` and `src`.
 - `react/jsx-no-target-blank` — Reject `<a target="_blank">` (or any JSX element with `target="_blank"`) that does not also carry `rel="noreferrer"` (or `rel="noopener noreferrer"`).
+- `react/jsx-no-undef` — reject JSX elements whose tag is an uppercase identifier with no value-level declaration anywhere in the source file.
+- `react/jsx-no-useless-fragment` — reject JSX fragments that wrap exactly one element child or have no meaningful content — the child (or nothing) can be returned directly.
 - `react/no-array-index-key` — Reject `key={index}` patterns inside JSX lists — array index keys reorder incorrectly on insertion.
 - `react/no-children-prop` — Reject passing children through an explicit `children` JSX prop.
 - `react/no-danger` — Reject `dangerouslySetInnerHTML` altogether.

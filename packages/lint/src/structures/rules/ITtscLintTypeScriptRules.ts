@@ -72,6 +72,19 @@ export interface ITtscLintTypeScriptRules {
   "typescript/ban-tslint-comment"?: TtscLintRuleSetting;
 
   /**
+   * Prefer a `static readonly` field over a `get` accessor whose body
+   * is a single `return <literal>;`. The getter form re-runs the body
+   * on every read and obscures that the value is fixed; a readonly
+   * field is shorter, narrows to the literal type, and signals "this
+   * is a constant" at the call site. Skipped when the class also
+   * declares a `set` accessor for the same member name — the setter's
+   * side effects cannot be reproduced by a field.
+   *
+   * @reference https://typescript-eslint.io/rules/class-literal-property-style
+   */
+  "typescript/class-literal-property-style"?: TtscLintRuleSetting;
+
+  /**
    * Prefer `Record<K, V>` over `{ [key: K]: V }` when an object type
    * has a single index signature and no other members.
    *
@@ -175,6 +188,19 @@ export interface ITtscLintTypeScriptRules {
    * @reference https://typescript-eslint.io/rules/no-confusing-non-null-assertion
    */
   "typescript/no-confusing-non-null-assertion"?: TtscLintRuleSetting;
+
+  /**
+   * Reject `void X` expressions used in any position where the
+   * surrounding context expects a value — initializer, call argument,
+   * `return` operand, conditional, binary, or ternary subexpression.
+   *
+   * The only acceptable positions are an expression statement
+   * (`void x;`), an arrow function's concise body (`() => void x`),
+   * and the operand of an enclosing `void` operator (`void void x`).
+   *
+   * @reference https://typescript-eslint.io/rules/no-confusing-void-expression
+   */
+  "typescript/no-confusing-void-expression"?: TtscLintRuleSetting;
 
   /**
    * Reject `enum` declarations whose members share the same literal
@@ -300,6 +326,21 @@ export interface ITtscLintTypeScriptRules {
    * @reference https://typescript-eslint.io/rules/no-misused-promises
    */
   "typescript/no-misused-promises"?: TtscLintRuleSetting;
+
+  /**
+   * Reject spread expressions whose operand is syntactically wrong
+   * for the surrounding context.
+   *
+   * AST-only subset of the upstream rule — no Checker required.
+   * Fires on object literal spread inside an array literal or a
+   * call/construct argument (`[...{ a: 1 }]`, `f(...{ a: 1 })`) and
+   * on array literal spread inside an object literal
+   * (`{ ...[1, 2] }`). General iterability detection still needs the
+   * full type-aware rule.
+   *
+   * @reference https://typescript-eslint.io/rules/no-misused-spread
+   */
+  "typescript/no-misused-spread"?: TtscLintRuleSetting;
 
   /**
    * Reject `enum`s that mix numeric and string members, which makes

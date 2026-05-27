@@ -55,6 +55,8 @@ func (r reactRule) Check(ctx *Context, node *shimast.Node) {
 		checkReactIframeMissingSandbox(ctx, node)
 	case "jsx-no-script-url":
 		checkReactJSXNoScriptURL(ctx, node)
+	case "jsx-no-target-blank":
+		checkReactJSXNoTargetBlank(ctx, node)
 	case "style-prop-object":
 		checkReactStylePropObject(ctx, node)
 	case "void-dom-elements-no-children":
@@ -209,6 +211,25 @@ func checkReactJSXNoScriptURL(ctx *Context, node *shimast.Node) {
 			ctx.Report(attr.node, "Do not use javascript: URLs in JSX props.")
 		}
 	}
+}
+
+func checkReactJSXNoTargetBlank(ctx *Context, node *shimast.Node) {
+	info := reactJSXElementFromNode(node)
+	if info.opening == nil {
+		return
+	}
+	target, ok := reactFindJSXAttr(info.attrs, "target")
+	if !ok || !target.known {
+		return
+	}
+	if strings.TrimSpace(target.value) != "_blank" {
+		return
+	}
+	rel, ok := reactFindJSXAttr(info.attrs, "rel")
+	if ok && rel.known && strings.Contains(rel.value, "noreferrer") {
+		return
+	}
+	ctx.Report(info.opening, "JSX elements with `target=\"_blank\"` must include `rel=\"noreferrer\"` (or `noopener noreferrer`).")
 }
 
 func checkReactStylePropObject(ctx *Context, node *shimast.Node) {
@@ -620,6 +641,7 @@ func init() {
 		"jsx-key",
 		"jsx-no-duplicate-props",
 		"jsx-no-script-url",
+		"jsx-no-target-blank",
 		"no-array-index-key",
 		"no-children-prop",
 		"no-danger",

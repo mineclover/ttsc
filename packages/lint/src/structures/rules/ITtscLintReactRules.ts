@@ -95,6 +95,18 @@ export interface ITtscLintReactRules {
   "react/jsx-no-script-url"?: TtscLintRuleSetting;
 
   /**
+   * Reject `<a target="_blank">` (or any JSX element with
+   * `target="_blank"`) that does not also carry `rel="noreferrer"`
+   * (or `rel="noopener noreferrer"`).
+   *
+   * Without those tokens the opened page can navigate the originating
+   * window through `window.opener`, a phishing and tab-nabbing vector.
+   *
+   * @reference https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-target-blank.md
+   */
+  "react/jsx-no-target-blank"?: TtscLintRuleSetting;
+
+  /**
    * Reject `key={index}` patterns inside JSX lists — array index
    * keys reorder incorrectly on insertion.
    *

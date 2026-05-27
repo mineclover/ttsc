@@ -21,6 +21,13 @@ import type { TtscLintRuleSetting } from "../TtscLintRuleSetting";
  */
 export interface ITtscLintCoreRules {
   /**
+   * Require block statements for every `if`, `else`, `while`, `for`, and `do` body — reject the single-statement shorthand.
+   *
+   * @reference https://eslint.org/docs/latest/rules/curly
+   */
+  "curly"?: TtscLintRuleSetting;
+
+  /**
    * Require `switch` statements to include a `default` clause.
    *
    * A switch without `default` silently drops every discriminant value
@@ -44,6 +51,20 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/default-case-last
    */
   "default-case-last"?: TtscLintRuleSetting;
+
+  /**
+   * Reject identifier declarations that aren't camelCase or PascalCase — snake_case bindings are flagged.
+   *
+   * @reference https://eslint.org/docs/latest/rules/camelcase
+   */
+  "camelcase"?: TtscLintRuleSetting;
+
+  /**
+   * Reject function bodies whose cyclomatic complexity exceeds twenty (default ESLint threshold).
+   *
+   * @reference https://eslint.org/docs/latest/rules/complexity
+   */
+  "complexity"?: TtscLintRuleSetting;
 
   /**
    * Reject functions where some `return` statements return a value and
@@ -135,6 +156,55 @@ export interface ITtscLintCoreRules {
   "guard-for-in"?: TtscLintRuleSetting;
 
   /**
+   * Reject identifier names shorter than two characters.
+   *
+   * @reference https://eslint.org/docs/latest/rules/id-length
+   */
+  "id-length"?: TtscLintRuleSetting;
+
+  /**
+   * Require every `var` / `let` declaration to be initialized at its declaration site.
+   *
+   * @reference https://eslint.org/docs/latest/rules/init-declarations
+   */
+  "init-declarations"?: TtscLintRuleSetting;
+
+  /**
+   * Reject a source file that declares more than one class.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-classes-per-file
+   */
+  "max-classes-per-file"?: TtscLintRuleSetting;
+
+  /**
+   * Reject block-statement nesting deeper than four levels inside a function.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-depth
+   */
+  "max-depth"?: TtscLintRuleSetting;
+
+  /**
+   * Reject a source file whose total line count exceeds three hundred.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-lines
+   */
+  "max-lines"?: TtscLintRuleSetting;
+
+  /**
+   * Reject a function whose body spans more than fifty lines.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-lines-per-function
+   */
+  "max-lines-per-function"?: TtscLintRuleSetting;
+
+  /**
+   * Reject callback nesting deeper than ten inside a single function.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-nested-callbacks
+   */
+  "max-nested-callbacks"?: TtscLintRuleSetting;
+
+  /**
    * Reject function declarations whose parameter list grows beyond
    * three. Long parameter lists are hard to read at the call site
    * because positional arguments lose their names; folding them into
@@ -149,6 +219,13 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/max-params
    */
   "max-params"?: TtscLintRuleSetting;
+
+  /**
+   * Reject function bodies whose statement count exceeds ten.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-statements
+   */
+  "max-statements"?: TtscLintRuleSetting;
 
   /**
    * Reject calls to `alert`, `confirm`, and `prompt`.
@@ -561,6 +638,13 @@ export interface ITtscLintCoreRules {
   "no-inner-declarations"?: TtscLintRuleSetting;
 
   /**
+   * Reject `this` references outside any function-like, class method, or class-static-block context.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-invalid-this
+   */
+  "no-invalid-this"?: TtscLintRuleSetting;
+
+  /**
    * Reject irregular whitespace characters (zero-width space,
    * non-breaking space, etc.) in source — typically copy-paste artifacts
    * from rich-text editors.
@@ -627,6 +711,13 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/no-loss-of-precision
    */
   "no-loss-of-precision"?: TtscLintRuleSetting;
+
+  /**
+   * Reject inline numeric literals outside `const` initializer position. `0`, `1`, `-1`, array indices, and enum values are exempt.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-magic-numbers
+   */
+  "no-magic-numbers"?: TtscLintRuleSetting;
 
   /**
    * Reject regex character classes that contain combined Unicode
@@ -824,6 +915,20 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/no-regex-spaces
    */
   "no-regex-spaces"?: TtscLintRuleSetting;
+
+  /**
+   * Reject `import` declarations targeting any module specifier in the project denylist.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-restricted-imports
+   */
+  "no-restricted-imports"?: TtscLintRuleSetting;
+
+  /**
+   * Reject AST node kinds listed in the project denylist.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-restricted-syntax
+   */
+  "no-restricted-syntax"?: TtscLintRuleSetting;
 
   /**
    * Reject assignment expressions used as the operand of `return`
@@ -1129,6 +1234,13 @@ export interface ITtscLintCoreRules {
   "operator-assignment"?: TtscLintRuleSetting;
 
   /**
+   * Reject `function() { ... }` expressions passed as callback arguments — prefer the arrow form.
+   *
+   * @reference https://eslint.org/docs/latest/rules/prefer-arrow-callback
+   */
+  "prefer-arrow-callback"?: TtscLintRuleSetting;
+
+  /**
    * Require `const` for variables that are never reassigned after
    * declaration. Autofixable for single-declaration `let`s.
    *
@@ -1180,6 +1292,13 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/prefer-object-spread
    */
   "prefer-object-spread"?: TtscLintRuleSetting;
+
+  /**
+   * Reject regex literals with unnamed capturing groups `(...)` — prefer named groups `(?<name>...)`.
+   *
+   * @reference https://eslint.org/docs/latest/rules/prefer-named-capture-group
+   */
+  "prefer-named-capture-group"?: TtscLintRuleSetting;
 
   /**
    * Prefer ES2015+ numeric literal forms (`0b…`, `0o…`, `0x…`) over
@@ -1235,6 +1354,20 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/require-yield
    */
   "require-yield"?: TtscLintRuleSetting;
+
+  /**
+   * Reject import specifiers within a single `import` declaration that aren't alphabetically sorted.
+   *
+   * @reference https://eslint.org/docs/latest/rules/sort-imports
+   */
+  "sort-imports"?: TtscLintRuleSetting;
+
+  /**
+   * Reject object-literal property keys that aren't alphabetically sorted.
+   *
+   * @reference https://eslint.org/docs/latest/rules/sort-keys
+   */
+  "sort-keys"?: TtscLintRuleSetting;
 
   /**
    * Require `Number.isNaN` / `isNaN` for `NaN` checks; restrict

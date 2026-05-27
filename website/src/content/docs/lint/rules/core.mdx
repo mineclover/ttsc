@@ -4,6 +4,9 @@ Generic ESLint-compatible rules that apply to both JavaScript and TypeScript sou
 
 Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 
+- `camelcase` — Reject identifier declarations that aren't camelCase or PascalCase — snake_case bindings are flagged.
+- `complexity` — Reject function bodies whose cyclomatic complexity exceeds twenty (default ESLint threshold).
+- `curly` — Require block statements for every `if`, `else`, `while`, `for`, and `do` body — reject the single-statement shorthand.
 - `default-case` — Require `switch` statements to include a `default` clause so unhandled discriminants surface explicitly instead of silently falling through.
 - `default-case-last` — Require the `default` clause of a `switch` statement to appear last, so the fall-through path matches the visual order of the labels.
 - `default-param-last` — Reject `(req, opt = 1, req2)` and similar parameter lists where a required parameter follows an optional or default-valued one.
@@ -13,7 +16,15 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 - `getter-return` — Require a `get` accessor's body to return a value on every reachable exit.
 - `grouped-accessor-pairs` — Require the `get` and `set` accessors of a single property to be declared adjacent in the class body so readers see the read/write pair together.
 - `guard-for-in` — Require `for (key in obj)` bodies to immediately guard against inherited keys with `Object.hasOwn(obj, key)` or `Object.prototype.hasOwnProperty.call(obj, key)`, so the loop body never silently processes a prototype-chain entry.
+- `id-length` — Reject identifier names shorter than two characters.
+- `init-declarations` — Require every `var` / `let` declaration to be initialized at its declaration site.
+- `max-classes-per-file` — Reject a source file that declares more than one class.
+- `max-depth` — Reject block-statement nesting deeper than four levels inside a function.
+- `max-lines` — Reject a source file whose total line count exceeds three hundred.
+- `max-lines-per-function` — Reject a function whose body spans more than fifty lines.
+- `max-nested-callbacks` — Reject callback nesting deeper than ten inside a single function.
 - `max-params` — Reject function declarations whose parameter list grows beyond three, since long parameter lists usually want to be folded into an options object.
+- `max-statements` — Reject function bodies whose statement count exceeds ten.
 - `no-alert` — Reject calls to `alert`, `confirm`, and `prompt`.
 - `no-array-constructor` — Reject `Array(...)` and `new Array(...)` constructor calls in favor of array literals.
 - `no-async-promise-executor` — Reject `new Promise(async (resolve, reject) => { ... })`.
@@ -55,6 +66,7 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 - `no-implicit-coercion` — Reject common implicit-coercion idioms (`!!x`, `+x`, `"" + x`) in favor of the explicit `Boolean(x)` / `Number(x)` / `String(x)` conversions.
 - `no-import-assign` — Reject writes to a binding introduced by an `import` declaration — assignment, compound assignment, or `++`/`--` of an imported name, plus property mutations of a namespace import (`ns.foo = ...`).
 - `no-inner-declarations` — Reject `function` and `var` declarations nested in non-function blocks (loops, `if`, etc.) — they hoist in surprising ways.
+- `no-invalid-this` — Reject `this` references outside any function-like, class method, or class-static-block context.
 - `no-irregular-whitespace` — Reject irregular whitespace characters (zero-width space, non-breaking space, etc.) in source — typically copy-paste artifacts from rich-text editors.
 - `no-iterator` — Reject the legacy `__iterator__` property — a SpiderMonkey-only extension predating ES2015 iterators.
 - `no-labels` — Reject labeled statements (`outer: for (...) { break outer; }`).
@@ -62,6 +74,7 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 - `no-lonely-if` — Reject `if (cond) { if (...) { ... } }` where the inner `if` is the only statement in an `else` — prefer `else if`.
 - `no-loop-func` — reject function declarations defined inside the body of a loop.
 - `no-loss-of-precision` — Reject numeric literals whose source text cannot round-trip through `Number` without losing digits, including overflow.
+- `no-magic-numbers` — Reject inline numeric literals outside `const` initializer position. `0`, `1`, `-1`, array indices, and enum values are exempt.
 - `no-misleading-character-class` — Reject regex character classes that contain combined Unicode sequences (e.g. surrogate pairs) which most readers will not realize represent multiple code units.
 - `no-mixed-operators` — Reject mixing operators of different precedence families (`a && b || c`, `a | b && c`) without explicit parentheses around the inner sub-expression.
 - `no-multi-assign` — Reject chained assignment such as `a = b = 0`, which obscures intent and surprises readers who expect comparison.
@@ -83,6 +96,8 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 - `no-prototype-builtins` — Reject `obj.hasOwnProperty(key)` and other direct `Object.prototype` builtins on user objects, since the property may be shadowed.
 - `no-redeclare` — reject declaring the same binding more than once in the same scope (`var x = 1; var x = 2;`, two `function foo()` declarations side by side, or a parameter rebound by a later `var` in the body).
 - `no-regex-spaces` — Reject more than one consecutive literal space in a regex; use `{N}` quantifiers for clarity.
+- `no-restricted-imports` — Reject `import` declarations targeting any module specifier in the project denylist.
+- `no-restricted-syntax` — Reject AST node kinds listed in the project denylist.
 - `no-return-assign` — Reject assignment expressions used as the operand of `return` (`return x = 1`) — almost always a typo for `===`.
 - `no-script-url` — Reject `javascript:` URLs in string literals — they execute their body as code on browser navigation, and security scanners treat them as an `eval` equivalent.
 - `no-self-assign` — Reject `x = x` and destructuring forms that copy a value to itself — almost always a typo.
@@ -116,10 +131,12 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 - `no-with` — Reject `with (...)` statements.
 - `object-shorthand` — Reject `{ foo: foo }` and similar object-literal shorthand candidates in favor of `{ foo }`.
 - `operator-assignment` — Prefer compound assignment (`x += y`) over the long form (`x = x + y`) where the two are equivalent.
+- `prefer-arrow-callback` — Reject `function() { ... }` expressions passed as callback arguments — prefer the arrow form.
 - `prefer-const` — Require `const` for variables that are never reassigned after declaration.
 - `prefer-destructuring` — Reject single-property and single-index variable declarations (`const a = obj.a`) that destructuring would replace verbatim.
 - `prefer-exponentiation-operator` — Prefer the `**` operator over `Math.pow(base, exp)`.
 - `prefer-for-of` — Prefer `for..of` over a traditional `for (let i = 0; i < arr.length; i++)` loop when the index is never used inside the body.
+- `prefer-named-capture-group` — Reject regex literals with unnamed capturing groups `(...)` — prefer named groups `(?<name>...)`.
 - `prefer-numeric-literals` — Prefer ES2015+ numeric literal forms (`0b…`, `0o…`, `0x…`) over `parseInt(string, 2 | 8 | 16)`.
 - `prefer-object-has-own` — Prefer `Object.hasOwn(obj, key)` over `Object.prototype.hasOwnProperty.call(obj, key)`.
 - `prefer-object-spread` — Prefer object-spread `{ ...a, ...b }` over `Object.assign({}, a, b)`.
@@ -128,6 +145,8 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/) (MIT).
 - `prefer-template` — Prefer template literals over string concatenation when any operand is non-literal.
 - `radix` — Require an explicit radix argument for `parseInt(str, radix)`.
 - `require-yield` — Require generator functions to contain at least one `yield`.
+- `sort-imports` — Reject import specifiers within a single `import` declaration that aren't alphabetically sorted.
+- `sort-keys` — Reject object-literal property keys that aren't alphabetically sorted.
 - `use-isnan` — Require `Number.isNaN` / `isNaN` for `NaN` checks; restrict `typeof` comparisons to the documented strings.
 - `valid-typeof` — Restrict the right-hand operand of `typeof` to the documented strings (`"number"`, `"object"`, ...) so `typeof x === "undefiend"` typos are caught.
 - `vars-on-top` — Require `var` declarations to be hoisted to the top of their scope by hand, mirroring how the engine treats them.

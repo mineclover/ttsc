@@ -366,6 +366,13 @@ export interface ITtscLintTypeScriptRules {
   "typescript/no-invalid-void-type"?: TtscLintRuleSetting;
 
   /**
+   * TypeScript-aware extension of `no-magic-numbers` that additionally ignores enum member values.
+   *
+   * @reference https://typescript-eslint.io/rules/no-magic-numbers
+   */
+  "typescript/no-magic-numbers"?: TtscLintRuleSetting;
+
+  /**
    * Reject `void X` where `X` is already statically typed `void` — the
    * `void` operator adds nothing because the operand already evaluates
    * to `undefined`. The operator is meaningful only on a value-
@@ -747,6 +754,13 @@ export interface ITtscLintTypeScriptRules {
    * @reference https://typescript-eslint.io/rules/no-unsafe-unary-minus
    */
   "typescript/no-unsafe-unary-minus"?: TtscLintRuleSetting;
+
+  /**
+   * TypeScript-aware extension of `no-useless-constructor` that tolerates a constructor existing solely to expose parameter properties.
+   *
+   * @reference https://typescript-eslint.io/rules/no-useless-constructor
+   */
+  "typescript/no-useless-constructor"?: TtscLintRuleSetting;
 
   /**
    * Reject redundant `export {}` declarations in module files.

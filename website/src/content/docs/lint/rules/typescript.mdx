@@ -37,6 +37,7 @@ Source: [`typescript-eslint`](https://github.com/typescript-eslint/typescript-es
 - `typescript/no-import-type-side-effects` — Hoist inline `type` modifiers on individual imports into a single top-level `import type {}`.
 - `typescript/no-inferrable-types` — Reject explicit type annotations that TypeScript can already infer from the initializer (`const x: number = 1`).
 - `typescript/no-invalid-void-type` — Reject `void` used as anything other than a function return type.
+- `typescript/no-magic-numbers` — TypeScript-aware extension of `no-magic-numbers` that additionally ignores enum member values.
 - `typescript/no-meaningless-void-operator` — Reject `void X` where `X` is already statically typed `void` — the operator adds nothing because the operand already evaluates to `undefined` (type-aware).
 - `typescript/no-misused-new` — Reject signatures that fake a constructor or an instance `new` method — `interface I { new (): I }` (TypeScript treats this as the type of `new I()` regardless of intent) and `class C { new(): C }`.
 - `typescript/no-misused-promises` — Reject Promise values supplied where a non-Promise was expected.
@@ -62,6 +63,7 @@ Source: [`typescript-eslint`](https://github.com/typescript-eslint/typescript-es
 - `typescript/no-unsafe-function-type` — Reject the unsafe `Function` type, which matches every callable regardless of signature.
 - `typescript/no-unsafe-return` — Reject a `return` expression whose static type is `any` from a function whose declared return type is a concrete (non-`any` / non-`unknown` / non-`void`) shape — the `any` leaks past the type boundary and disables every downstream check on the returned value.
 - `typescript/no-unsafe-unary-minus` — Reject the unary `-` operator applied to an operand whose static type is not number-like or bigint-like — `-x` silently coerces strings, objects, and other shapes via `Number(x)` and almost always indicates a bug.
+- `typescript/no-useless-constructor` — TypeScript-aware extension of `no-useless-constructor` that tolerates a constructor existing solely to expose parameter properties.
 - `typescript/no-useless-empty-export` — Reject redundant `export {}` declarations in module files.
 - `typescript/no-wrapper-object-types` — Reject the wrapper object types `String`, `Number`, `Boolean`, `Symbol`, and `BigInt`.
 - `typescript/non-nullable-type-assertion-style` — reject `x as Foo` assertions whose target type is the non-nullable version of `x`'s static type — replace with the shorter `x!` non-null assertion.

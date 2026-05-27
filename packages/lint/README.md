@@ -11,7 +11,7 @@
 
 A linter and formatter. Co-protagonist of the [`ttsc`](https://ttsc.dev) toolchain — paired with `ttsc`, it replaces `eslint` and `prettier`.
 
-530+ rules. Lint violations surface as `error TSxxxxx` from a single compile pass; the formatter applies via `ttsc format`.
+580+ rules. Lint violations surface as `error TSxxxxx` from a single compile pass; the formatter applies via `ttsc format`.
 
 ## Demonstration
 
@@ -203,7 +203,10 @@ Generic ESLint-compatible rules that apply to both JavaScript and TypeScript sou
 
 Source: [ESLint core rules](https://eslint.org/docs/latest/rules/).
 
+- [`camelcase`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/camelcase.ts): reject identifier declarations that aren't camelCase or PascalCase — snake_case bindings are flagged.
+- [`complexity`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/complexity.ts): reject function bodies whose cyclomatic complexity exceeds twenty (default ESLint threshold).
 - [`consistent-return`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/consistent-return.ts): reject functions where some `return` statements return a value and others fall through without one.
+- [`curly`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/curly.ts): require block statements for every `if`, `else`, `while`, `for`, and `do` body — reject the single-statement shorthand.
 - [`default-case`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/default-case.ts): require `switch` statements to include a `default` clause.
 - [`default-case-last`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/default-case-last.ts): require the `default` clause of a `switch` statement to appear last.
 - [`default-param-last`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/default-param-last.ts): keeps parameters with default values at the end of the list.
@@ -213,7 +216,15 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/).
 - [`getter-return`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/getter-return.ts): require a `get` accessor's body to return a value on every reachable exit.
 - [`grouped-accessor-pairs`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/grouped-accessor-pairs.ts): require the `get` and `set` accessors of a property to be declared adjacent in the class body.
 - [`guard-for-in`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/guard-for-in.ts): require `for...in` bodies to guard against inherited keys with `Object.hasOwn` or `Object.prototype.hasOwnProperty.call`.
+- [`id-length`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/id-length.ts): reject identifier names shorter than two characters.
+- [`init-declarations`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/init-declarations.ts): require every `var` / `let` declaration to be initialized at its declaration site.
+- [`max-classes-per-file`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/max-classes-per-file.ts): reject a source file that declares more than one class.
+- [`max-depth`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/max-depth.ts): reject block-statement nesting deeper than four levels inside a function.
+- [`max-lines`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/max-lines.ts): reject a source file whose total line count exceeds three hundred.
+- [`max-lines-per-function`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/max-lines-per-function.ts): reject a function whose body spans more than fifty lines.
+- [`max-nested-callbacks`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/max-nested-callbacks.ts): reject callback nesting deeper than ten inside a single function.
 - [`max-params`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/max-params.ts): reject function declarations with more than three parameters.
+- [`max-statements`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/max-statements.ts): reject function bodies whose statement count exceeds ten.
 - [`no-alert`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-alert.ts): rejects `alert`, `confirm`, and `prompt`.
 - [`no-array-constructor`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-array-constructor.ts): rejects `Array` constructor calls.
 - [`no-async-promise-executor`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-async-promise-executor.ts): rejects async Promise executors.
@@ -255,6 +266,7 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/).
 - [`no-implicit-coercion`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-implicit-coercion.ts): reject common implicit-coercion idioms (`!!x`, `+x`, `"" + x`) in favor of the explicit `Boolean(x)` / `Number(x)` / `String(x)` conversions.
 - [`no-import-assign`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-import-assign.ts): rejects writes to imported bindings (including `ns.x = ...` for namespace imports).
 - [`no-inner-declarations`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-inner-declarations.ts): rejects function declarations nested in blocks.
+- [`no-invalid-this`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-invalid-this.ts): reject `this` references outside any function-like, class method, or class-static-block context.
 - [`no-irregular-whitespace`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-irregular-whitespace.ts): rejects irregular whitespace.
 - [`no-iterator`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-iterator.ts): rejects `__iterator__`.
 - [`no-labels`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-labels.ts): rejects labels.
@@ -262,6 +274,7 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/).
 - [`no-lonely-if`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-lonely-if.ts): rejects `if` as the only statement in an `else`.
 - [`no-loop-func`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-loop-func.ts): reject function declarations defined inside the body of a loop.
 - [`no-loss-of-precision`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-loss-of-precision.ts): rejects number literals that lose precision.
+- [`no-magic-numbers`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-magic-numbers.ts): reject inline numeric literals outside `const` initializer position. `0`, `1`, `-1`, array indices, and enum values are exempt.
 - [`no-misleading-character-class`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-misleading-character-class.ts): rejects misleading regex character classes.
 - [`no-mixed-operators`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-mixed-operators.ts): reject mixing operators of different precedence families in the same expression without explicit parentheses around the inner sub-expression.
 - [`no-multi-assign`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-multi-assign.ts): rejects chained assignments.
@@ -283,6 +296,8 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/).
 - [`no-prototype-builtins`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-prototype-builtins.ts): rejects direct `Object.prototype` method calls.
 - [`no-redeclare`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-redeclare.ts): rejects redeclaring a binding in the same scope.
 - [`no-regex-spaces`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-regex-spaces.ts): rejects repeated literal spaces in regexes.
+- [`no-restricted-imports`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-restricted-imports.ts): reject `import` declarations targeting any module specifier in the project denylist.
+- [`no-restricted-syntax`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-restricted-syntax.ts): reject AST node kinds listed in the project denylist.
 - [`no-return-assign`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-return-assign.ts): rejects assignments in `return`.
 - [`no-script-url`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-script-url.ts): rejects `javascript:` URLs.
 - [`no-self-assign`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-self-assign.ts): rejects assignments to the same value.
@@ -316,10 +331,12 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/).
 - [`no-with`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-with.ts): rejects `with` statements.
 - [`object-shorthand`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/object-shorthand.ts): requires object property shorthand where possible.
 - [`operator-assignment`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/operator-assignment.ts): prefers compound assignment operators.
+- [`prefer-arrow-callback`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-arrow-callback.ts): reject `function() { ... }` expressions passed as callback arguments — prefer the arrow form.
 - [`prefer-const`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-const.ts): prefers `const` for `let` bindings that are never reassigned.
 - [`prefer-destructuring`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-destructuring.ts): reject single-property and single-index variable declarations (`const a = obj.a`, `const x = arr[0]`) that destructuring would replace verbatim.
 - [`prefer-exponentiation-operator`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-exponentiation-operator.ts): prefers `**` over `Math.pow`.
 - [`prefer-for-of`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-for-of.ts): prefers `for...of` for simple array iteration.
+- [`prefer-named-capture-group`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-named-capture-group.ts): reject regex literals with unnamed capturing groups `(...)` — prefer named groups `(?<name>...)`.
 - [`prefer-numeric-literals`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-numeric-literals.ts): prefer ES2015+ numeric literal forms (`0b…`, `0o…`, `0x…`) over `parseInt(string, 2 | 8 | 16)`.
 - [`prefer-object-has-own`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-object-has-own.ts): prefer `Object.hasOwn(obj, key)` over `Object.prototype.hasOwnProperty.call(obj, key)`.
 - [`prefer-object-spread`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-object-spread.ts): prefer object-spread `{ ...a, ...b }` over `Object.assign({}, a, b)`.
@@ -328,6 +345,8 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/).
 - [`prefer-template`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-template.ts): prefers template literals over string concatenation.
 - [`radix`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/radix.ts): requires a radix argument for `parseInt`.
 - [`require-yield`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/require-yield.ts): requires generator functions to contain `yield`.
+- [`sort-imports`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/sort-imports.ts): reject import specifiers within a single `import` declaration that aren't alphabetically sorted.
+- [`sort-keys`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/sort-keys.ts): reject object-literal property keys that aren't alphabetically sorted.
 - [`use-isnan`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/use-isnan.ts): requires `Number.isNaN`/`isNaN` for `NaN` checks.
 - [`valid-typeof`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/valid-typeof.ts): restricts `typeof` comparisons to valid strings.
 - [`vars-on-top`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/vars-on-top.ts): requires `var` declarations at the top of their scope.
@@ -372,6 +391,7 @@ Source: [`typescript-eslint`](https://github.com/typescript-eslint/typescript-es
 - [`typescript/no-import-type-side-effects`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-import-type-side-effects/violation.ts): hoists inline `type` modifiers into a single `import type` declaration.
 - [`typescript/no-inferrable-types`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-inferrable-types.ts): rejects type annotations TypeScript can infer.
 - [`typescript/no-invalid-void-type`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/typescript-no-invalid-void-type.ts): reject `void` used as anything other than a function return type.
+- [`typescript/no-magic-numbers`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/typescript-no-magic-numbers.ts): typeScript-aware extension of `no-magic-numbers` that additionally ignores enum member values.
 - [`typescript/no-meaningless-void-operator`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/typescript-no-meaningless-void-operator.ts): reject `void X` where `X` is already statically typed `void` — the operator adds nothing because the operand already evaluates to `undefined` (type-aware).
 - [`typescript/no-misused-new`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-misused-new.ts): rejects constructor-like signatures in interfaces.
 - [`typescript/no-misused-promises`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-misused-promises.ts): reject Promise values supplied where a non-Promise was expected.
@@ -397,6 +417,7 @@ Source: [`typescript-eslint`](https://github.com/typescript-eslint/typescript-es
 - [`typescript/no-unsafe-function-type`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-unsafe-function-type.ts): rejects the unsafe `Function` type.
 - [`typescript/no-unsafe-return`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/typescript-no-unsafe-return.ts): reject a `return` expression whose static type is `any` from a function whose declared return type is a concrete (non-`any` / non-`unknown` / non-`void`) shape — the `any` leaks past the type boundary and disables every downstream check on the returned value (type-aware).
 - [`typescript/no-unsafe-unary-minus`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/typescript-no-unsafe-unary-minus.ts): reject the unary `-` operator applied to an operand whose static type is not number-like or bigint-like — `-x` silently coerces strings, objects, and other shapes via `Number(x)` and almost always indicates a bug (type-aware).
+- [`typescript/no-useless-constructor`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/typescript-no-useless-constructor.ts): typeScript-aware extension of `no-useless-constructor` that tolerates a constructor existing solely to expose parameter properties.
 - [`typescript/no-useless-empty-export`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-useless-empty-export.ts): rejects redundant empty `export {}` declarations in module files.
 - [`typescript/no-wrapper-object-types`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-wrapper-object-types.ts): rejects boxed object type names such as `String` and `Boolean`.
 - [`typescript/non-nullable-type-assertion-style`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/non-nullable-type-assertion-style.ts): reject `x as Foo` assertions whose target type is the non-nullable version of `x`'s static type — replace with the shorter `x!` non-null assertion.

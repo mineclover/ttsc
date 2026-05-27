@@ -1,6 +1,6 @@
-// expect: functional/no-mixed-types error
 type Mixed = {
   value: number;
+  // expect: functional/no-mixed-types error
   compute(): number;
 };
 

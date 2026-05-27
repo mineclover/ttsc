@@ -16,3 +16,6 @@ compiler-dependencies/node_modules
 compiler-dependencies/package-lock.json
 # Native sanity binary built by `go build ./compiler/playground` outside the wasm path.
 compiler/playground
+
+# Auto-generated blog RSS feed
+public/blog/rss.xml

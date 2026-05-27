@@ -88,6 +88,12 @@ export function PlaygroundShell({
   const dependencyProgressTimer = useRef<number | null>(null);
   const dependencyInstallChain = useRef<Promise<void>>(Promise.resolve());
   const dependencyAbort = useRef<AbortController | null>(null);
+  // Mirror `preinstalledPackages` into a ref so the worker-teardown
+  // effect can read the current value without taking the prop as a
+  // dep — listing the array prop in deps would tear down the worker on
+  // every parent re-render that produces a fresh array reference.
+  const preinstalledPackagesRef =
+    useRef<readonly string[]>(preinstalledPackages);
   // The ref tracks names the wasm MemFS already has — preinstalled at boot
   // (via `preinstalledPackages`) plus everything `installPlaygroundDependencies`
   // has added across the session. A useEffect below merges fresh
@@ -141,11 +147,12 @@ export function PlaygroundShell({
     setSource(next);
   }, []);
 
-  // ── Sync installedDependencyNames when preinstalledPackages prop changes ──
-  // The ref captures the initial value on mount; without this effect a
+  // ── Sync installedDependencyNames + preinstalledPackagesRef on prop change ──
+  // The refs capture the initial value on mount; without this effect a
   // parent that swaps `preinstalledPackages` later would race a stale
   // Set against the fresh prop used in `ignoredPackages` below.
   useEffect(() => {
+    preinstalledPackagesRef.current = preinstalledPackages;
     for (const name of preinstalledPackages) {
       installedDependencyNames.current.add(name);
     }
@@ -418,13 +425,21 @@ export function PlaygroundShell({
   // would make installDependenciesForSource skip the install (because
   // `installedDependencyNames.current.has(name)` is still true) and
   // the next compile would fail with `Cannot find module`.
+  //
+  // The effect depends on `[client]` ONLY — listing the array prop
+  // `preinstalledPackages` in deps would tear down the worker on every
+  // parent re-render that produces a fresh array reference. We read the
+  // current value through `preinstalledPackagesRef`, which the sync
+  // effect above keeps up to date.
   useEffect(
     () => () => {
       void client.reset();
-      installedDependencyNames.current = new Set<string>(preinstalledPackages);
+      installedDependencyNames.current = new Set<string>(
+        preinstalledPackagesRef.current,
+      );
       runtimeDependencyFiles.current = {};
     },
-    [client, preinstalledPackages],
+    [client],
   );
 
   const onPickExample = useCallback(

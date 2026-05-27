@@ -65,6 +65,15 @@ function resolveWasmUrl(wasmUrl: string): string {
  * are serialized via `bootChainByApiName` so they don't race on the
  * shared `globalThis[apiName+"Ready"]` resolver slot. On rejection the
  * cache entries are cleared so the next call retries from scratch.
+ *
+ * **Single-Worker caveat.** Even with the chain, a second boot loaded
+ * into the SAME Worker after a first boot completes will overlay its
+ * Go runtime on top of the first — `importScripts(wasmExecUrl)` rebinds
+ * `globalThis.Go`, and the first wasm's keepalive goroutine keeps
+ * running through the new runtime's js-bridge tables. The serialization
+ * is sufficient for the typical use case (one boot per Worker over the
+ * page's lifetime) but DOES NOT make a Worker safe to host two wasm
+ * instances at once. Create a fresh Worker per concurrent wasm.
  */
 export function bootTtsc(options: IBootTtscOptions): Promise<IBootResult> {
   const apiName = options.apiName ?? "ttsc";

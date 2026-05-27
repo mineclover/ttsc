@@ -26,6 +26,19 @@ export interface ITtscLintReactRules {
   "react/button-has-type"?: TtscLintRuleSetting;
 
   /**
+   * Require components wrapped in `React.memo(...)` or
+   * `React.forwardRef(...)` to be named — either by passing a named
+   * function, assigning the call to a named binding, or setting an
+   * explicit `displayName`.
+   *
+   * Anonymous wrappers leave the resulting component nameless in
+   * React DevTools and runtime stack frames.
+   *
+   * @reference https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/display-name.md
+   */
+  "react/display-name"?: TtscLintRuleSetting;
+
+  /**
    * Detect high-confidence missing identifiers in React Hook
    * dependency arrays (`useEffect`, `useLayoutEffect`,
    * `useInsertionEffect`, `useMemo`, `useCallback`).
@@ -93,6 +106,42 @@ export interface ITtscLintReactRules {
    * @reference https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-script-url.md
    */
   "react/jsx-no-script-url"?: TtscLintRuleSetting;
+
+  /**
+   * Reject `<a target="_blank">` (or any JSX element with
+   * `target="_blank"`) that does not also carry `rel="noreferrer"`
+   * (or `rel="noopener noreferrer"`).
+   *
+   * Without those tokens the opened page can navigate the originating
+   * window through `window.opener`, a phishing and tab-nabbing vector.
+   *
+   * @reference https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-target-blank.md
+   */
+  "react/jsx-no-target-blank"?: TtscLintRuleSetting;
+
+  /**
+   * Reject JSX elements whose tag is an uppercase identifier with no
+   * value-level declaration anywhere in the source file.
+   *
+   * Lowercase tags are intrinsic HTML; qualified `<Foo.Bar>` forms are
+   * skipped because resolving the outer name requires module-level
+   * information that belongs to the type checker.
+   *
+   * @reference https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-undef.md
+   */
+  "react/jsx-no-undef"?: TtscLintRuleSetting;
+
+  /**
+   * Reject JSX fragments that wrap exactly one element child or have
+   * no meaningful content — the child (or nothing) can be returned
+   * directly.
+   *
+   * Covers both the short `<>...</>` form and explicit
+   * `<Fragment>` / `<React.Fragment>` elements.
+   *
+   * @reference https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-no-useless-fragment.md
+   */
+  "react/jsx-no-useless-fragment"?: TtscLintRuleSetting;
 
   /**
    * Reject `key={index}` patterns inside JSX lists — array index

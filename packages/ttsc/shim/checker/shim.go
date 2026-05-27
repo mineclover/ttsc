@@ -46,6 +46,9 @@ const (
   TypeFlagsNumberLike      = innerchecker.TypeFlagsNumberLike
   TypeFlagsBigIntLike      = innerchecker.TypeFlagsBigIntLike
   TypeFlagsBooleanLike     = innerchecker.TypeFlagsBooleanLike
+  TypeFlagsEnum            = innerchecker.TypeFlagsEnum
+  TypeFlagsEnumLiteral     = innerchecker.TypeFlagsEnumLiteral
+  TypeFlagsEnumLike        = innerchecker.TypeFlagsEnumLike
 
   ObjectFlagsReference        = innerchecker.ObjectFlagsReference
   ObjectFlagsClass            = innerchecker.ObjectFlagsClass

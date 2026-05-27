@@ -21,6 +21,8 @@ func (r reactRule) Visits() []shimast.Kind {
 		return []shimast.Kind{shimast.KindBinaryExpression}
 	case "no-unescaped-entities":
 		return []shimast.Kind{shimast.KindJsxText}
+	case "jsx-no-useless-fragment":
+		return []shimast.Kind{shimast.KindJsxFragment, shimast.KindJsxElement, shimast.KindJsxSelfClosingElement}
 	}
 	return []shimast.Kind{shimast.KindJsxElement, shimast.KindJsxSelfClosingElement}
 }
@@ -55,6 +57,10 @@ func (r reactRule) Check(ctx *Context, node *shimast.Node) {
 		checkReactIframeMissingSandbox(ctx, node)
 	case "jsx-no-script-url":
 		checkReactJSXNoScriptURL(ctx, node)
+	case "jsx-no-target-blank":
+		checkReactJSXNoTargetBlank(ctx, node)
+	case "jsx-no-useless-fragment":
+		checkReactJSXNoUselessFragment(ctx, node)
 	case "style-prop-object":
 		checkReactStylePropObject(ctx, node)
 	case "void-dom-elements-no-children":
@@ -209,6 +215,134 @@ func checkReactJSXNoScriptURL(ctx *Context, node *shimast.Node) {
 			ctx.Report(attr.node, "Do not use javascript: URLs in JSX props.")
 		}
 	}
+}
+
+func checkReactJSXNoTargetBlank(ctx *Context, node *shimast.Node) {
+	info := reactJSXElementFromNode(node)
+	if info.opening == nil {
+		return
+	}
+	target, ok := reactFindJSXAttr(info.attrs, "target")
+	if !ok || !target.known {
+		return
+	}
+	if strings.TrimSpace(target.value) != "_blank" {
+		return
+	}
+	rel, ok := reactFindJSXAttr(info.attrs, "rel")
+	if ok && rel.known && strings.Contains(rel.value, "noreferrer") {
+		return
+	}
+	ctx.Report(info.opening, "JSX elements with `target=\"_blank\"` must include `rel=\"noreferrer\"` (or `noopener noreferrer`).")
+}
+
+func checkReactJSXNoUselessFragment(ctx *Context, node *shimast.Node) {
+	children, ok := reactUselessFragmentChildren(node)
+	if !ok {
+		return
+	}
+	meaningful := reactMeaningfulJSXChildren(children)
+	if len(meaningful) == 0 {
+		ctx.Report(node, "Fragment wraps a single element — return the child directly.")
+		return
+	}
+	if len(meaningful) == 1 {
+		switch meaningful[0].Kind {
+		case shimast.KindJsxElement, shimast.KindJsxSelfClosingElement, shimast.KindJsxFragment:
+			ctx.Report(node, "Fragment wraps a single element — return the child directly.")
+		}
+	}
+}
+
+// reactUselessFragmentChildren returns the child list of a fragment-like node
+// — the short `<>...</>` form or an explicit `<Fragment>` / `<React.Fragment>`
+// element — along with `true`. For any other node it returns false.
+//
+// JsxSelfClosingElement is included so an empty `<Fragment />` is still
+// considered a useless wrapper.
+func reactUselessFragmentChildren(node *shimast.Node) (*shimast.NodeList, bool) {
+	if node == nil {
+		return nil, false
+	}
+	switch node.Kind {
+	case shimast.KindJsxFragment:
+		frag := node.AsJsxFragment()
+		if frag == nil {
+			return nil, false
+		}
+		return frag.Children, true
+	case shimast.KindJsxElement:
+		el := node.AsJsxElement()
+		if el == nil || el.OpeningElement == nil {
+			return nil, false
+		}
+		if !reactIsFragmentTagName(el.OpeningElement.TagName()) {
+			return nil, false
+		}
+		return el.Children, true
+	case shimast.KindJsxSelfClosingElement:
+		el := node.AsJsxSelfClosingElement()
+		if el == nil {
+			return nil, false
+		}
+		if !reactIsFragmentTagName(el.TagName) {
+			return nil, false
+		}
+		return nil, true
+	}
+	return nil, false
+}
+
+// reactIsFragmentTagName reports whether a JSX tag-name node refers to React's
+// fragment component — either the bare `Fragment` identifier or the
+// `React.Fragment` qualified form.
+func reactIsFragmentTagName(node *shimast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if identifierText(node) == "Fragment" {
+		return true
+	}
+	if node.Kind == shimast.KindPropertyAccessExpression {
+		access := node.AsPropertyAccessExpression()
+		if access == nil {
+			return false
+		}
+		if identifierText(access.Expression) == "React" && identifierText(access.Name()) == "Fragment" {
+			return true
+		}
+	}
+	return false
+}
+
+// reactMeaningfulJSXChildren returns the JSX children that contribute rendered
+// output. Whitespace-only JsxText and empty JsxExpression nodes are skipped so
+// the caller sees only nodes that could replace the fragment.
+func reactMeaningfulJSXChildren(children *shimast.NodeList) []*shimast.Node {
+	if children == nil {
+		return nil
+	}
+	out := make([]*shimast.Node, 0, len(children.Nodes))
+	for _, child := range children.Nodes {
+		if child == nil {
+			continue
+		}
+		if child.Kind == shimast.KindJsxText {
+			if strings.TrimSpace(nodeText(nilSafeSourceFile(child), child)) == "" {
+				continue
+			}
+			out = append(out, child)
+			continue
+		}
+		if child.Kind == shimast.KindJsxExpression {
+			expr := child.AsJsxExpression()
+			if expr == nil || expr.Expression == nil {
+				continue
+			}
+		}
+		out = append(out, child)
+	}
+	return out
 }
 
 func checkReactStylePropObject(ctx *Context, node *shimast.Node) {
@@ -620,6 +754,8 @@ func init() {
 		"jsx-key",
 		"jsx-no-duplicate-props",
 		"jsx-no-script-url",
+		"jsx-no-target-blank",
+		"jsx-no-useless-fragment",
 		"no-array-index-key",
 		"no-children-prop",
 		"no-danger",

@@ -31,9 +31,9 @@ async function testCase() {
     "testing-library/no-wait-for-snapshot":            SeverityError,
     "testing-library/prefer-find-by":                  SeverityError,
   }, []ruleExpectation{
-    {Rule: "testing-library/no-wait-for-multiple-assertions", Severity: SeverityError, Line: 1},
-    {Rule: "testing-library/no-wait-for-side-effects", Severity: SeverityError, Line: 1},
-    {Rule: "testing-library/no-wait-for-snapshot", Severity: SeverityError, Line: 1},
-    {Rule: "testing-library/prefer-find-by", Severity: SeverityError, Line: 1},
+    {Rule: "testing-library/no-wait-for-multiple-assertions", Severity: SeverityError, Line: 5},
+    {Rule: "testing-library/no-wait-for-side-effects", Severity: SeverityError, Line: 5},
+    {Rule: "testing-library/no-wait-for-snapshot", Severity: SeverityError, Line: 5},
+    {Rule: "testing-library/prefer-find-by", Severity: SeverityError, Line: 5},
   })
 }

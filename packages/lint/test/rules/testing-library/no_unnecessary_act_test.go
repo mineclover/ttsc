@@ -26,6 +26,6 @@ function testCase() {
   assertTestingLibraryFindings(t, source, RuleConfig{
     "testing-library/no-unnecessary-act": SeverityError,
   }, []ruleExpectation{
-    {Rule: "testing-library/no-unnecessary-act", Severity: SeverityError, Line: 1},
+    {Rule: "testing-library/no-unnecessary-act", Severity: SeverityError, Line: 5},
   })
 }

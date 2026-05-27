@@ -301,26 +301,6 @@ func wrapperPrimitive(name string) (string, bool) {
   return "", false
 }
 
-// noUselessConstructor: an empty constructor with no parameters is noise.
-// typescript-eslint strict: https://typescript-eslint.io/rules/no-useless-constructor/
-type noUselessConstructor struct{}
-
-func (noUselessConstructor) Name() string           { return "no-useless-constructor" }
-func (noUselessConstructor) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindConstructor} }
-func (noUselessConstructor) Check(ctx *Context, node *shimast.Node) {
-  ctor := node.AsConstructorDeclaration()
-  if ctor == nil || ctor.Body == nil {
-    return
-  }
-  if len(node.Parameters()) != 0 {
-    return
-  }
-  body := ctor.Body.AsBlock()
-  if body == nil || body.Statements == nil || len(body.Statements.Nodes) == 0 {
-    ctx.Report(node, "Useless empty constructor.")
-  }
-}
-
 // preferLiteralEnumMember: computed enum members are harder to inspect.
 // typescript-eslint strict: https://typescript-eslint.io/rules/prefer-literal-enum-member/
 type preferLiteralEnumMember struct{}
@@ -500,7 +480,6 @@ func init() {
   Register(noUnsafeDeclarationMerging{})
   Register(noUnsafeFunctionType{})
   Register(noWrapperObjectTypes{})
-  Register(noUselessConstructor{})
   Register(preferLiteralEnumMember{})
   Register(consistentTypeAssertions{})
   Register(consistentTypeDefinitions{})

@@ -801,8 +801,8 @@ func isTacitWrapperText(text string) bool {
 	if len(parts) != 2 {
 		return false
 	}
-	param := strings.Trim(parts[0], "()")
-	if !isFunctionalIdentifier(param) {
+	param := tacitWrapperParameterName(strings.Trim(parts[0], "()"))
+	if param == "" {
 		return false
 	}
 	call := parts[1]
@@ -816,6 +816,33 @@ func isTacitWrapperText(text string) bool {
 	callee := call[:open]
 	arg := strings.TrimSuffix(call[open+1:], ")")
 	return arg == param && isFunctionalMemberChain(callee)
+}
+
+// tacitWrapperParameterName returns the bare identifier of a single
+// arrow-function parameter, peeling off a `: Type` annotation and an
+// optional `?` so the rule still matches typed wrappers like
+// `(value: number) => transform(value)`. Returns "" when the parameter
+// list is empty, contains a destructured pattern, or has more than one
+// parameter (a multi-arg list is split by `=>` further upstream).
+func tacitWrapperParameterName(param string) string {
+	if param == "" {
+		return ""
+	}
+	// Strip default value: `x = 0`. The default would re-evaluate
+	// inside the wrapper, so the tacit form would lose it — bail.
+	if strings.ContainsRune(param, '=') {
+		return ""
+	}
+	// Strip optional marker and type annotation.
+	if i := strings.IndexRune(param, ':'); i >= 0 {
+		param = param[:i]
+	}
+	param = strings.TrimSuffix(param, "?")
+	param = strings.TrimSpace(param)
+	if !isFunctionalIdentifier(param) {
+		return ""
+	}
+	return param
 }
 
 func isFunctionalMemberChain(text string) bool {

@@ -21,6 +21,60 @@ import type { TtscLintRuleSetting } from "../TtscLintRuleSetting";
  */
 export interface ITtscLintCoreRules {
   /**
+   * Require block statements for every `if`, `else`, `while`, `for`, and `do` body — reject the single-statement shorthand.
+   *
+   * @reference https://eslint.org/docs/latest/rules/curly
+   */
+  "curly"?: TtscLintRuleSetting;
+
+  /**
+   * Require `switch` statements to include a `default` clause.
+   *
+   * A switch without `default` silently drops every discriminant value
+   * that no `case` label matched. The rule forces the catch-all branch
+   * to be written out so unhandled cases become an intentional decision
+   * instead of a hidden fall-through.
+   *
+   * @reference https://eslint.org/docs/latest/rules/default-case
+   */
+  "default-case"?: TtscLintRuleSetting;
+
+  /**
+   * Require the `default` clause of a `switch` statement to appear
+   * after every explicit `case` label.
+   *
+   * Placing `default` ahead of a `case` reverses the visual order of
+   * the labels and changes the fall-through path — running `default`
+   * and then falling into the next `case` is almost always a
+   * misordering rather than intent.
+   *
+   * @reference https://eslint.org/docs/latest/rules/default-case-last
+   */
+  "default-case-last"?: TtscLintRuleSetting;
+
+  /**
+   * Reject identifier declarations that aren't camelCase or PascalCase — snake_case bindings are flagged.
+   *
+   * @reference https://eslint.org/docs/latest/rules/camelcase
+   */
+  "camelcase"?: TtscLintRuleSetting;
+
+  /**
+   * Reject function bodies whose cyclomatic complexity exceeds twenty (default ESLint threshold).
+   *
+   * @reference https://eslint.org/docs/latest/rules/complexity
+   */
+  "complexity"?: TtscLintRuleSetting;
+
+  /**
+   * Reject functions where some `return` statements return a value and
+   * others (explicit bare `return;` or implicit fall-through) do not.
+   *
+   * @reference https://eslint.org/docs/latest/rules/consistent-return
+   */
+  "consistent-return"?: TtscLintRuleSetting;
+
+  /**
    * Reject `(req, opt = 1, req2)` and similar parameter lists where a
    * required parameter follows an optional or default-valued one.
    *
@@ -63,6 +117,117 @@ export interface ITtscLintCoreRules {
   "for-direction"?: TtscLintRuleSetting;
 
   /**
+   * Require a `get` accessor's body to return a value on every
+   * reachable exit. A getter that falls through returns `undefined`
+   * to the caller, which is almost never the intent and turns into a
+   * silent bug that only surfaces when the property is finally read.
+   *
+   * @reference https://eslint.org/docs/latest/rules/getter-return
+   */
+  "getter-return"?: TtscLintRuleSetting;
+
+  /**
+   * Require the `get` and `set` accessors of a single property to be
+   * declared adjacent in the class body.
+   *
+   * When the read and write halves of a property are split apart by
+   * unrelated members, a reader scanning the class has to chase the
+   * pair across the body — and patches to one half are easy to make
+   * without noticing the other.
+   *
+   * @reference https://eslint.org/docs/latest/rules/grouped-accessor-pairs
+   */
+  "grouped-accessor-pairs"?: TtscLintRuleSetting;
+
+  /**
+   * Require the body of every `for (key in obj)` loop to begin with a
+   * guard against inherited keys: `Object.hasOwn(obj, key)` or the
+   * older `Object.prototype.hasOwnProperty.call(obj, key)`. The
+   * inverted-guard early-skip shape `if (!Object.hasOwn(...))
+   * continue;` is also accepted.
+   *
+   * Without the guard the loop processes every enumerable name on the
+   * prototype chain — including monkey-patches someone else attached
+   * to `Object.prototype` — so an unguarded body silently leaks work
+   * onto inherited entries.
+   *
+   * @reference https://eslint.org/docs/latest/rules/guard-for-in
+   */
+  "guard-for-in"?: TtscLintRuleSetting;
+
+  /**
+   * Reject identifier names shorter than two characters.
+   *
+   * @reference https://eslint.org/docs/latest/rules/id-length
+   */
+  "id-length"?: TtscLintRuleSetting;
+
+  /**
+   * Require every `var` / `let` declaration to be initialized at its declaration site.
+   *
+   * @reference https://eslint.org/docs/latest/rules/init-declarations
+   */
+  "init-declarations"?: TtscLintRuleSetting;
+
+  /**
+   * Reject a source file that declares more than one class.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-classes-per-file
+   */
+  "max-classes-per-file"?: TtscLintRuleSetting;
+
+  /**
+   * Reject block-statement nesting deeper than four levels inside a function.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-depth
+   */
+  "max-depth"?: TtscLintRuleSetting;
+
+  /**
+   * Reject a source file whose total line count exceeds three hundred.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-lines
+   */
+  "max-lines"?: TtscLintRuleSetting;
+
+  /**
+   * Reject a function whose body spans more than fifty lines.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-lines-per-function
+   */
+  "max-lines-per-function"?: TtscLintRuleSetting;
+
+  /**
+   * Reject callback nesting deeper than ten inside a single function.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-nested-callbacks
+   */
+  "max-nested-callbacks"?: TtscLintRuleSetting;
+
+  /**
+   * Reject function declarations whose parameter list grows beyond
+   * three. Long parameter lists are hard to read at the call site
+   * because positional arguments lose their names; folding them into
+   * an options object recovers the names and lets callers pass a
+   * subset.
+   *
+   * Every function-like declaration is checked: function declarations,
+   * function expressions, arrow functions, methods, accessors, and
+   * constructors. The threshold is fixed at three to match the ESLint
+   * default; rule options are deferred.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-params
+   */
+  "max-params"?: TtscLintRuleSetting;
+
+  /**
+   * Reject function bodies whose statement count exceeds ten.
+   *
+   * @reference https://eslint.org/docs/latest/rules/max-statements
+   */
+  "max-statements"?: TtscLintRuleSetting;
+
+  /**
    * Reject calls to `alert`, `confirm`, and `prompt`.
    *
    * These browser dialogs block the main thread and are almost always
@@ -93,6 +258,18 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/no-async-promise-executor
    */
   "no-async-promise-executor"?: TtscLintRuleSetting;
+
+  /**
+   * Reject `await` expressions evaluated inside a loop body. The loop
+   * runs strictly serially because each iteration blocks on the
+   * previous one's microtask hop; when the operations are independent
+   * the equivalent `Promise.all([…])` is dramatically faster. The rule
+   * intentionally exempts `for await … of` because the awaitable
+   * iterator is the loop's whole reason for existing.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-await-in-loop
+   */
+  "no-await-in-loop"?: TtscLintRuleSetting;
 
   /**
    * Reject bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`, `>>>`).
@@ -190,6 +367,16 @@ export interface ITtscLintCoreRules {
   "no-continue"?: TtscLintRuleSetting;
 
   /**
+   * Reject `return X;` (with a value) inside a class constructor. The
+   * returned value is ignored when the constructor is invoked with
+   * `new` unless it happens to be an object; relying on that behavior
+   * is always a misunderstanding of the constructor protocol.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-constructor-return
+   */
+  "no-constructor-return"?: TtscLintRuleSetting;
+
+  /**
    * Reject ASCII control characters (`\x00`–`\x1F`) inside regular
    * expression literals and `RegExp` strings.
    *
@@ -232,6 +419,17 @@ export interface ITtscLintCoreRules {
   "no-dupe-args"?: TtscLintRuleSetting;
 
   /**
+   * Reject two declarations of the same member on a single class. The
+   * later declaration silently overwrites the earlier one at runtime;
+   * the syntax permits it but the result is never what the author
+   * intended. A getter and a setter for the same property coexist; an
+   * instance member and a static member with the same name coexist.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-dupe-class-members
+   */
+  "no-dupe-class-members"?: TtscLintRuleSetting;
+
+  /**
    * Reject `if (a) {} else if (a) {}` — the second branch is
    * unreachable because the first condition already handled it.
    *
@@ -254,6 +452,25 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/no-duplicate-case
    */
   "no-duplicate-case"?: TtscLintRuleSetting;
+
+  /**
+   * Reject two import declarations that resolve to the same module
+   * specifier. The runtime sees one module load either way; the
+   * duplicated declaration is purely noise at the head of the file
+   * and obscures the dependency graph.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-duplicate-imports
+   */
+  "no-duplicate-imports"?: TtscLintRuleSetting;
+
+  /**
+   * Reject an `else` block whose preceding `if` branch already
+   * terminates control flow with `return`, `throw`, `break`, or
+   * `continue` — flatten the body into the surrounding scope.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-else-return
+   */
+  "no-else-return"?: TtscLintRuleSetting;
 
   /**
    * Reject empty blocks (`if (x) {}`, `while (x) {}`, `try {} catch
@@ -284,6 +501,22 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/no-empty-function
    */
   "no-empty-function"?: TtscLintRuleSetting;
+
+  /**
+   * Reject empty named import or export clauses — `import {} from "x"`,
+   * `import name, {} from "x"`, and `export {}` — which bind nothing.
+   *
+   * The empty-only import shape leaves just the side-effect load and is
+   * better written as `import "x"`; the default-plus-empty form should
+   * drop the empty clause; and a bare `export {}` either restates
+   * module-ness redundantly or marks an otherwise non-module file in
+   * a way that has cleaner alternatives. The stricter sibling rule
+   * `typescript/no-useless-empty-export` fires only when another
+   * module-syntax statement is already present.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-empty-named-blocks
+   */
+  "no-empty-named-blocks"?: TtscLintRuleSetting;
 
   /**
    * Reject empty destructuring patterns (`const {} = obj`, `function
@@ -329,6 +562,16 @@ export interface ITtscLintCoreRules {
   "no-ex-assign"?: TtscLintRuleSetting;
 
   /**
+   * Reject assignments to a built-in prototype such as
+   * `Array.prototype.foo = bar`. Only `<Builtin>.prototype.<key> = …`
+   * is flagged; assigning to `Object.foo = …` (a static property) is
+   * left alone.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-extend-native
+   */
+  "no-extend-native"?: TtscLintRuleSetting;
+
+  /**
    * Reject unnecessary `Function.prototype.bind()` calls — for
    * example, binding without arguments or binding an arrow function
    * (which ignores `this`).
@@ -365,12 +608,41 @@ export interface ITtscLintCoreRules {
   "no-func-assign"?: TtscLintRuleSetting;
 
   /**
+   * Reject common implicit-coercion idioms (`!!x`, `+x`, `"" + x`) in
+   * favor of the explicit `Boolean(x)` / `Number(x)` / `String(x)`
+   * conversions. The explicit forms are more readable and avoid
+   * surprise around primitive edge cases.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-implicit-coercion
+   */
+  "no-implicit-coercion"?: TtscLintRuleSetting;
+
+  /**
+   * Reject writes to a binding introduced by an `import` declaration —
+   * assignment (`x = …`), compound assignment, or increment/decrement
+   * of an imported name, plus property mutations of a namespace import
+   * (`ns.foo = …`). Imported bindings are read-only at runtime; mutating
+   * them either throws under strict mode or silently desynchronises the
+   * module's view of its own exports.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-import-assign
+   */
+  "no-import-assign"?: TtscLintRuleSetting;
+
+  /**
    * Reject `function` and `var` declarations nested in non-function
    * blocks (loops, `if`, etc.) — they hoist in surprising ways.
    *
    * @reference https://eslint.org/docs/latest/rules/no-inner-declarations
    */
   "no-inner-declarations"?: TtscLintRuleSetting;
+
+  /**
+   * Reject `this` references outside any function-like, class method, or class-static-block context.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-invalid-this
+   */
+  "no-invalid-this"?: TtscLintRuleSetting;
 
   /**
    * Reject irregular whitespace characters (zero-width space,
@@ -422,12 +694,30 @@ export interface ITtscLintCoreRules {
   "no-lonely-if"?: TtscLintRuleSetting;
 
   /**
+   * Reject function declarations defined inside the body of a loop.
+   * Each iteration of the loop allocates a fresh function whose
+   * closure captures the surrounding `let`/`var` binding — a class
+   * of bugs where every captured function reads the iteration's
+   * final value instead of its own.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-loop-func
+   */
+  "no-loop-func"?: TtscLintRuleSetting;
+
+  /**
    * Reject numeric literals whose source text cannot round-trip
    * through `Number` without losing digits, including overflow.
    *
    * @reference https://eslint.org/docs/latest/rules/no-loss-of-precision
    */
   "no-loss-of-precision"?: TtscLintRuleSetting;
+
+  /**
+   * Reject inline numeric literals outside `const` initializer position. `0`, `1`, `-1`, array indices, and enum values are exempt.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-magic-numbers
+   */
+  "no-magic-numbers"?: TtscLintRuleSetting;
 
   /**
    * Reject regex character classes that contain combined Unicode
@@ -437,6 +727,22 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/no-misleading-character-class
    */
   "no-misleading-character-class"?: TtscLintRuleSetting;
+
+  /**
+   * Reject mixing operators of different precedence families in the
+   * same expression without explicit parentheses around the inner
+   * sub-expression. The famous case is `a && b || c`: readers expect
+   * left-to-right grouping but the parser sees `(a && b) || c` because
+   * `&&` binds tighter than `||`.
+   *
+   * The conservative baseline only flags the highest-confusion mixes —
+   * logical mixed with a different logical (`&&` next to `||` / `??`),
+   * and bitwise (`&`, `|`, `^`) next to a comparison or logical.
+   * Wrapping the inner sub-expression in parens suppresses the report.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-mixed-operators
+   */
+  "no-mixed-operators"?: TtscLintRuleSetting;
 
   /**
    * Reject chained assignment such as `a = b = 0`, which obscures
@@ -497,6 +803,17 @@ export interface ITtscLintCoreRules {
   "no-new-wrappers"?: TtscLintRuleSetting;
 
   /**
+   * Reject `new Symbol(...)`. `Symbol` is a function but not a
+   * constructor; calling it with `new` throws a TypeError at runtime.
+   * The upstream rule was renamed `no-new-native-nonconstructor`; the
+   * legacy name remains the more readable pointer for this specific
+   * Symbol check.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-new-symbol
+   */
+  "no-new-symbol"?: TtscLintRuleSetting;
+
+  /**
    * Reject calling global non-callable objects as functions, such as
    * `Math()` or `JSON()`.
    *
@@ -531,6 +848,16 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/no-octal-escape
    */
   "no-octal-escape"?: TtscLintRuleSetting;
+
+  /**
+   * Reject reassigning a function parameter inside the body of the
+   * function it belongs to. The parameter name stops pointing at the
+   * caller's argument after the write. Property mutations
+   * (`param.foo = …`) are not flagged.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-param-reassign
+   */
+  "no-param-reassign"?: TtscLintRuleSetting;
 
   /**
    * Reject `++` and `--` operators.
@@ -571,12 +898,37 @@ export interface ITtscLintCoreRules {
   "no-prototype-builtins"?: TtscLintRuleSetting;
 
   /**
+   * Reject declaring the same binding more than once in the same scope
+   * (`var x = 1; var x = 2;`, two `function foo()` declarations side by
+   * side, or a parameter rebound by a later `var` in the body). The
+   * second declaration silently overwrites the first; shadowing the
+   * binding in a nested scope is left alone.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-redeclare
+   */
+  "no-redeclare"?: TtscLintRuleSetting;
+
+  /**
    * Reject more than one consecutive literal space in a regex; use
    * `{N}` quantifiers for clarity.
    *
    * @reference https://eslint.org/docs/latest/rules/no-regex-spaces
    */
   "no-regex-spaces"?: TtscLintRuleSetting;
+
+  /**
+   * Reject `import` declarations targeting any module specifier in the project denylist.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-restricted-imports
+   */
+  "no-restricted-imports"?: TtscLintRuleSetting;
+
+  /**
+   * Reject AST node kinds listed in the project denylist.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-restricted-syntax
+   */
+  "no-restricted-syntax"?: TtscLintRuleSetting;
 
   /**
    * Reject assignment expressions used as the operand of `return`
@@ -628,6 +980,14 @@ export interface ITtscLintCoreRules {
   "no-setter-return"?: TtscLintRuleSetting;
 
   /**
+   * Reject a variable declaration that shadows a same-name binding in
+   * an enclosing scope.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-shadow
+   */
+  "no-shadow"?: TtscLintRuleSetting;
+
+  /**
    * Reject redeclaring restricted globals (`NaN`, `Infinity`,
    * `undefined`, etc.).
    *
@@ -650,6 +1010,17 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/no-template-curly-in-string
    */
   "no-template-curly-in-string"?: TtscLintRuleSetting;
+
+  /**
+   * Reject `this` (or `super.x`) references that precede the first
+   * `super()` call in a derived constructor. The runtime throws a
+   * ReferenceError on the first such access; catching it at lint time
+   * avoids a class of bugs that only surface after the constructor is
+   * actually called.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-this-before-super
+   */
+  "no-this-before-super"?: TtscLintRuleSetting;
 
   /**
    * Reject throwing non-Error operands (`throw "boom"`, `throw 1`).
@@ -684,6 +1055,20 @@ export interface ITtscLintCoreRules {
   "no-unneeded-ternary"?: TtscLintRuleSetting;
 
   /**
+   * Reject statements that follow an unconditional `return`, `throw`,
+   * `break`, or `continue` in the same block — control flow has already
+   * left the block, so any later statement is dead code.
+   *
+   * The conservative baseline scans the immediate statement list of a
+   * block (or the top-level source / module body) only; hoistable
+   * function declarations following the terminator are exempt because
+   * they are hoisted above the unreachable point.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-unreachable
+   */
+  "no-unreachable"?: TtscLintRuleSetting;
+
+  /**
    * Reject `return` and `throw` inside a `finally` block, which
    * override any earlier `return`/`throw` from the corresponding
    * `try`/`catch`.
@@ -705,6 +1090,16 @@ export interface ITtscLintCoreRules {
   "no-unsafe-negation"?: TtscLintRuleSetting;
 
   /**
+   * Reject member access or call expressions that chain off an
+   * optional chain without continuing the chain. `(obj?.foo).bar`
+   * throws a TypeError if obj is null/undefined; the chain must
+   * continue with `?.` to remain safe.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-unsafe-optional-chaining
+   */
+  "no-unsafe-optional-chaining"?: TtscLintRuleSetting;
+
+  /**
    * Reject expression statements with no observable effect, like a
    * bare `x;` or `'use strict' && f();`.
    *
@@ -721,6 +1116,19 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/no-unused-labels
    */
   "no-unused-labels"?: TtscLintRuleSetting;
+
+  /**
+   * Reject an assignment whose value is immediately overwritten by the
+   * very next statement without an intervening read of the same
+   * identifier. The conservative baseline only fires on two
+   * syntactically adjacent `x = <expr>;` statements where the
+   * left-hand sides are the same bare identifier and the second
+   * statement's right-hand side does not reference `x` itself — almost
+   * always a leftover from refactoring.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-useless-assignment
+   */
+  "no-useless-assignment"?: TtscLintRuleSetting;
 
   /**
    * Reject unnecessary `.call()` / `.apply()` calls (such as
@@ -779,6 +1187,17 @@ export interface ITtscLintCoreRules {
   "no-useless-rename"?: TtscLintRuleSetting;
 
   /**
+   * Reject a bare `return;` whose only effect is to end a function
+   * body that would have returned anyway. The conservative baseline
+   * only fires on the last statement of a function-like's immediate
+   * body — earlier `return;` inside a branch or loop may still be
+   * load-bearing.
+   *
+   * @reference https://eslint.org/docs/latest/rules/no-useless-return
+   */
+  "no-useless-return"?: TtscLintRuleSetting;
+
+  /**
    * Reject `var` declarations.
    *
    * Use `let` for mutable bindings and `const` for immutable ones.
@@ -815,12 +1234,28 @@ export interface ITtscLintCoreRules {
   "operator-assignment"?: TtscLintRuleSetting;
 
   /**
+   * Reject `function() { ... }` expressions passed as callback arguments — prefer the arrow form.
+   *
+   * @reference https://eslint.org/docs/latest/rules/prefer-arrow-callback
+   */
+  "prefer-arrow-callback"?: TtscLintRuleSetting;
+
+  /**
    * Require `const` for variables that are never reassigned after
    * declaration. Autofixable for single-declaration `let`s.
    *
    * @reference https://eslint.org/docs/latest/rules/prefer-const
    */
   "prefer-const"?: TtscLintRuleSetting;
+
+  /**
+   * Reject single-property and single-index variable declarations
+   * (`const a = obj.a`, `const x = arr[0]`) that destructuring would
+   * replace verbatim.
+   *
+   * @reference https://eslint.org/docs/latest/rules/prefer-destructuring
+   */
+  "prefer-destructuring"?: TtscLintRuleSetting;
 
   /**
    * Prefer the `**` operator over `Math.pow(base, exp)`.
@@ -837,6 +1272,51 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/prefer-for-of
    */
   "prefer-for-of"?: TtscLintRuleSetting;
+
+  /**
+   * Prefer `Object.hasOwn(obj, key)` over
+   * `Object.prototype.hasOwnProperty.call(obj, key)`. The new helper
+   * is shorter, less error-prone, and matches the form linters
+   * elsewhere recommend.
+   *
+   * @reference https://eslint.org/docs/latest/rules/prefer-object-has-own
+   */
+  "prefer-object-has-own"?: TtscLintRuleSetting;
+
+  /**
+   * Prefer object-spread `{ ...a, ...b }` over `Object.assign({}, a, b)`.
+   * Only fires when the first argument is an empty object literal —
+   * mutating `Object.assign(target, …)` calls are left alone because
+   * the spread form does not preserve their observable side effects.
+   *
+   * @reference https://eslint.org/docs/latest/rules/prefer-object-spread
+   */
+  "prefer-object-spread"?: TtscLintRuleSetting;
+
+  /**
+   * Reject regex literals with unnamed capturing groups `(...)` — prefer named groups `(?<name>...)`.
+   *
+   * @reference https://eslint.org/docs/latest/rules/prefer-named-capture-group
+   */
+  "prefer-named-capture-group"?: TtscLintRuleSetting;
+
+  /**
+   * Prefer ES2015+ numeric literal forms (`0b…`, `0o…`, `0x…`) over
+   * `parseInt(string, 2 | 8 | 16)`. The literal form is shorter, type-
+   * safe at lint time, and not subject to runtime radix mismatches.
+   *
+   * @reference https://eslint.org/docs/latest/rules/prefer-numeric-literals
+   */
+  "prefer-numeric-literals"?: TtscLintRuleSetting;
+
+  /**
+   * Reject reading from `arguments` in a non-arrow function body —
+   * prefer the ES2015 rest-parameter form `(...args)`, which declares
+   * the variadic contract on the signature and yields a real array.
+   *
+   * @reference https://eslint.org/docs/latest/rules/prefer-rest-params
+   */
+  "prefer-rest-params"?: TtscLintRuleSetting;
 
   /**
    * Prefer spread arguments `f(...args)` over `f.apply(null, args)`.
@@ -874,6 +1354,20 @@ export interface ITtscLintCoreRules {
    * @reference https://eslint.org/docs/latest/rules/require-yield
    */
   "require-yield"?: TtscLintRuleSetting;
+
+  /**
+   * Reject import specifiers within a single `import` declaration that aren't alphabetically sorted.
+   *
+   * @reference https://eslint.org/docs/latest/rules/sort-imports
+   */
+  "sort-imports"?: TtscLintRuleSetting;
+
+  /**
+   * Reject object-literal property keys that aren't alphabetically sorted.
+   *
+   * @reference https://eslint.org/docs/latest/rules/sort-keys
+   */
+  "sort-keys"?: TtscLintRuleSetting;
 
   /**
    * Require `Number.isNaN` / `isNaN` for `NaN` checks; restrict

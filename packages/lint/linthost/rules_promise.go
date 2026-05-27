@@ -123,6 +123,258 @@ func isThenableType(checker *shimchecker.Checker, t *shimchecker.Type) bool {
 	return len(checker.GetSignaturesOfType(propType, shimchecker.SignatureKindCall)) > 0
 }
 
+// noFloatingPromises: an `ExpressionStatement` whose value is a Promise but
+// is neither awaited, wrapped in `void`, nor terminated by a rejection-aware
+// handler (`.catch`, `.finally`, or `.then(_, onRejected)`) silently swallows
+// any rejection produced by the Promise. The Node runtime emits
+// `unhandledRejection` only for the outermost discarded Promise, so a single
+// missing handler cascades into hard-to-trace failures. typescript-eslint
+// recommended-type-checked:
+// https://typescript-eslint.io/rules/no-floating-promises/
+//
+// Only `ExpressionStatement` is visited: assignments, return values, and
+// argument positions are never "floating" because the surrounding context
+// captures the Promise. The handler set mirrors `await-thenable`'s shape so
+// the Checker calls stay confined to one file.
+type noFloatingPromises struct{}
+
+func (noFloatingPromises) Name() string { return "typescript/no-floating-promises" }
+func (noFloatingPromises) NeedsTypeChecker() bool {
+	return true
+}
+func (noFloatingPromises) Visits() []shimast.Kind {
+	return []shimast.Kind{shimast.KindExpressionStatement}
+}
+func (noFloatingPromises) Check(ctx *Context, node *shimast.Node) {
+	if ctx.Checker == nil {
+		return
+	}
+	stmt := node.AsExpressionStatement()
+	if stmt == nil || stmt.Expression == nil {
+		return
+	}
+	expr := stripParens(stmt.Expression)
+	if expr == nil {
+		return
+	}
+	// Syntactic discharges short-circuit the Checker call: any of these
+	// expression shapes already signals that the author opted out of the
+	// "discarded" reading, so the rule never needs to walk the type system.
+	if isPromiseHandledExpression(expr) {
+		return
+	}
+	t := ctx.Checker.GetTypeAtLocation(expr)
+	if t == nil {
+		return
+	}
+	if !isPromiseTypedExpression(ctx.Checker, t) {
+		return
+	}
+	ctx.Report(node, "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler, or be explicitly marked as ignored with the `void` operator.")
+}
+
+// isPromiseHandledExpression reports whether the expression is syntactically
+// "handled" — already awaited, marked `void`, or terminated by a rejection-aware
+// promise method. The list of accepted methods matches typescript-eslint's
+// no-floating-promises: `catch` and `finally` always defuse the chain, while
+// `then` only defuses it when an explicit rejection handler is supplied as the
+// second argument.
+func isPromiseHandledExpression(expr *shimast.Node) bool {
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case shimast.KindAwaitExpression, shimast.KindVoidExpression:
+		return true
+	case shimast.KindCallExpression:
+		call := expr.AsCallExpression()
+		if call == nil {
+			return false
+		}
+		method, ok := promiseMethodCallName(call)
+		if !ok {
+			return false
+		}
+		switch method {
+		case "catch", "finally":
+			return true
+		case "then":
+			return call.Arguments != nil && len(call.Arguments.Nodes) >= 2
+		}
+	}
+	return false
+}
+
+// promiseMethodCallName returns the trailing property name when the call's
+// callee is a property access (e.g. `getPromise().catch` -> "catch"). Unlike
+// `promiseCallMethod`, it does NOT gate the result on whether the receiver
+// looks like a Promise — the Checker handles that downstream when deciding
+// whether the whole expression is still Promise-typed. The named-receiver
+// constraint would otherwise reject legitimate handlers on user-typed
+// objects such as `repo.users.findById(id).catch(reportError)`.
+func promiseMethodCallName(call *shimast.CallExpression) (string, bool) {
+	if call == nil || call.Expression == nil {
+		return "", false
+	}
+	_, method, ok := promisePropertyAccessParts(call.Expression)
+	if !ok {
+		return "", false
+	}
+	return method, true
+}
+
+// isPromiseTypedExpression reports whether `t` represents a Promise (or thenable)
+// at runtime. Mirrors `isAwaitable` but is intentionally stricter: `any` and
+// `unknown` are NOT treated as floating, because that would explode on
+// generic-helper boundaries; `never` is also skipped because a function whose
+// return type is `never` cannot float a real Promise.
+func isPromiseTypedExpression(checker *shimchecker.Checker, t *shimchecker.Type) bool {
+	if checker == nil || t == nil {
+		return false
+	}
+	flags := t.Flags()
+	if flags&(shimchecker.TypeFlagsAny|shimchecker.TypeFlagsUnknown|shimchecker.TypeFlagsNever) != 0 {
+		return false
+	}
+	if flags&(shimchecker.TypeFlagsUnion|shimchecker.TypeFlagsIntersection) != 0 {
+		for _, part := range t.Types() {
+			if part == nil {
+				continue
+			}
+			if isPromiseTypedExpression(checker, part) {
+				return true
+			}
+		}
+		return false
+	}
+	if checker.GetPromisedTypeOfPromise(t) != nil {
+		return true
+	}
+	return isThenableType(checker, t)
+}
+
+// returnAwait: `return promise;` inside try/catch/finally lets the rejection
+// escape the surrounding handler instead of being observed by it. Awaiting the
+// promise first (`return await promise;`) keeps the rejection inside the
+// async function's microtask queue, so the enclosing `catch` or `finally` can
+// see it. typescript-eslint recommended-type-checked:
+// https://typescript-eslint.io/rules/return-await/
+//
+// Trigger condition (walks up from the return statement and stops at the
+// nearest function boundary):
+//
+//   - the return is lexically inside a `try` block — fire;
+//   - the return is lexically inside a `finally` block — fire;
+//   - the return is lexically inside a `catch` block AND another
+//     try/catch/finally context wraps that catch — fire.
+//
+// Returning a Promise from outside any handler is fine: the caller observes
+// the rejection through its own await. The rule is type-aware: it consults
+// `ctx.Checker.GetTypeAtLocation` and `GetPromisedTypeOfPromise` to skip
+// non-Promise returns.
+type returnAwait struct{}
+
+func (returnAwait) Name() string { return "typescript/return-await" }
+func (returnAwait) NeedsTypeChecker() bool {
+	return true
+}
+func (returnAwait) Visits() []shimast.Kind {
+	return []shimast.Kind{shimast.KindReturnStatement}
+}
+func (returnAwait) Check(ctx *Context, node *shimast.Node) {
+	if ctx.Checker == nil {
+		return
+	}
+	ret := node.AsReturnStatement()
+	if ret == nil || ret.Expression == nil {
+		return
+	}
+	expr := stripParens(ret.Expression)
+	if expr == nil {
+		return
+	}
+	// Already `return await promise;` — author opted in.
+	if expr.Kind == shimast.KindAwaitExpression {
+		return
+	}
+	if !returnAwaitInsideHandler(node) {
+		return
+	}
+	t := ctx.Checker.GetTypeAtLocation(expr)
+	if t == nil {
+		return
+	}
+	if ctx.Checker.GetPromisedTypeOfPromise(t) == nil {
+		return
+	}
+	ctx.Report(node, "Returning a Promise from a try/catch/finally block requires `await` so the surrounding handler observes the rejection.")
+}
+
+// returnAwaitInsideHandler walks the parent chain from `node` upward, stops at
+// the nearest function boundary, and reports whether the return statement sits
+// inside a try block, a finally block, or a catch block that is itself wrapped
+// by another try/catch/finally context.
+//
+// The function boundary stop matches `walkToFinally` in rules_finally: a return
+// inside a nested function targets that inner function, so it cannot escape
+// the outer try/catch/finally and must not trip the rule.
+func returnAwaitInsideHandler(node *shimast.Node) bool {
+	cur := node.Parent
+	for cur != nil {
+		if isFunctionLikeKind(cur) || cur.Kind == shimast.KindSourceFile {
+			return false
+		}
+		if cur.Kind == shimast.KindBlock {
+			grand := cur.Parent
+			if grand != nil && grand.Kind == shimast.KindTryStatement {
+				try := grand.AsTryStatement()
+				if try != nil {
+					if try.TryBlock == cur {
+						return true
+					}
+					if try.FinallyBlock == cur {
+						return true
+					}
+				}
+			}
+		}
+		if cur.Kind == shimast.KindCatchClause {
+			// Inside a catch: only fires when another try/catch/finally
+			// wraps this one so the rejection can be re-observed.
+			if hasEnclosingTryContext(cur.Parent) {
+				return true
+			}
+		}
+		cur = cur.Parent
+	}
+	return false
+}
+
+// hasEnclosingTryContext walks upward from `node` and reports whether the path
+// to the nearest function boundary crosses any try block, catch clause, or
+// finally block. Used by the catch-clause arm of returnAwaitInsideHandler to
+// decide whether the catch is itself wrapped by another handler.
+func hasEnclosingTryContext(node *shimast.Node) bool {
+	for cur := node; cur != nil; cur = cur.Parent {
+		if isFunctionLikeKind(cur) || cur.Kind == shimast.KindSourceFile {
+			return false
+		}
+		if cur.Kind == shimast.KindBlock {
+			grand := cur.Parent
+			if grand != nil && grand.Kind == shimast.KindTryStatement {
+				try := grand.AsTryStatement()
+				if try != nil && (try.TryBlock == cur || try.FinallyBlock == cur) {
+					return true
+				}
+			}
+		}
+		if cur.Kind == shimast.KindCatchClause {
+			return true
+		}
+	}
+	return false
+}
+
 // promise/param-names mirrors eslint-plugin-promise's constructor convention:
 // inline executors should name their parameters resolve/reject (allowing a
 // leading underscore for intentionally unused parameters).
@@ -907,6 +1159,8 @@ func fileDeclaresPromise(file *shimast.Node) bool {
 
 func init() {
 	Register(awaitThenable{})
+	Register(noFloatingPromises{})
+	Register(returnAwait{})
 	Register(promiseAlwaysReturn{})
 	Register(promiseAvoidNew{})
 	Register(promiseCatchOrReturn{})

@@ -194,6 +194,19 @@ export interface ITtscLintTypeScriptRules {
   "typescript/no-extra-non-null-assertion"?: TtscLintRuleSetting;
 
   /**
+   * Reject Promise-typed expressions whose result is discarded — most
+   * often a bare `getPromise();` expression statement.
+   *
+   * Type-aware via the Checker. A floating promise loses its rejection
+   * channel and runs out of order with surrounding code. Acceptable
+   * sinks are `await`, `.catch(...)`, `.then(_, onRejected)`,
+   * `.finally(...)`, assignment, the `void` operator, and `return`.
+   *
+   * @reference https://typescript-eslint.io/rules/no-floating-promises
+   */
+  "typescript/no-floating-promises"?: TtscLintRuleSetting;
+
+  /**
    * Hoist inline `type` modifiers on individual imports into a single
    * top-level `import type {}`. Autofixable.
    *
@@ -221,6 +234,19 @@ export interface ITtscLintTypeScriptRules {
    * @reference https://typescript-eslint.io/rules/no-misused-new
    */
   "typescript/no-misused-new"?: TtscLintRuleSetting;
+
+  /**
+   * Reject Promise values supplied where a non-Promise was expected.
+   *
+   * Covers conditional positions (`if (promise)`, `while`, `for`,
+   * ternary, `&&`, `||`, `??`) where the Promise is truthy by
+   * reference, and `async` callbacks passed to APIs that expect a
+   * void-returning function (e.g. `Array#forEach`, JSX event
+   * handlers), where the returned Promise is silently dropped.
+   *
+   * @reference https://typescript-eslint.io/rules/no-misused-promises
+   */
+  "typescript/no-misused-promises"?: TtscLintRuleSetting;
 
   /**
    * Reject `enum`s that mix numeric and string members, which makes
@@ -353,6 +379,18 @@ export interface ITtscLintTypeScriptRules {
   "typescript/no-wrapper-object-types"?: TtscLintRuleSetting;
 
   /**
+   * Reject `throw X` where `X` is statically known not to derive from
+   * `Error` — string literals, numbers, plain object literals, and the
+   * like.
+   *
+   * Type-aware via the Checker. Non-Error throws lose the stack trace
+   * and confuse `instanceof` checks in the surrounding `catch`.
+   *
+   * @reference https://typescript-eslint.io/rules/only-throw-error
+   */
+  "typescript/only-throw-error"?: TtscLintRuleSetting;
+
+  /**
    * Prefer `as const` over `as "literal"` assertions. Autofixable.
    *
    * @reference https://typescript-eslint.io/rules/prefer-as-const
@@ -396,6 +434,31 @@ export interface ITtscLintTypeScriptRules {
   "typescript/prefer-namespace-keyword"?: TtscLintRuleSetting;
 
   /**
+   * Reject `async` functions whose body contains no `await`
+   * expression.
+   *
+   * An async function with no `await` only inflates the return type
+   * to `Promise<T>` without doing any asynchronous work; collapse it
+   * to a sync function. Async generators are accepted as long as
+   * they have at least one `yield`.
+   *
+   * @reference https://typescript-eslint.io/rules/require-await
+   */
+  "typescript/require-await"?: TtscLintRuleSetting;
+
+  /**
+   * Reject `return promise` inside `try`, `catch`, or `finally`;
+   * require `return await promise`.
+   *
+   * Without the `await`, the surrounding handler unbinds before the
+   * promise settles, so a rejection skips the `catch` block entirely
+   * and the `finally` cleanup races the result.
+   *
+   * @reference https://typescript-eslint.io/rules/return-await
+   */
+  "typescript/return-await"?: TtscLintRuleSetting;
+
+  /**
    * Reject `/// <reference path="..." />`, `/// <reference types=""
    * />`, and `/// <reference lib="" />` directives.
    *
@@ -405,4 +468,17 @@ export interface ITtscLintTypeScriptRules {
    * @reference https://typescript-eslint.io/rules/triple-slash-reference
    */
   "typescript/triple-slash-reference"?: TtscLintRuleSetting;
+
+  /**
+   * Require the callback parameter of `.catch(...)` and the second
+   * argument of `.then(...)` to be typed `unknown`.
+   *
+   * Mirrors TypeScript 4.4+ `useUnknownInCatchVariables`, which made
+   * `catch (e)` default to `unknown` — the same discipline applied to
+   * promise rejection handlers so a rejection cannot smuggle in an
+   * implicit `any`.
+   *
+   * @reference https://typescript-eslint.io/rules/use-unknown-in-catch-callback-variable
+   */
+  "typescript/use-unknown-in-catch-callback-variable"?: TtscLintRuleSetting;
 }

@@ -411,11 +411,20 @@ export function PlaygroundShell({
   // unmounts or workerUrl changes. Without this an SPA navigation away
   // from the playground leaks one Worker per mount; a workerUrl swap
   // leaks the previous Worker forever.
+  //
+  // Reset the dependency-tracking refs too. They named packages that
+  // existed in the previous worker's MemFS; the fresh worker boots with
+  // only `preinstalledPackages` mounted, so carrying the old names
+  // would make installDependenciesForSource skip the install (because
+  // `installedDependencyNames.current.has(name)` is still true) and
+  // the next compile would fail with `Cannot find module`.
   useEffect(
     () => () => {
       void client.reset();
+      installedDependencyNames.current = new Set<string>(preinstalledPackages);
+      runtimeDependencyFiles.current = {};
     },
-    [client],
+    [client, preinstalledPackages],
   );
 
   const onPickExample = useCallback(
@@ -442,6 +451,12 @@ export function PlaygroundShell({
     const epoch = ++executeEpoch.current;
     setExecuting(true);
     setBundleError(null);
+    // Clear the previous run's console output up front. Without this the
+    // pane keeps showing the old logs labeled as the new run until the
+    // first push fires — and an early-return bundle-error path (or an
+    // install rejection) might never push at all, leaving stale output
+    // attributed to the in-flight Execute.
+    setConsoleMessages([]);
     const messages: IConsoleMessage[] = [];
     const push = (type: IConsoleMessage["type"], args: unknown[]) => {
       if (executeEpoch.current !== epoch) return;

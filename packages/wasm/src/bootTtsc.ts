@@ -26,6 +26,16 @@ declare const importScripts: (...urls: string[]) => void;
  */
 const bootsInFlight = new Map<string, Promise<IBootResult>>();
 
+/**
+ * Per-apiName serialization chain. Two concurrent boots with the same
+ * apiName but different wasmUrls each install their own `globalThis[apiName
+ * + "Ready"]` resolver — they would race and the second would overwrite
+ * the first, stranding the first boot's await. The chain serializes them
+ * so one boot's Go-side `Ready.Invoke()` always lands on the resolver
+ * that boot installed.
+ */
+const bootChainByApiName = new Map<string, Promise<unknown>>();
+
 function bootKey(apiName: string, wasmUrl: string): string {
   return `${apiName}|${resolveWasmUrl(wasmUrl)}`;
 }
@@ -51,19 +61,35 @@ function resolveWasmUrl(wasmUrl: string): string {
  * Boot a host-built wasm. Re-entrant only if you reuse the same `host`.
  *
  * Concurrent calls with the same `(apiName, wasmUrl)` pair share the same
- * in-flight boot. On rejection the cache entry is cleared so the next
- * call retries from scratch.
+ * in-flight boot. Calls with the same `apiName` but different `wasmUrl`
+ * are serialized via `bootChainByApiName` so they don't race on the
+ * shared `globalThis[apiName+"Ready"]` resolver slot. On rejection the
+ * cache entries are cleared so the next call retries from scratch.
  */
 export function bootTtsc(options: IBootTtscOptions): Promise<IBootResult> {
   const apiName = options.apiName ?? "ttsc";
   const key = bootKey(apiName, options.wasmUrl);
   const inflight = bootsInFlight.get(key);
   if (inflight) return inflight;
-  const promise = bootTtscOnce(options, apiName).catch((err) => {
-    bootsInFlight.delete(key);
-    throw err;
-  });
+  const prior = bootChainByApiName.get(apiName) ?? Promise.resolve();
+  const promise = prior
+    .catch(() => {
+      /* don't propagate a prior boot's rejection — let this one run */
+    })
+    .then(() => bootTtscOnce(options, apiName))
+    .catch((err) => {
+      bootsInFlight.delete(key);
+      throw err;
+    });
   bootsInFlight.set(key, promise);
+  // Track the chain head for this apiName so the next boot waits on it.
+  // Swallow on the chain head specifically: we already throw to the
+  // immediate caller; surfacing it through the chain would reject every
+  // subsequent boot just because this one failed.
+  bootChainByApiName.set(
+    apiName,
+    promise.catch(() => {}),
+  );
   return promise;
 }
 

@@ -21,6 +21,7 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
+  workflow_dispatch:
 
 jobs:
   deploy:

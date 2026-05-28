@@ -15,12 +15,12 @@
  *
  * - `node bench.mjs --setup-only`
  * - `node bench.mjs --verify-only`
- * - `node bench.mjs --project vue --project type-fest`
- * - `node bench.mjs --project=type-fest --ttsc-build-only`
- * - `node bench.mjs --project=type-fest --only-ttsc-build --reset`
- * - `node bench.mjs --project=type-fest --only-ttsc-build --no-website`
- * - `node bench.mjs --project=type-fest --lint-only`
- * - `node bench.mjs --cell-filter=':ttsc:build:' vue type-fest`
+ * - `node bench.mjs --project vue --project rxjs`
+ * - `node bench.mjs --project=vue --ttsc-build-only`
+ * - `node bench.mjs --project=vue --only-ttsc-build --reset`
+ * - `node bench.mjs --project=vue --only-ttsc-build --no-website`
+ * - `node bench.mjs --project=vue --lint-only`
+ * - `node bench.mjs --cell-filter=':ttsc:build:' vue zod`
  *
  * Default output is milestone-only: phase timers, per-cell `run i: N ms`, and
  * short status lines ("Cloning X", "Installing X", "Reusing X"). Child process
@@ -194,41 +194,6 @@ const PACKAGE_CONFIGS = {
       },
     }),
   },
-  "type-fest": {
-    kind: "type-level library",
-    repoName: "ttsc-benchmark-type-fest",
-    repo: "https://github.com/samchon/ttsc-benchmark-type-fest.git",
-    packageManager: "pnpm",
-    filesRoot: ".",
-    commands: compilerCommands({
-      build: (tool) => [
-        {
-          cmd: `pnpm exec ${tool} -p tsconfig.json`,
-          env: { NODE_OPTIONS: "--max-old-space-size=6144" },
-        },
-      ],
-      noEmit: (tool) => [
-        {
-          cmd: `pnpm exec ${tool} -p tsconfig.json --noEmit`,
-          env: { NODE_OPTIONS: "--max-old-space-size=6144" },
-        },
-      ],
-      eslint: [
-        `pnpm exec eslint --no-ignore --quiet ${tsconfigFiles("tsconfig.json")}`,
-      ],
-      format: {
-        legacy: [
-          `pnpm exec prettier --check --ignore-path /dev/null ${tsconfigFiles("tsconfig.json")}`,
-        ],
-        ttscLint: [
-          {
-            cmd: "pnpm exec ttsc format -p tsconfig.json",
-            env: { NODE_OPTIONS: "--max-old-space-size=6144" },
-          },
-        ],
-      },
-    }),
-  },
   typeorm: {
     kind: "ORM library",
     repoName: "ttsc-benchmark-typeorm",
@@ -394,7 +359,6 @@ const PROJECT_ORDER_BY_STARS = [
   "zod",
   "typeorm",
   "rxjs",
-  "type-fest",
   "shopping-backend",
 ];
 
@@ -869,6 +833,27 @@ function setupClone(project, branch) {
       sh(`git checkout ${quote(branch)}`, dir, {
         quiet: true,
         label: `checkout ${project.repoName}@${branch}`,
+      });
+    }
+    // Pull upstream changes so a fixture commit (e.g. a type-error
+    // fix on the upstream branch) reaches every reused clone without
+    // forcing the operator to `rm -rf .work/<repo>@<branch>`. Hard-
+    // reset to `origin/<branch>` after fetching so local edits made
+    // by previous runs (`cleanupBenchmarkWorktree`'s `git restore`
+    // would catch tracked files, but stray new files won't) cannot
+    // mask the upstream state. Skip the fetch only on `--no-install`
+    // because that flag declares the operator's intent to bench
+    // exactly the disk state they already have.
+    if (!flags.has("--no-install")) {
+      sh(`git fetch --depth=1 origin ${quote(branch)}`, dir, {
+        quiet: true,
+        check: false,
+        label: `fetch ${project.repoName}@${branch}`,
+      });
+      sh(`git reset --hard FETCH_HEAD`, dir, {
+        quiet: true,
+        check: false,
+        label: `reset ${project.repoName}@${branch}`,
       });
     }
     cleanupBenchmarkWorktree(dir, project);

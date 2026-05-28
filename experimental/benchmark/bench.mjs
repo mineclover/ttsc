@@ -75,6 +75,14 @@ const RETRIES = numberEnv("TTSC_BENCH_RETRIES", 2);
 // traces are written. Human runs leave it off and read milestone lines only.
 const VERBOSE = flags.has("--verbose");
 const BRANCHES = ["legacy", "ttsc", "ttsc-lint"];
+// Sequential mode deletes each clone after measuring it, so by the time the
+// final report is built every clone may be gone. The cache lets sequential
+// mode stash file counts and the legacy `typescript` version while the clone
+// still exists; batch mode leaves it empty and reads from disk as before.
+// Declared up here (before `main()` is invoked at line 442) so the helpers
+// further down the file that touch it aren't tripped by a temporal-dead-zone
+// reference when `createReport` -> `projectReportFor` runs during startup.
+const projectMetaCache = new Map();
 const TTSC_VERSION = JSON.parse(
   fs.readFileSync(path.join(REPO_ROOT, "packages/ttsc/package.json"), "utf8"),
 ).version;
@@ -1136,17 +1144,22 @@ function rewriteTextTarballs(file, targets) {
   let changed = false;
   // Match any historical ttsc tarball reference for this target — not just
   // the current `{stem}-{TTSC_VERSION}.tgz` file name. After a version bump
-  // (e.g. 0.12.4 -> 0.13.0) the pack pid changes and the new tarball ships
-  // under a new file name, so a stale `pnpm-workspace.yaml` override left
-  // by an earlier prepared clone (the vue fixture pins
-  // `'@ttsc/linux-x64'` through `overrides`) would otherwise survive the
-  // scrub and pnpm would fail to open the now-deleted `/tmp/ttsc-tgz-OLD/`
-  // path with ENOENT (exit 254). Pin the stem so `ttsc-` and
-  // `ttsc-linux-x64-` do not cross-rewrite.
+  // (e.g. 0.12.4 -> 0.13.0, or 0.13.1 -> 0.14.0-dev.20260528.1) the pack
+  // pid changes and the new tarball ships under a new file name, so a
+  // stale `pnpm-workspace.yaml` override left by an earlier prepared clone
+  // (the vue fixture pins `'@ttsc/linux-x64'` through `overrides`) would
+  // otherwise survive the scrub and pnpm would fail to open the
+  // now-deleted `/tmp/ttsc-tgz-OLD/` path with ENOENT (exit 254). Pin the
+  // stem by stripping the current version suffix literally so `ttsc-` and
+  // `ttsc-linux-x64-` do not cross-rewrite, and accept any old version
+  // suffix (release or pre-release like `-dev.YYYYMMDD.N`) in the regex.
+  const versionSuffix = `-${TTSC_VERSION}.tgz`;
   for (const target of targets) {
-    const stem = target.file.replace(/-\d+\.\d+\.\d+\.tgz$/, "");
+    const stem = target.file.endsWith(versionSuffix)
+      ? target.file.slice(0, -versionSuffix.length)
+      : target.file.replace(/-[\d][\w.-]*\.tgz$/, "");
     const pattern = new RegExp(
-      `(?:file:)?[^\\s'",}]*ttsc-tgz[^\\s'",}]*/${escapeRegExp(stem)}-\\d+\\.\\d+\\.\\d+\\.tgz`,
+      `(?:file:)?[^\\s'",}]*ttsc-tgz[^\\s'",}]*/${escapeRegExp(stem)}-[\\d][\\w.-]*\\.tgz`,
       "g",
     );
     const next = text.replace(pattern, `file:${path.join(TGZ, target.file)}`);
@@ -1542,22 +1555,35 @@ function toolFor(branch, op, tool) {
 }
 
 function measureProject(project, report) {
-  return timePhase(`measure project ${project.name}`, () => {
-    const projectReport = ensureProjectReport(report, project);
-    for (const cell of projectCells(project)) {
-      const existingIndex = projectReport.measurements.findIndex(
-        (measurement) => measurement.id === cell.id,
-      );
-      if (existingIndex !== -1)
-        process.stdout.write(
-          `\n[${cell.id}] refreshing existing measurement\n`,
-        );
-      const measurement = measureCell(cell);
-      if (existingIndex === -1) projectReport.measurements.push(measurement);
-      else projectReport.measurements.splice(existingIndex, 1, measurement);
-      writeReports(report, { publishWebsite: true });
-    }
+  return timePhase(`measure project ${project.name}`, () =>
+    measureCells(projectCells(project), project, report),
+  );
+}
+
+function measureProjectBranch(project, branch, report) {
+  return timePhase(`measure ${project.name}@${branch}`, () => {
+    const cells = projectCells(project).filter(
+      (cell) => cell.branch === branch,
+    );
+    measureCells(cells, project, report);
   });
+}
+
+function measureCells(cells, project, report) {
+  const projectReport = ensureProjectReport(report, project);
+  for (const cell of cells) {
+    const existingIndex = projectReport.measurements.findIndex(
+      (measurement) => measurement.id === cell.id,
+    );
+    if (existingIndex !== -1)
+      process.stdout.write(
+        `\n[${cell.id}] refreshing existing measurement\n`,
+      );
+    const measurement = measureCell(cell);
+    if (existingIndex === -1) projectReport.measurements.push(measurement);
+    else projectReport.measurements.splice(existingIndex, 1, measurement);
+    writeReports(report, { publishWebsite: true });
+  }
 }
 
 function ensureProjectReport(report, project) {
@@ -1569,14 +1595,37 @@ function ensureProjectReport(report, project) {
   return projectReport;
 }
 
+function cacheProjectMeta(projectName, updates) {
+  const existing = projectMetaCache.get(projectName) ?? {};
+  projectMetaCache.set(projectName, { ...existing, ...updates });
+}
+
+function captureProjectMetaFromClone(project, branch) {
+  const meta = projectMetaCache.get(project.name) ?? {};
+  if (meta.files == null || meta.files === 0) {
+    const files = countSourceFiles(projectSourceRoot(project));
+    if (files > 0) cacheProjectMeta(project.name, { files });
+  }
+  if (branch === "legacy" && !meta.legacyTypescript) {
+    const legacyTypescript = depVersion(
+      cloneDir(project, "legacy"),
+      "typescript",
+    );
+    if (legacyTypescript)
+      cacheProjectMeta(project.name, { legacyTypescript });
+  }
+}
+
 function projectReportFor(project, measurements) {
+  const meta = projectMetaCache.get(project.name) ?? {};
   return {
     name: project.name,
     repo: project.repoName,
     kind: project.kind,
-    files: countSourceFiles(projectSourceRoot(project)),
+    files: meta.files ?? countSourceFiles(projectSourceRoot(project)),
     typescript: displayLegacyTypescriptVersion(
-      depVersion(cloneDir(project, "legacy"), "typescript"),
+      meta.legacyTypescript ??
+        depVersion(cloneDir(project, "legacy"), "typescript"),
     ),
     measurements,
   };
@@ -1656,7 +1705,14 @@ function commonDepVersion(projects, branch, name) {
   const versions = [
     ...new Set(
       projects
-        .map((project) => depVersion(cloneDir(project, branch), name))
+        .map((project) => {
+          if (branch === "legacy" && name === "typescript") {
+            const cached =
+              projectMetaCache.get(project.name)?.legacyTypescript;
+            if (cached) return cached;
+          }
+          return depVersion(cloneDir(project, branch), name);
+        })
         .filter(Boolean),
     ),
   ];
@@ -1879,6 +1935,21 @@ function main() {
   if (!wantedProjects.some((project) => projectCells(project).length !== 0))
     throw new Error("no benchmark cells selected");
 
+  const sequential =
+    flags.has("--sequential") || process.env.TTSC_BENCH_SEQUENTIAL === "1";
+  if (sequential) {
+    if (flags.has("--no-setup"))
+      throw new Error(
+        "--sequential is incompatible with --no-setup; sequential mode " +
+          "clones/installs/removes one (project, branch) at a time",
+      );
+    if (flags.has("--setup-only"))
+      throw new Error(
+        "--sequential is incompatible with --setup-only; sequential mode " +
+          "deletes each clone after its cells are measured",
+      );
+  }
+
   // Quiet-host gate. Short ttsc cells (build/noEmit) finish in 2–8 s
   // and a noisy host (concurrent claude worktrees, ts-node jobs, video
   // playback) can move a single sample by 30–60 %. The threshold is the
@@ -1907,6 +1978,11 @@ function main() {
 
   fs.mkdirSync(WORK, { recursive: true });
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
+
+  if (sequential) {
+    runSequential(totalStart);
+    return;
+  }
 
   if (!flags.has("--no-setup")) {
     packTarballs();
@@ -1968,6 +2044,113 @@ function main() {
   process.stdout.write(
     `[timer] total benchmark ${formatDuration(hrtimeMs(totalStart))}\n`,
   );
+}
+
+function runSequential(totalStart) {
+  packTarballs();
+  const setupFailures = [];
+  const measuredProjects = [];
+  // Start from a skeleton report so the on-disk JSON is well-formed before
+  // any clone exists. `createReport` already merges previous measurements
+  // when not `--reset`; the per-project `files`/`typescript` fields will be
+  // refreshed from `projectMetaCache` once each clone is on disk.
+  const report = createReport(wantedProjects);
+  writeReports(report);
+
+  for (const project of wantedProjects) {
+    for (const branch of projectBranches(project)) {
+      try {
+        setupClone(project, branch);
+      } catch (error) {
+        const message = `${project.repoName}@${branch}: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+        setupFailures.push(message);
+        if (!flags.has("--allow-missing"))
+          throw new Error(
+            "sequential setup failed; pass --allow-missing to continue " +
+              "past failed (project, branch) cycles\n- " + message,
+          );
+        process.stdout.write(`[sequential] skip ${message}\n`);
+        continue;
+      }
+
+      captureProjectMetaFromClone(project, branch);
+      if (!measuredProjects.includes(project)) measuredProjects.push(project);
+      ensureProjectReport(report, project);
+      refreshProjectReportMeta(report, project);
+      report.host = hostSpec(measuredProjects);
+
+      if (flags.has("--verify-only")) {
+        verifyProjectBranch(project, branch);
+      } else {
+        measureProjectBranch(project, branch, report);
+      }
+
+      removeClone(project, branch);
+      writeReports(report, { publishWebsite: true });
+    }
+  }
+
+  if (flags.has("--verify-only")) {
+    process.stdout.write("\nAll benchmark commands verified.\n");
+    return;
+  }
+
+  writeReports(report, { publishWebsite: true });
+  process.stdout.write(`Report written to ${OUT}\n`);
+  process.stdout.write(`Website JSON written to ${WEBSITE_JSON}\n`);
+  process.stdout.write(
+    `[timer] total benchmark ${formatDuration(hrtimeMs(totalStart))}\n`,
+  );
+  if (setupFailures.length)
+    process.stderr.write(
+      "[sequential] skipped cycles (--allow-missing):\n" +
+        setupFailures.map((m) => `- ${m}`).join("\n") +
+        "\n",
+    );
+}
+
+function refreshProjectReportMeta(report, project) {
+  const projectReport = ensureProjectReport(report, project);
+  const meta = projectMetaCache.get(project.name) ?? {};
+  if (meta.files != null && meta.files > 0) projectReport.files = meta.files;
+  if (meta.legacyTypescript)
+    projectReport.typescript = displayLegacyTypescriptVersion(
+      meta.legacyTypescript,
+    );
+}
+
+function verifyProjectBranch(project, branch) {
+  const failures = [];
+  const cells = projectCells(project).filter(
+    (cell) => cell.branch === branch,
+  );
+  for (const cell of cells) {
+    const root = cloneDir(project, cell.branch);
+    process.stdout.write(`\nVERIFY ${cell.id}\n`);
+    const result = runSteps(cell.steps, root);
+    if (!result.ok) {
+      failures.push(`${cell.id} failed (${result.status})`);
+      process.stderr.write(result.log);
+    } else {
+      process.stdout.write(`  ok ${result.ms.toFixed(0)} ms\n`);
+    }
+  }
+  if (failures.length)
+    throw new Error(
+      `benchmark command verification failed\n${failures
+        .map((f) => `- ${f}`)
+        .join("\n")}`,
+    );
+}
+
+function removeClone(project, branch) {
+  const dir = cloneDir(project, branch);
+  if (!fs.existsSync(dir)) return;
+  timePhase(`remove clone ${project.repoName}@${branch}`, () => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
 }
 
 function verifyCommands(projects) {

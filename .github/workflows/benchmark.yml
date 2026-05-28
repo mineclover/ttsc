@@ -247,5 +247,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add website/public/benchmark.json
-          git commit -m "chore(benchmark): refresh website/public/benchmark.json [skip ci]"
+          # No `[skip ci]` tag — the benchmark workflow's `push` trigger is
+          # already pinned to `paths: [pnpm-workspace.yaml]`, so a
+          # benchmark.json-only commit cannot re-enter this workflow.
+          # Letting the commit through allows `.github/workflows/website.yml`
+          # (which watches `website/**`) to redeploy the dashboard with the
+          # fresh data.
+          git commit -m "chore(benchmark): refresh website/public/benchmark.json"
           git push origin HEAD:master

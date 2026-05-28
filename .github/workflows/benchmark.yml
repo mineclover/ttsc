@@ -5,22 +5,28 @@ name: benchmark
 #
 # Pipeline:
 #
-#   prepare        — emit the JSON matrix of projects to measure based on
-#                    the trigger / dispatch inputs
-#   pack           — pack the local ttsc / @ttsc/lint / platform tarballs
-#                    once and upload them as a shared artifact
-#   measure (× 21) — 7 projects × 3 branches in parallel; each job clones
-#                    one (project, branch), measures its cells in sequential
-#                    mode, deletes the clone, and uploads its partial
-#                    `report.json` as a `bench-<project>-<branch>` artifact
-#   publish        — download all partials, merge them into the website
-#                    JSON via experimental/benchmark/merge-website.mjs,
-#                    and commit & push the result to master
+#   prepare       — emit the JSON matrix of projects based on the trigger
+#                   / dispatch inputs
+#   pack          — pack the local ttsc / @ttsc/lint / platform tarballs
+#                   once and upload them as a shared artifact
+#   measure (× 7) — one job per fixture; inside each job the bench runs
+#                   `legacy → ttsc → ttsc-lint` *sequentially on the same
+#                   runner* so the comparison numbers that the dashboard
+#                   actually shows (ttsc vs tsc, ttsc-lint vs eslint) come
+#                   from one physical machine. Cross-fixture rows
+#                   (`vue` vs `rxjs`) are independent and unaffected by
+#                   running on different runners. Each job uploads its
+#                   partial `report.json` as `bench-<project>`.
+#   publish       — download all partials, merge them into the website
+#                   JSON via experimental/benchmark/merge-website.mjs,
+#                   and commit & push the result to master
 #
-# Each measure job covers exactly one (project, branch). The standard
-# ubuntu-latest runner (4 cores, ~14 GB free disk) finishes a single
-# fixture / branch comfortably within the 350-minute timeout, while the
-# 21-way fan-out keeps wall time bounded by the slowest cell.
+# Why not also fan out by branch? The previous (project × branch)
+# 21-job matrix scattered the within-fixture comparisons across three
+# different ubuntu-latest VMs, so a noisy host on the `ttsc` runner
+# could turn into a phantom regression vs the `legacy` runner. Keeping
+# the three branches on one runner is the single biggest knob for
+# cross-row comparability inside a fixture.
 #
 # Triggers:
 #   - push to master that touches pnpm-workspace.yaml (catalog version of
@@ -155,9 +161,8 @@ jobs:
       fail-fast: false
       matrix:
         project: ${{ fromJSON(needs.prepare.outputs.projects_json) }}
-        branch: [legacy, ttsc, ttsc-lint]
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
         with:
@@ -179,20 +184,23 @@ jobs:
         with:
           name: ttsc-tarballs
           path: ${{ runner.temp }}/ttsc-tgz
-      - name: Measure ${{ matrix.project }}@${{ matrix.branch }}
+      - name: Measure ${{ matrix.project }}
         env:
           TTSC_BENCH_SEQUENTIAL: '1'
           TTSC_BENCH_TGZ: ${{ runner.temp }}/ttsc-tgz
           TTSC_BENCH_SKIP_PACK: '1'
           VERIFY_ONLY: ${{ needs.prepare.outputs.verify_only }}
           PROJECT: ${{ matrix.project }}
-          BRANCH: ${{ matrix.branch }}
         run: |
           set -euo pipefail
+          # One job, one fixture, all three branches in series. `--sequential`
+          # iterates `legacy → ttsc → ttsc-lint` on this single runner, so the
+          # per-row comparisons the dashboard exposes (ttsc vs tsc, ttsc-lint
+          # vs eslint) all use the same physical machine and the same OS
+          # / CPU scheduling moment.
           args=(
             --sequential
             "--project=$PROJECT"
-            "--cell-filter=^$PROJECT:$BRANCH:"
             --no-website
             --no-pack
             --allow-missing
@@ -207,7 +215,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bench-${{ matrix.project }}-${{ matrix.branch }}
+          name: bench-${{ matrix.project }}
           path: experimental/benchmark/.work/report.json
           if-no-files-found: ignore
           retention-days: 7

@@ -133,14 +133,19 @@ Per-project commands, install/prepare overrides, and prerequisites live in
   resumable snapshot just like batch mode. Verify-only runs skip the
   per-cycle website write to avoid noisy host-metadata-only commits.
 - `.github/workflows/benchmark.yml` parallelises a full sweep by fanning out
-  `--sequential --cell-filter='^${project}:${branch}:'` across a 21-job
-  matrix (7 fixtures × 3 branches), each job producing one partial
-  `report.json` artifact. A single `publish` job downloads every partial and
-  invokes `merge-website.mjs` to fold the cells into
+  `--sequential --project=${project}` across a 7-job matrix (one per
+  fixture). Each job runs `legacy → ttsc → ttsc-lint` sequentially on the
+  same runner so the within-fixture comparisons the dashboard surfaces
+  (ttsc vs tsc, ttsc-lint vs eslint) come from one physical machine.
+  Cross-fixture rows (`vue` vs `rxjs`) are independent and unaffected by
+  running on different runners, which is why the matrix doesn't go all the
+  way to 21 jobs. Each `measure` job uploads its partial `report.json`;
+  the `publish` job downloads every partial and invokes
+  `merge-website.mjs` to fold the cells into
   `website/public/benchmark.json` by id — missing partials keep their
-  previous cells intact, fresh partials replace by id, and only the freshest
-  partial that *carries measurements* rotates the top-level `date` / `host`
-  block.
+  previous cells intact, fresh partials replace by id, and only the
+  freshest partial that *carries measurements* rotates the top-level
+  `date` / `host` block.
 - At startup the runner checks `loadavg[0] / cpus()` and warns when the ratio
   exceeds 0.5 — the fastest cells (`ttsc:build:single`, ~2–8 s) drift 20–60 %
   on a busy host. Override with `TTSC_BENCH_REQUIRE_QUIET=1` to error

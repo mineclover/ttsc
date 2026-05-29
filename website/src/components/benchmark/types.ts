@@ -8,10 +8,11 @@
  * sparse so a project may carry only some of the branch × tool × op × threading
  * combinations; the dashboard skips any comparison whose pair is missing.
  *
- * Required fields drive the dashboard. Optional fields (`samples`, `minMs`,
- * stability) carry the runner's richer per-cell data through to the JSON so a
- * published result is fully reproducible; the dashboard does not depend on
- * them.
+ * The runner stores only raw `samples` arrays. The dashboard reduces them with
+ * `measurementMs()` / `lintMs()` etc. (in `./format.ts`) to whichever
+ * statistic it currently surfaces — `min` today — so the published JSON never
+ * carries derived statistics that would drift out of sync with the chosen
+ * reduction.
  */
 
 export type BenchmarkBranch = "legacy" | "ttsc" | "ttsc-lint";
@@ -53,7 +54,7 @@ export type BenchmarkThreading =
  * How a measured run that exited non-zero was classified. `race` is the
  * intermittent TypeScript-Go parallel-emit data race (retried; a clean timing
  * is still recorded). `error` is a deterministic failure (the cell is left
- * unmeasured, so `medianMs` is `0`).
+ * unmeasured — `samples` is empty and any derived ms is `0`).
  */
 export type BenchmarkFailureKind = "race" | "error";
 
@@ -63,43 +64,30 @@ export interface BenchmarkMeasurement {
   op: BenchmarkOp;
   threading: BenchmarkThreading;
   /**
-   * Median wall-clock time in milliseconds across the measured runs. `0` means
-   * the cell could not be measured (a deterministic failure); the dashboard
-   * skips any comparison touching a `0`.
+   * Raw per-run wall-clock samples in milliseconds, in run order. The
+   * dashboard takes the minimum (see `measurementMs` in `./format.ts`); the
+   * full array is preserved so a future reduction (median, p95, …) can be
+   * picked without re-running the sweep. An empty array means the cell could
+   * not be measured (a deterministic failure); any derived ms is `0` and the
+   * dashboard skips comparisons touching it.
    */
-  medianMs: number;
-  /** Fastest measured run in milliseconds, when at least one run succeeded. */
-  minMs?: number;
-  /** Raw per-run wall-clock samples in milliseconds, in run order. */
-  samples?: number[];
+  samples: number[];
   /**
-   * Median `@ttsc/lint` check sidecar wall-clock time parsed from `ttsc
-   * --diagnostics`. Present only for `ttsc-lint` build/check cells recorded by
-   * newer benchmark runs.
+   * Per-run `@ttsc/lint` check sidecar wall-clock samples parsed from
+   * `ttsc --diagnostics`. Present only for `ttsc-lint` build/check cells
+   * recorded by newer benchmark runs.
    */
-  lintMedianMs?: number;
-  /** Fastest measured `@ttsc/lint` sidecar run in milliseconds. */
-  lintMinMs?: number;
-  /** Raw per-run `@ttsc/lint` sidecar samples in milliseconds. */
   lintSamples?: number[];
   /**
-   * Median native `@ttsc/lint` time parsed from the lint sidecar's own
+   * Per-run native `@ttsc/lint` samples parsed from the lint sidecar's own
    * diagnostics timing. This is the green lint segment in the dashboard.
    */
-  lintPluginMedianMs?: number;
-  /** Fastest measured native `@ttsc/lint` run in milliseconds. */
-  lintPluginMinMs?: number;
-  /** Raw per-run native `@ttsc/lint` samples in milliseconds. */
   lintPluginSamples?: number[];
   /**
-   * Median third-party transform-host wall-clock time parsed from `ttsc
-   * --diagnostics`. Present when a `ttsc-lint` check/build cell also runs
-   * source transform plugins such as typia or nestia.
+   * Per-run third-party transform-host samples parsed from
+   * `ttsc --diagnostics`. Present when a `ttsc-lint` check/build cell also
+   * runs source transform plugins such as typia or nestia.
    */
-  transformHostMedianMs?: number;
-  /** Fastest measured transform-host run in milliseconds. */
-  transformHostMinMs?: number;
-  /** Raw per-run transform-host samples in milliseconds. */
   transformHostSamples?: number[];
   /**
    * Count of runs that hit the intermittent parallel-emit data race and were

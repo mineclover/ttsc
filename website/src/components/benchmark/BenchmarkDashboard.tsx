@@ -3,7 +3,15 @@
 import { useEffect, useState } from "react";
 
 import HostPanel from "./HostPanel";
-import { findMeasurement, formatDuration, formatMultiplier } from "./format";
+import {
+  findMeasurement,
+  formatDuration,
+  formatMultiplier,
+  lintMs,
+  lintPluginMs,
+  measurementMs,
+  transformHostMs,
+} from "./format";
 import type {
   BenchmarkMeasurement,
   BenchmarkProject,
@@ -160,8 +168,8 @@ function Snapshot({ report }: { report: BenchmarkReport }) {
           Benchmark Snapshot
         </h2>
         <p className="mt-1 text-[13px] text-neutral-400">
-          Prepared-clone wall-clock timings. Ratios use median command times
-          from the generated benchmark JSON.
+          Prepared-clone wall-clock timings. Ratios use the fastest command
+          time per cell from the generated benchmark JSON.
         </p>
       </div>
       <dl className="grid grid-cols-2 gap-px bg-[#262b36] xl:grid-cols-4">
@@ -292,7 +300,7 @@ function ProjectOperationRows({
   const baseline = rows.find((row) => row.baseline);
   const maxMs = Math.max(
     1,
-    ...rows.map((row) => row.measurement.medianMs).filter((ms) => ms > 0),
+    ...rows.map((row) => measurementMs(row.measurement)).filter((ms) => ms > 0),
   );
 
   if (!baseline || rows.length <= 1) return null;
@@ -302,10 +310,10 @@ function ProjectOperationRows({
       (row) =>
         !row.baseline &&
         row.measurement.tool === "ttsc" &&
-        row.measurement.medianMs > 0,
+        measurementMs(row.measurement) > 0,
     )
     .reduce<{ factor: number; label: string } | undefined>((acc, row) => {
-      const factor = baseline.measurement.medianMs / row.measurement.medianMs;
+      const factor = measurementMs(baseline.measurement) / measurementMs(row.measurement);
       return !acc || factor > acc.factor ? { factor, label: row.label } : acc;
     }, undefined);
 
@@ -314,7 +322,7 @@ function ProjectOperationRows({
       <ProjectLabel
         project={project}
         title={title}
-        baselineMs={baseline.measurement.medianMs}
+        baselineMs={measurementMs(baseline.measurement)}
         bestFactor={best?.factor}
         bestLabel={best?.label}
       />
@@ -323,14 +331,14 @@ function ProjectOperationRows({
           <DurationBar
             key={`${project.name}:${op}:${row.label}`}
             label={row.label}
-            ms={row.measurement.medianMs}
+            ms={measurementMs(row.measurement)}
             maxMs={maxMs}
             color={row.color}
             ratio={
               row.baseline
                 ? "baseline"
                 : formatMultiplier(
-                    baseline.measurement.medianMs / row.measurement.medianMs,
+                    measurementMs(baseline.measurement) / measurementMs(row.measurement),
                   )
             }
             baseline={row.baseline}
@@ -764,12 +772,12 @@ function lintRowsForProject(
       op,
       threading: "multi",
       label: "tsc + eslint",
-      totalMs: tsc.medianMs + eslint.medianMs,
+      totalMs: measurementMs(tsc) + measurementMs(eslint),
       baseline: true,
-      eslintMs: eslint.medianMs,
+      eslintMs: measurementMs(eslint),
       segments: [
-        { label: "tsc", ms: tsc.medianMs, color: "bg-neutral-500" },
-        { label: "ESLint", ms: eslint.medianMs, color: "bg-amber-500" },
+        { label: "tsc", ms: measurementMs(tsc), color: "bg-neutral-500" },
+        { label: "ESLint", ms: measurementMs(eslint), color: "bg-amber-500" },
       ],
     });
 
@@ -801,16 +809,16 @@ function lintRowsForProject(
     });
     if (!total || !plainTtsc) continue;
     const directLintMs =
-      total.lintPluginMedianMs !== undefined && total.lintPluginMedianMs > 0
-        ? total.lintPluginMedianMs
+      lintPluginMs(total) !== undefined && lintPluginMs(total) > 0
+        ? lintPluginMs(total)
         : undefined;
     ttscByThreading[threading] = {
       directLintTiming: directLintMs !== undefined,
-      lintMs: directLintMs ?? total.medianMs - plainTtsc.medianMs,
-      plainMs: plainTtsc.medianMs,
-      transformHostMs: Math.max(0, total.transformHostMedianMs ?? 0),
-      totalMs: total.medianMs,
-      rawOverhead: total.medianMs - plainTtsc.medianMs,
+      lintMs: directLintMs ?? measurementMs(total) - measurementMs(plainTtsc),
+      plainMs: measurementMs(plainTtsc),
+      transformHostMs: Math.max(0, transformHostMs(total) ?? 0),
+      totalMs: measurementMs(total),
+      rawOverhead: measurementMs(total) - measurementMs(plainTtsc),
     };
   }
 
@@ -870,11 +878,11 @@ function lintRowsForProject(
       threading,
       label,
       totalMs: adjustedTotalMs,
-      eslintMs: eslint?.medianMs,
+      eslintMs: (eslint && measurementMs(eslint)),
       lintOverheadMs,
       lintFactor:
         eslint && lintOverheadMs > 0
-          ? eslint.medianMs / lintOverheadMs
+          ? measurementMs(eslint) / lintOverheadMs
           : undefined,
       transformHostMs: boundedTransformHostMs || undefined,
       directLintTiming,
@@ -974,7 +982,7 @@ function bestOperationProject(
     const winner = rows
       .filter((row) => !row.baseline && row.measurement.tool === "ttsc")
       .reduce<Winner | undefined>((innerBest, row) => {
-        const factor = baseline.measurement.medianMs / row.measurement.medianMs;
+        const factor = measurementMs(baseline.measurement) / measurementMs(row.measurement);
         const current = {
           project,
           label: `${op === "build" ? "Build" : "Type-check"} ${row.label}`,
@@ -997,7 +1005,7 @@ function bestFormatProject(report: BenchmarkReport): Winner | undefined {
     const winner = rows
       .filter((row) => !row.baseline)
       .reduce<Winner | undefined>((innerBest, row) => {
-        const factor = baseline.measurement.medianMs / row.measurement.medianMs;
+        const factor = measurementMs(baseline.measurement) / measurementMs(row.measurement);
         const current = {
           project,
           label: `Format ${row.label}`,
@@ -1059,7 +1067,7 @@ function findMeasured(
   options: MeasurementOptions,
 ): BenchmarkMeasurement | undefined {
   const measurement = findMeasurement(measurements, options);
-  return measurement && measurement.medianMs > 0 ? measurement : undefined;
+  return measurement && measurementMs(measurement) > 0 ? measurement : undefined;
 }
 
 function findLegacyEslint(
@@ -1083,7 +1091,7 @@ function findLegacyEslint(
       (measurement) =>
         measurement.branch === "legacy" &&
         measurement.tool === "eslint" &&
-        measurement.medianMs > 0,
+        measurementMs(measurement) > 0,
     )
   );
 }
@@ -1131,15 +1139,15 @@ function ProjectFormatRows({
   const baseline = rows.find((row) => row.baseline);
   const maxMs = Math.max(
     1,
-    ...rows.map((row) => row.measurement.medianMs).filter((ms) => ms > 0),
+    ...rows.map((row) => measurementMs(row.measurement)).filter((ms) => ms > 0),
   );
 
   if (!baseline || rows.length <= 1) return null;
 
   const best = rows
-    .filter((row) => !row.baseline && row.measurement.medianMs > 0)
+    .filter((row) => !row.baseline && measurementMs(row.measurement) > 0)
     .reduce<{ factor: number; label: string } | undefined>((acc, row) => {
-      const factor = baseline.measurement.medianMs / row.measurement.medianMs;
+      const factor = measurementMs(baseline.measurement) / measurementMs(row.measurement);
       return !acc || factor > acc.factor ? { factor, label: row.label } : acc;
     }, undefined);
 
@@ -1148,7 +1156,7 @@ function ProjectFormatRows({
       <ProjectLabel
         project={project}
         title={title}
-        baselineMs={baseline.measurement.medianMs}
+        baselineMs={measurementMs(baseline.measurement)}
         bestFactor={best?.factor}
         bestLabel={best?.label}
       />
@@ -1157,14 +1165,14 @@ function ProjectFormatRows({
           <DurationBar
             key={`${project.name}:format:${row.label}`}
             label={row.label}
-            ms={row.measurement.medianMs}
+            ms={measurementMs(row.measurement)}
             maxMs={maxMs}
             color={row.color}
             ratio={
               row.baseline
                 ? "baseline"
                 : formatMultiplier(
-                    baseline.measurement.medianMs / row.measurement.medianMs,
+                    measurementMs(baseline.measurement) / measurementMs(row.measurement),
                   )
             }
             baseline={row.baseline}
@@ -1183,7 +1191,7 @@ function formatRowsForProject(project: BenchmarkProject): OperationRow[] {
       m.branch === "legacy" &&
       m.op === "format" &&
       m.threading === "multi" &&
-      m.medianMs > 0,
+      measurementMs(m) > 0,
   );
   if (prettier)
     rows.push({
@@ -1198,7 +1206,7 @@ function formatRowsForProject(project: BenchmarkProject): OperationRow[] {
         m.branch === "ttsc-lint" &&
         m.op === "format" &&
         m.threading === threading &&
-        m.medianMs > 0,
+        measurementMs(m) > 0,
     );
     if (ttscFormat)
       rows.push({
@@ -1251,7 +1259,7 @@ function findTtscLintTotal(
         measurement.tool !== "@ttsc/lint" &&
         measurement.tool !== "eslint" &&
         measurement.tool !== "prettier" &&
-        measurement.medianMs > 0,
+        measurementMs(measurement) > 0,
     )
   );
 }

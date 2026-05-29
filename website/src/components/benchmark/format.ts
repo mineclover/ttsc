@@ -1,5 +1,36 @@
 import type { BenchmarkMeasurement } from "./types";
 
+/**
+ * Reduce a `samples` array to the wall-clock number the dashboard surfaces.
+ * `min` is the convention: system noise pushes individual runs slower, never
+ * faster, so the fastest run is the closest we can get to a noise-free
+ * measurement of the workload itself. Empty samples → `0`, which lets
+ * downstream code treat unmeasured cells as "skip the comparison".
+ */
+function sampleMin(samples: number[] | undefined): number {
+  return samples && samples.length > 0 ? Math.min(...samples) : 0;
+}
+
+/** Wall-clock min for the cell's main samples. */
+export function measurementMs(measurement: BenchmarkMeasurement): number {
+  return sampleMin(measurement.samples);
+}
+
+/** Wall-clock min for the `@ttsc/lint` sidecar timing, if recorded. */
+export function lintMs(measurement: BenchmarkMeasurement): number {
+  return sampleMin(measurement.lintSamples);
+}
+
+/** Wall-clock min for the native `@ttsc/lint` plugin timing, if recorded. */
+export function lintPluginMs(measurement: BenchmarkMeasurement): number {
+  return sampleMin(measurement.lintPluginSamples);
+}
+
+/** Wall-clock min for the third-party transform-host timing, if recorded. */
+export function transformHostMs(measurement: BenchmarkMeasurement): number {
+  return sampleMin(measurement.transformHostSamples);
+}
+
 /** Human-friendly wall-clock label: sub-second in `ms`, otherwise `s`. */
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)} ms`;
@@ -102,8 +133,8 @@ export function deriveSpeedups(
       `build-${threading}`,
       `Build (${threading})`,
       "legacy tsc build vs ttsc build",
-      legacyBuild && { tool: "tsc", ms: legacyBuild.medianMs },
-      ttscBuild && { tool: `ttsc ${threading}`, ms: ttscBuild.medianMs },
+      legacyBuild && { tool: "tsc", ms: measurementMs(legacyBuild) },
+      ttscBuild && { tool: `ttsc ${threading}`, ms: measurementMs(ttscBuild) },
     );
 
     const ttscNoEmit = findMeasurement(measurements, {
@@ -116,10 +147,10 @@ export function deriveSpeedups(
       `noEmit-${threading}`,
       `No emit (${threading})`,
       "legacy tsc --noEmit vs ttsc --noEmit",
-      legacyNoEmit && { tool: "tsc --noEmit", ms: legacyNoEmit.medianMs },
+      legacyNoEmit && { tool: "tsc --noEmit", ms: measurementMs(legacyNoEmit) },
       ttscNoEmit && {
         tool: `ttsc --noEmit ${threading}`,
-        ms: ttscNoEmit.medianMs,
+        ms: measurementMs(ttscNoEmit),
       },
     );
 
@@ -142,11 +173,11 @@ export function deriveSpeedups(
       legacyBuild &&
         eslint && {
           tool: "tsc + eslint",
-          ms: legacyBuild.medianMs + eslint.medianMs,
+          ms: measurementMs(legacyBuild) + measurementMs(eslint),
         },
       ttscLintBuild && {
         tool: `ttsc-lint ${threading}`,
-        ms: ttscLintBuild.medianMs,
+        ms: measurementMs(ttscLintBuild),
       },
     );
 
@@ -169,21 +200,21 @@ export function deriveSpeedups(
       legacyNoEmit &&
         eslint && {
           tool: "tsc --noEmit + eslint",
-          ms: legacyNoEmit.medianMs + eslint.medianMs,
+          ms: measurementMs(legacyNoEmit) + measurementMs(eslint),
         },
       ttscLintNoEmit && {
         tool: `ttsc-lint --noEmit ${threading}`,
-        ms: ttscLintNoEmit.medianMs,
+        ms: measurementMs(ttscLintNoEmit),
       },
     );
 
     if (eslint && ttscBuild && ttscLintBuild) {
-      const overhead = ttscLintBuild.medianMs - ttscBuild.medianMs;
+      const overhead = measurementMs(ttscLintBuild) - measurementMs(ttscBuild);
       push(
         `lint-overhead-${threading}`,
         `Lint overhead (${threading})`,
         "eslint alone vs ttsc-lint build minus ttsc build",
-        { tool: "eslint", ms: eslint.medianMs },
+        { tool: "eslint", ms: measurementMs(eslint) },
         overhead > 0
           ? { tool: `ttsc-lint - ttsc ${threading}`, ms: overhead }
           : undefined,

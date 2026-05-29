@@ -745,12 +745,6 @@ function runSteps(steps, root) {
   return { ok: true, status: 0, ms: Number(t1 - t0) / 1e6, log };
 }
 
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = sorted.length >> 1;
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
 function classifyFailure(log) {
   return /concurrent map|fatal error|\bpanic:|DATA RACE/.test(log)
     ? "race"
@@ -1409,30 +1403,27 @@ function measureCell({ id, project, branch, tool, op, threading, steps }) {
     );
   }
 
+  // Only raw `samples` arrays are persisted. The dashboard reduces them
+  // (today: minimum) at render time, so we never pre-compute a `medianMs`
+  // or `minMs` that would drift out of sync with whichever reduction the
+  // dashboard surfaces. Cells that didn't measure cleanly get an empty
+  // `samples` array (handled by `failedMeasurement` below).
   const measured = {
     id,
     branch,
     tool: toolFor(branch, op, tool),
     op,
     threading,
-    medianMs: median(samples),
-    minMs: Math.min(...samples),
     samples,
     raceRetries: raceRetries || undefined,
   };
   if (capturesLintTiming && lintSidecarSamples.length !== 0) {
-    measured.lintMedianMs = median(lintSidecarSamples);
-    measured.lintMinMs = Math.min(...lintSidecarSamples);
     measured.lintSamples = lintSidecarSamples;
   }
   if (capturesLintTiming && lintPluginSamples.length !== 0) {
-    measured.lintPluginMedianMs = median(lintPluginSamples);
-    measured.lintPluginMinMs = Math.min(...lintPluginSamples);
     measured.lintPluginSamples = lintPluginSamples;
   }
   if (capturesLintTiming && transformHostSamples.length !== 0) {
-    measured.transformHostMedianMs = median(transformHostSamples);
-    measured.transformHostMinMs = Math.min(...transformHostSamples);
     measured.transformHostSamples = transformHostSamples;
   }
   return measured;
@@ -1548,7 +1539,6 @@ function failedMeasurement(
     tool: toolFor(branch, op, tool),
     op,
     threading,
-    medianMs: 0,
     samples: [],
     raceRetries: raceRetries || undefined,
     failure: classifyFailure(result.log),
@@ -1763,15 +1753,15 @@ function buildMarkdown(report) {
     lines.push(`## ${project.name}`);
     lines.push("");
     lines.push(
-      "| Branch | Op | Threading | Median | @ttsc/lint sidecar | @ttsc/lint | Transform host | Samples | Failure |",
+      "| Branch | Op | Threading | Min | @ttsc/lint sidecar | @ttsc/lint | Transform host | Samples | Failure |",
     );
     lines.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
     for (const m of project.measurements) {
       lines.push(
-        `| ${m.branch} | ${m.op} | ${m.threading} | ${formatMs(m.medianMs)} | ` +
-          `${formatMs(m.lintMedianMs ?? 0)} | ` +
-          `${formatMs(m.lintPluginMedianMs ?? 0)} | ` +
-          `${formatMs(m.transformHostMedianMs ?? 0)} | ` +
+        `| ${m.branch} | ${m.op} | ${m.threading} | ${formatMs(sampleMin(m.samples))} | ` +
+          `${formatMs(sampleMin(m.lintSamples))} | ` +
+          `${formatMs(sampleMin(m.lintPluginSamples))} | ` +
+          `${formatMs(sampleMin(m.transformHostSamples))} | ` +
           `${m.samples?.map((s) => s.toFixed(0)).join(", ") || "-"} | ` +
           `${m.failure ?? ""} |`,
       );
@@ -1779,6 +1769,10 @@ function buildMarkdown(report) {
     lines.push("");
   }
   return lines.join("\n");
+}
+
+function sampleMin(samples) {
+  return samples && samples.length > 0 ? Math.min(...samples) : 0;
 }
 
 function formatMs(ms) {

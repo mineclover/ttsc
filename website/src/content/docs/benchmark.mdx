@@ -7,15 +7,12 @@ time changes when a real TypeScript project moves from the legacy
 `tsc`/`eslint` path to TypeScript-Go backed builds, checks, and linting.
 
 The fixtures are real repositories cloned into prepared `legacy`, `ttsc`, and
-`ttsc-lint` branches. The dashboard reports medians from repeated command-line
-runs on the same machine, so the ratios are the useful signal; absolute seconds
-still depend on the host shown below. Projects are displayed by upstream GitHub
-stars so the most recognizable fixtures appear first.
-
-The public headline uses VS Code as the reference fixture: `ttsc` type-checks
-up to **10x** faster than legacy `tsc`, and the measured `@ttsc/lint` pass is
-**500x** faster than ESLint. The dashboard still keeps every fixture's raw
-measurements visible below.
+`ttsc-lint` branches. The dashboard reports the fastest command-line run per
+cell on the same machine — system noise can only push individual runs slower,
+never faster, so the minimum is the closest we can get to the workload itself.
+Absolute seconds still depend on the host shown below; the ratios are the
+useful signal. Projects are displayed by upstream GitHub stars so the most
+recognizable fixtures appear first.
 
 <BenchmarkDashboard />
 
@@ -67,11 +64,13 @@ runner invokes the repository's normal TypeScript configuration for the command
 being measured.
 
 The run count is configured by `TTSC_BENCH_RUNS` and `TTSC_BENCH_WARMUP`, and
-the chosen values are recorded in `website/public/benchmark.json` with the
-median, fastest sample, full sample list, retry counts, deterministic failures,
-and, for `ttsc-lint` build/check cells, parsed `@ttsc/lint` timings. A
-missing bar means that project does not currently have a valid comparable
-command for that tool.
+the chosen values are recorded in `website/public/benchmark.json` along with
+the raw per-run wall-clock samples, retry counts, deterministic failures, and,
+for `ttsc-lint` build/check cells, parsed `@ttsc/lint` timings. The dashboard
+reduces each cell's samples to its minimum at render time, so the published
+JSON never carries derived statistics that would drift out of sync with the
+chosen reduction. A missing bar means that project does not currently have a
+valid comparable command for that tool.
 
 The host panel's **Legacy TypeScript** field is the installed `typescript`
 version in the fixture `legacy` clone. The current fixture set resolves to a
@@ -205,14 +204,15 @@ rm -rf experimental/benchmark/.work
 node experimental/benchmark/bench.mjs
 ```
 
-The runner defaults to **5 measured runs + 1 warmup** per cell. That is the
-setting the published snapshot uses: enough samples for the median to absorb
-single-cell outliers while keeping a full matrix sweep practical on a single
-host. Override with `TTSC_BENCH_RUNS` / `TTSC_BENCH_WARMUP` when you want a
-quicker spot-check (`TTSC_BENCH_RUNS=1 TTSC_BENCH_WARMUP=0` finishes a sweep
-in roughly half an hour but every cell is one sample) or a steadier
-sampling run (e.g. `TTSC_BENCH_RUNS=10` doubles every sample). Results are
-written to `experimental/benchmark/.work/report.md`,
+The runner defaults to **5 measured runs + 1 warmup** per cell. The dashboard
+takes the minimum across those samples, so more samples push the published
+number toward the noise-free best case rather than averaging it. Override with
+`TTSC_BENCH_RUNS` / `TTSC_BENCH_WARMUP` when you want a quicker spot-check
+(`TTSC_BENCH_RUNS=1 TTSC_BENCH_WARMUP=0` finishes a sweep in roughly half an
+hour but a single cold spike then sets the cell's number) or a steadier
+sampling run (e.g. `TTSC_BENCH_RUNS=10` doubles every sample and lowers the
+chance of an outlier squatting on the minimum). Results are written to
+`experimental/benchmark/.work/report.md`,
 `experimental/benchmark/.work/report.json`, and `website/public/benchmark.json`.
 
 The published snapshot pins every fixture's `legacy` branch to the

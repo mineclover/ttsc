@@ -1,4 +1,6 @@
-import type { TtscLintSeverity } from "./TtscLintSeverity";
+import type { TtscLintSeverity } from "../TtscLintSeverity";
+import type { ITtscLintFormatJsDoc } from "./ITtscLintFormatJsDoc";
+import type { ITtscLintFormatSortImports } from "./ITtscLintFormatSortImports";
 
 /**
  * Prettier-style flat configuration for the format rules.
@@ -68,11 +70,11 @@ export interface ITtscLintFormat {
 
   /**
    * Quoting policy for object-literal property keys. Mirrors Prettier's
-   * `quoteProps`. `"as-needed"` (the default) removes quotes from a key that
-   * is a valid identifier (`{ "foo": 1 }` becomes `{ foo: 1 }`), keeping them
-   * on non-identifier or numeric keys (`"bar-baz"`, `"123"`). `"consistent"`
-   * keeps every key quoted when any one of them requires quotes. `"preserve"`
-   * never changes quoting.
+   * `quoteProps`. `"as-needed"` (the default) removes quotes from a key that is
+   * a valid identifier (`{ "foo": 1 }` becomes `{ foo: 1 }`), keeping them on
+   * non-identifier or numeric keys (`"bar-baz"`, `"123"`). `"consistent"` keeps
+   * every key quoted when any one of them requires quotes. `"preserve"` never
+   * changes quoting.
    *
    * @default "as-needed"
    */
@@ -118,55 +120,22 @@ export interface ITtscLintFormat {
   endOfLine?: "lf" | "crlf";
 
   /**
-   * Group order for `format/sort-imports`. Setting this enables the rule;
-   * mirrors `@trivago/prettier-plugin-sort-imports`' `importOrder`. The
-   * `<THIRD_PARTY_MODULES>` literal is the catch-all placeholder for specifiers
-   * that match no other group.
-   */
-  importOrder?: readonly ("<THIRD_PARTY_MODULES>" | (string & {}))[];
-
-  /**
-   * Insert blank line between sort-imports groups.
-   *
-   * @default true
-   */
-  importOrderSeparation?: boolean;
-
-  /**
-   * Sort named import specifiers alphabetically within each declaration.
-   *
-   * @default true
-   */
-  importOrderSortSpecifiers?: boolean;
-
-  /**
-   * Case-insensitive comparison for sort-imports.
+   * Import sorting & merging. Off unless present; `true` enables it with
+   * defaults, an object customizes.
    *
    * @default false
    */
-  importOrderCaseInsensitive?: boolean;
+  sortImports?: boolean | ITtscLintFormatSortImports;
 
   /**
-   * JSDoc tag normalization (`format/jsdoc`). On by default like the rest of
-   * the format set; pass `false` to disable, or an object to customize. (The
-   * rule id stays `format/jsdoc`; only this config key is camelCased to match
-   * the other multi-word keys.)
+   * JSDoc tag normalization. On by default like the rest of the format set;
+   * pass `false` to disable, or an object to customize.
    *
    * Today it only rewrites tag synonyms (`@return` → `@returns`, `@arg` →
    * `@param`, ...); tag sorting, `@param` column alignment, and description
    * wrapping are on the roadmap.
    *
-   * - `tagSynonyms`, extra `from → to` rewrites layered on the built-in synonym
-   *   table.
-   * - `sortTags`, sort JSDoc tags into canonical order (reserved; today's MVP
-   *   only rewrites tag names).
-   *
    * @default true
    */
-  jsDoc?:
-    | boolean
-    | {
-        tagSynonyms?: Record<string, string>;
-        sortTags?: boolean;
-      };
+  jsDoc?: boolean | ITtscLintFormatJsDoc;
 }

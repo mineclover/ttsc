@@ -570,9 +570,10 @@ func collectConfigObject(store *ConfigStore, raw any, baseDir, path string, chai
   formatValue, hasFormat := obj["format"]
   if hasRules || hasFormat {
     // Expand the format block (if any) into a rules-shaped map, then
-    // overlay any explicit `rules` entries. `rules`-wins semantics: a
-    // `rules` entry that names a `format/*` rule fully replaces the
-    // entry expanded from the `format` block.
+    // overlay the user's explicit `rules` entries. Formatter settings live
+    // exclusively in the `format` block: any `format/*` key in `rules` is
+    // dropped below (never activates, never overrides the format block), so
+    // the overlay only ever layers lint-rule severities on top.
     var formatRulesRaw map[string]any
     if hasFormat {
       formatMap, ok := formatValue.(map[string]any)
@@ -1125,8 +1126,8 @@ const { pathToFileURL } = require("node:url");
   let current = mod;
   let allowNamedConfig = true;
   // Match the 8-hop walk used by the TypeScript loader at
-  // ` + "`" + `typeScriptConfigLoaderSource` + "`" + ` so doubly-wrapped CJS/ESM
-  // interop (e.g. ` + "`" + `{default:{default:config}}` + "`" + `) is resolved
+  // `+"`"+`typeScriptConfigLoaderSource`+"`"+` so doubly-wrapped CJS/ESM
+  // interop (e.g. `+"`"+`{default:{default:config}}`+"`"+`) is resolved
   // consistently across .js/.cjs/.mjs and .ts/.cts/.mts loaders.
   for (let i = 0; i < 8; i++) {
     if (current !== null && typeof current === "object" && Object.prototype.hasOwnProperty.call(current, "default")) {
@@ -1154,7 +1155,7 @@ const { pathToFileURL } = require("node:url");
 // toSerializableConfig copies every ITtscLintConfig key onto a plain object so
 // it survives the JSON round trip to the Go sidecar. Every key is copied
 // verbatim — files, ignores, extends, plugins, rules, AND format — so a config
-// whose only key is ` + "`" + `format` + "`" + ` is not silently dropped.
+// whose only key is `+"`"+`format`+"`"+` is not silently dropped.
 function toSerializableConfig(value) {
   const out = {};
   for (const key of [%s]) {

@@ -10,7 +10,7 @@ The fixtures are real repositories cloned into prepared `legacy`, `ttsc`, and `t
 
 ## Reading the Results
 
-The Summary tab keeps only the strongest result in each category. Build and Type-check compare one unit of work across the legacy compiler, `ttsc` in single-threaded and checker-pool modes.
+The Summary tab keeps only the strongest result in each category. Build and Type-check compare one unit of work across the legacy compiler, `ttsc` in single-threaded and checker-pool modes. Raw `tsgo` rows are kept as a reference for native-preview overhead, but they are not eligible for the headline winner or per-project best ratio.
 
 Lint is intentionally split out. The legacy path is `tsc + eslint`, two separate passes over the project. The `ttsc-lint` path runs `ttsc` with `@ttsc/lint` loaded and invokes those cells with `--diagnostics`, so the runner parses the lint sidecar's own `@ttsc/lint time` line instead of deriving lint cost from total-minus-total noise. The chart separates that measured lint portion from the rest of the compiler run. The rest stays blue because `@ttsc/lint` also builds a TypeScript-Go Program and reports normal TypeScript diagnostics for the project. If the same command also runs source transform hosts such as typia or nestia, the chart shows that transform-host time as a second compiler segment after the green lint segment, because that work is still part of the TypeScript compile path rather than ESLint-style lint work. The chart also shows the pure lint-to-lint ratio.
 
@@ -41,7 +41,7 @@ The host panel's **Legacy TypeScript** field is the installed `typescript` versi
 
 ### Threading variants
 
-Build, type-check, and lint cells for `ttsc` are measured under four threading configurations, in display order:
+Build, type-check, and lint cells for `ttsc` and `ttsc:tsgo` are measured under four threading configurations, in display order:
 
 | Variant | Flag | What it caps |
 | --- | --- | --- |

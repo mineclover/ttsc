@@ -17,6 +17,7 @@
 export type BenchmarkBranch = "legacy" | "ttsc" | "ttsc-lint";
 export type BenchmarkTool =
   | "tsc"
+  | "tsgo"
   | "ttsc"
   | "ttsc+@ttsc/lint"
   | "eslint"
@@ -106,6 +107,8 @@ export interface BenchmarkProject {
   kind: string;
   /** Installed TypeScript version in the fixture's legacy clone. */
   typescript?: string;
+  /** Installed @typescript/native-preview version in the fixture's ttsc clone. */
+  tsgo?: string;
   measurements: BenchmarkMeasurement[];
 }
 
@@ -117,6 +120,7 @@ export interface BenchmarkHost {
   ramGB: number;
   node: string;
   ttsc: string;
+  tsgo: string;
   typescript: string;
 }
 

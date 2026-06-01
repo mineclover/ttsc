@@ -518,6 +518,12 @@ function compilerCommands({ build, noEmit, eslint, format }) {
     ttsc: {
       build: normalizeSteps(build("ttsc")),
       noEmit: normalizeSteps(noEmit("ttsc")),
+      // Direct tsgo invocation lives on the same `ttsc` clone as a second op
+      // so the chart can show the raw native-preview cost alongside ttsc and
+      // expose the per-invocation plugin-host overhead the ttsc launcher
+      // carries.
+      tsgoBuild: normalizeSteps(build("tsgo")),
+      tsgoNoEmit: normalizeSteps(noEmit("tsgo")),
     },
     "ttsc-lint": ttscLint,
   };
@@ -561,6 +567,8 @@ function nestjsCommands() {
     ttsc: {
       build: normalizeSteps(nestjsPackageSteps("ttsc", false)),
       noEmit: normalizeSteps(nestjsPackageSteps("ttsc", true)),
+      tsgoBuild: normalizeSteps(nestjsPackageSteps("tsgo", false)),
+      tsgoNoEmit: normalizeSteps(nestjsPackageSteps("tsgo", true)),
     },
     "ttsc-lint": {
       build: normalizeSteps(nestjsPackageSteps("ttsc", false)),
@@ -1257,7 +1265,10 @@ function singleThreadedSteps(steps) {
       const { singleThreadedCmd, ...rest } = step;
       return { ...rest, cmd: singleThreadedCmd };
     }
-    if (!/\bttsc\b/.test(step.cmd) || /--singleThreaded\b/.test(step.cmd)) {
+    if (
+      !/\b(?:ttsc|tsgo)\b/.test(step.cmd) ||
+      /--singleThreaded\b/.test(step.cmd)
+    ) {
       return step;
     }
     return { ...step, cmd: `${step.cmd} --singleThreaded` };
@@ -1265,14 +1276,14 @@ function singleThreadedSteps(steps) {
 }
 
 /**
- * Append `--checkers N` to every ttsc step in the cell. Used to sweep the
+ * Append `--checkers N` to every ttsc/tsgo step in the cell. Used to sweep the
  * checker-pool size axis (2 / 4 / 8) replacing the previous binary single/multi
  * axis. Parse and the lint engine still run with the host's full CPU count;
  * only the type-checker pool is capped.
  */
 function checkersSteps(steps, n) {
   return steps.map((step) => {
-    if (!/\bttsc\b/.test(step.cmd) || /--checkers\b/.test(step.cmd)) {
+    if (!/\b(?:ttsc|tsgo)\b/.test(step.cmd) || /--checkers\b/.test(step.cmd)) {
       return step;
     }
     return { ...step, cmd: `${step.cmd} --checkers ${n}` };
@@ -1292,10 +1303,10 @@ function diagnosticsSteps(steps) {
 }
 
 /**
- * Threading variants the bench measures for every ttsc / ttsc-lint cell. Order
- * is the spec the user asked for: serial baseline first, then the 2/4/8
- * checker-pool sweep, so the dashboard rows read left-to-right as `single →
- * checkers2 → checkers4 → checkers8`.
+ * Threading variants the bench measures for every ttsc / ttsc-lint / ttsc:tsgo
+ * cell. Order is the spec the user asked for: serial baseline first, then the
+ * 2/4/8 checker-pool sweep, so the dashboard rows read left-to-right as `single
+ * → checkers2 → checkers4 → checkers8`.
  *
  * Returned by a function rather than a top-level `const` so the call sites
  * (`projectCells`, invoked from `main()` near the top of the file) hit a
@@ -1576,9 +1587,7 @@ function measureCells(cells, project, report) {
       (measurement) => measurement.id === cell.id,
     );
     if (existingIndex !== -1)
-      process.stdout.write(
-        `\n[${cell.id}] refreshing existing measurement\n`,
-      );
+      process.stdout.write(`\n[${cell.id}] refreshing existing measurement\n`);
     const measurement = measureCell(cell);
     if (existingIndex === -1) projectReport.measurements.push(measurement);
     else projectReport.measurements.splice(existingIndex, 1, measurement);
@@ -1611,8 +1620,7 @@ function captureProjectMetaFromClone(project, branch) {
       cloneDir(project, "legacy"),
       "typescript",
     );
-    if (legacyTypescript)
-      cacheProjectMeta(project.name, { legacyTypescript });
+    if (legacyTypescript) cacheProjectMeta(project.name, { legacyTypescript });
   }
 }
 
@@ -1627,6 +1635,7 @@ function projectReportFor(project, measurements) {
       meta.legacyTypescript ??
         depVersion(cloneDir(project, "legacy"), "typescript"),
     ),
+    tsgo: NATIVE_PREVIEW_VERSION,
     measurements,
   };
 }
@@ -1689,6 +1698,7 @@ function hostSpec(projects) {
     typescript: displayLegacyTypescriptVersion(
       commonDepVersion(projects, "legacy", "typescript"),
     ),
+    tsgo: NATIVE_PREVIEW_VERSION,
   };
 }
 
@@ -1707,8 +1717,7 @@ function commonDepVersion(projects, branch, name) {
       projects
         .map((project) => {
           if (branch === "legacy" && name === "typescript") {
-            const cached =
-              projectMetaCache.get(project.name)?.legacyTypescript;
+            const cached = projectMetaCache.get(project.name)?.legacyTypescript;
             if (cached) return cached;
           }
           return depVersion(cloneDir(project, branch), name);
@@ -1954,7 +1963,7 @@ function main() {
       );
   }
 
-  // Quiet-host gate. Short ttsc cells (build/noEmit) finish in 2–8 s
+  // Quiet-host gate. Short ttsc / tsgo cells (build/noEmit) finish in 2–8 s
   // and a noisy host (concurrent claude worktrees, ts-node jobs, video
   // playback) can move a single sample by 30–60 %. The threshold is the
   // 1-minute load average per logical CPU: 0.5 is the rule of thumb above
@@ -2082,7 +2091,8 @@ function runSequential(totalStart) {
         if (!flags.has("--allow-missing"))
           throw new Error(
             "sequential setup failed; pass --allow-missing to continue " +
-              "past failed (project, branch) cycles\n- " + message,
+              "past failed (project, branch) cycles\n- " +
+              message,
           );
         process.stdout.write(`[sequential] skip ${message}\n`);
         continue;
@@ -2140,9 +2150,7 @@ function refreshProjectReportMeta(report, project) {
 
 function verifyProjectBranch(project, branch) {
   const failures = [];
-  const cells = projectCells(project).filter(
-    (cell) => cell.branch === branch,
-  );
+  const cells = projectCells(project).filter((cell) => cell.branch === branch);
   for (const cell of cells) {
     const root = cloneDir(project, cell.branch);
     process.stdout.write(`\nVERIFY ${cell.id}\n`);
@@ -2235,6 +2243,23 @@ function projectCells(project) {
           });
         }
       }
+      if (branch === "ttsc" && (op === "build" || op === "noEmit")) {
+        const tsgoSteps =
+          branchCommands[op === "build" ? "tsgoBuild" : "tsgoNoEmit"];
+        if (tsgoSteps?.length) {
+          for (const variant of threadingVariants()) {
+            cells.push({
+              id: `${project.name}:${branch}:tsgo:${op}:${variant.name}`,
+              project,
+              branch,
+              tool: "tsgo",
+              op,
+              threading: variant.name,
+              steps: variant.apply(tsgoSteps),
+            });
+          }
+        }
+      }
     }
   }
   return filterCells(cells);
@@ -2247,7 +2272,10 @@ function projectBranches(project) {
 function filterCells(cells) {
   const predicates = [];
   if (flags.has("--ttsc-build-only") || flags.has("--only-ttsc-build")) {
-    predicates.push((cell) => cell.branch === "ttsc" && cell.op === "build");
+    predicates.push(
+      (cell) =>
+        cell.branch === "ttsc" && cell.op === "build" && cell.tool !== "tsgo",
+    );
   }
   if (flags.has("--lint-only")) {
     predicates.push(isLintComparisonCell);
@@ -2267,7 +2295,8 @@ function filterCells(cells) {
 function isLintComparisonCell(cell) {
   if (cell.branch === "legacy")
     return cell.op === "noEmit" || cell.op === "eslint";
-  if (cell.branch === "ttsc") return cell.op === "noEmit";
+  if (cell.branch === "ttsc")
+    return cell.op === "noEmit" && cell.tool !== "tsgo";
   return cell.branch === "ttsc-lint" && cell.op === "noEmit";
 }
 

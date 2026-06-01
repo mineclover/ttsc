@@ -119,7 +119,7 @@ export default function BenchmarkDashboard() {
           report={report}
           op="build"
           title="Build"
-          description="Each project groups tsc (legacy) and ttsc threading variants in one chart."
+          description="Each project groups tsc (legacy), ttsc ST/MT, and optional tsgo ST/MT in one chart."
         />
       ) : null}
       {activeTab === "check" ? (
@@ -127,7 +127,7 @@ export default function BenchmarkDashboard() {
           report={report}
           op="noEmit"
           title="Type-check"
-          description="Each project groups tsc (legacy) and ttsc threading variants in one noEmit chart."
+          description="Each project groups tsc (legacy), ttsc ST/MT, and optional tsgo ST/MT in one noEmit chart."
         />
       ) : null}
       {activeTab === "lint" ? <LintTab report={report} /> : null}
@@ -168,8 +168,8 @@ function Snapshot({ report }: { report: BenchmarkReport }) {
           Benchmark Snapshot
         </h2>
         <p className="mt-1 text-[13px] text-neutral-400">
-          Prepared-clone wall-clock timings. Ratios use the fastest command
-          time per cell from the generated benchmark JSON.
+          Prepared-clone wall-clock timings. Ratios use the fastest command time
+          per cell from the generated benchmark JSON.
         </p>
       </div>
       <dl className="grid grid-cols-2 gap-px bg-[#262b36] xl:grid-cols-4">
@@ -227,11 +227,7 @@ function SummaryTab({ report }: { report: BenchmarkReport }) {
             />
           ) : null}
           {lint ? (
-            <ProjectLintRows
-              project={lint.project}
-              op="noEmit"
-              title="Lint"
-            />
+            <ProjectLintRows project={lint.project} op="noEmit" title="Lint" />
           ) : null}
           {format ? (
             <ProjectFormatRows project={format.project} title="Format" />
@@ -313,7 +309,8 @@ function ProjectOperationRows({
         measurementMs(row.measurement) > 0,
     )
     .reduce<{ factor: number; label: string } | undefined>((acc, row) => {
-      const factor = measurementMs(baseline.measurement) / measurementMs(row.measurement);
+      const factor =
+        measurementMs(baseline.measurement) / measurementMs(row.measurement);
       return !acc || factor > acc.factor ? { factor, label: row.label } : acc;
     }, undefined);
 
@@ -338,7 +335,8 @@ function ProjectOperationRows({
               row.baseline
                 ? "baseline"
                 : formatMultiplier(
-                    measurementMs(baseline.measurement) / measurementMs(row.measurement),
+                    measurementMs(baseline.measurement) /
+                      measurementMs(row.measurement),
                   )
             }
             baseline={row.baseline}
@@ -749,6 +747,21 @@ function operationRows(
       });
   }
 
+  for (const threading of TTSC_THREADING_SPECTRUM) {
+    const measurement = findMeasured(measurements, {
+      branch: "ttsc",
+      tool: "tsgo",
+      op,
+      threading,
+    });
+    if (measurement)
+      rows.push({
+        label: compilerCliLabel("tsgo", op, threading),
+        measurement,
+        color: tsgoBarColor(threading),
+      });
+  }
+
   return rows;
 }
 
@@ -878,7 +891,7 @@ function lintRowsForProject(
       threading,
       label,
       totalMs: adjustedTotalMs,
-      eslintMs: (eslint && measurementMs(eslint)),
+      eslintMs: eslint && measurementMs(eslint),
       lintOverheadMs,
       lintFactor:
         eslint && lintOverheadMs > 0
@@ -982,7 +995,8 @@ function bestOperationProject(
     const winner = rows
       .filter((row) => !row.baseline && row.measurement.tool === "ttsc")
       .reduce<Winner | undefined>((innerBest, row) => {
-        const factor = measurementMs(baseline.measurement) / measurementMs(row.measurement);
+        const factor =
+          measurementMs(baseline.measurement) / measurementMs(row.measurement);
         const current = {
           project,
           label: `${op === "build" ? "Build" : "Type-check"} ${row.label}`,
@@ -1005,7 +1019,8 @@ function bestFormatProject(report: BenchmarkReport): Winner | undefined {
     const winner = rows
       .filter((row) => !row.baseline)
       .reduce<Winner | undefined>((innerBest, row) => {
-        const factor = measurementMs(baseline.measurement) / measurementMs(row.measurement);
+        const factor =
+          measurementMs(baseline.measurement) / measurementMs(row.measurement);
         const current = {
           project,
           label: `Format ${row.label}`,
@@ -1067,7 +1082,9 @@ function findMeasured(
   options: MeasurementOptions,
 ): BenchmarkMeasurement | undefined {
   const measurement = findMeasurement(measurements, options);
-  return measurement && measurementMs(measurement) > 0 ? measurement : undefined;
+  return measurement && measurementMs(measurement) > 0
+    ? measurement
+    : undefined;
 }
 
 function findLegacyEslint(
@@ -1147,7 +1164,8 @@ function ProjectFormatRows({
   const best = rows
     .filter((row) => !row.baseline && measurementMs(row.measurement) > 0)
     .reduce<{ factor: number; label: string } | undefined>((acc, row) => {
-      const factor = measurementMs(baseline.measurement) / measurementMs(row.measurement);
+      const factor =
+        measurementMs(baseline.measurement) / measurementMs(row.measurement);
       return !acc || factor > acc.factor ? { factor, label: row.label } : acc;
     }, undefined);
 
@@ -1172,7 +1190,8 @@ function ProjectFormatRows({
               row.baseline
                 ? "baseline"
                 : formatMultiplier(
-                    measurementMs(baseline.measurement) / measurementMs(row.measurement),
+                    measurementMs(baseline.measurement) /
+                      measurementMs(row.measurement),
                   )
             }
             baseline={row.baseline}
@@ -1265,7 +1284,7 @@ function findTtscLintTotal(
 }
 
 function compilerCliLabel(
-  tool: "tsc" | "ttsc",
+  tool: "tsc" | "ttsc" | "tsgo",
   op: Operation,
   threading: Threading,
 ) {
@@ -1281,7 +1300,7 @@ function compilerCliLabel(
   return parts.join(" ");
 }
 
-/** Threading variants the ttsc rows iterate, in display order. */
+/** Threading variants the ttsc/tsgo rows iterate, in display order. */
 const TTSC_THREADING_SPECTRUM: readonly Threading[] = [
   "single",
   "checkers2",
@@ -1309,6 +1328,20 @@ function ttscBarColor(threading: Threading): string {
     case "checkers8":
     case "multi":
       return "bg-cyan-400";
+  }
+}
+
+function tsgoBarColor(threading: Threading): string {
+  switch (threading) {
+    case "single":
+      return "bg-violet-700";
+    case "checkers2":
+      return "bg-violet-600";
+    case "checkers4":
+      return "bg-violet-500";
+    case "checkers8":
+    case "multi":
+      return "bg-violet-400";
   }
 }
 

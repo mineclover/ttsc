@@ -78,6 +78,13 @@ interface LoadResult {
   shortCircuit?: boolean;
 }
 
+interface ServedSource {
+  source: string;
+  moduleOption?: string;
+  emittedFile?: string;
+  sourceFile?: string;
+}
+
 type NextResolve = (
   specifier: string,
   context: ResolveContext,
@@ -200,13 +207,19 @@ function resolve(
   nextResolve: NextResolve,
 ): ResolveResult {
   try {
-    return nextResolve(specifier, context);
+    return rememberCommonJsNamedInterop(
+      nextResolve(specifier, context),
+      context,
+    );
   } catch (error) {
     const rescued = probeRescuableSpecifier(specifier, context.parentURL);
     if (rescued === null) {
       throw error;
     }
-    return { shortCircuit: true, url: rescued };
+    return rememberCommonJsNamedInterop(
+      { shortCircuit: true, url: rescued },
+      context,
+    );
   }
 }
 
@@ -218,6 +231,10 @@ interface BuiltProject {
   moduleOption?: string;
 }
 const builtProjects = new Map<string, BuiltProject>();
+
+/** File URLs whose CommonJS source was reached from an ESM parent import. */
+const commonJsNamedInteropUrls = new Set<string>();
+const commonJsNameScanSources = new Map<string, string | null>();
 
 function load(
   url: string,
@@ -231,12 +248,93 @@ function load(
   if (!isTypeScriptSource(filename)) {
     return nextLoad(url, context);
   }
-  const { source, moduleOption } = resolveServedSource(filename, url);
+  const { format, source } = resolveRuntimeSource(filename, url);
   return {
-    format: moduleFormat(filename, moduleOption),
+    format,
     shortCircuit: true,
     source,
   };
+}
+
+function resolveRuntimeSource(
+  filename: string,
+  url: string = pathToFileURL(filename).href,
+): { format: string; source: string } {
+  const served = resolveServedSource(filename, url);
+  const format = moduleFormat(filename, served.moduleOption);
+  return {
+    format,
+    source:
+      format === "commonjs" && commonJsNamedInteropUrls.has(url)
+        ? exposeCommonJsStarExports(
+            served.source,
+            served.emittedFile,
+            served.sourceFile,
+          )
+        : served.source,
+  };
+}
+
+function rememberCommonJsNamedInterop(
+  result: ResolveResult,
+  context: ResolveContext,
+): ResolveResult {
+  if (shouldExposeCommonJsNamedExports(result.url, context.parentURL)) {
+    commonJsNamedInteropUrls.add(result.url);
+  }
+  return result;
+}
+
+function shouldExposeCommonJsNamedExports(
+  url: string,
+  parentURL: string | undefined,
+): boolean {
+  if (
+    parentURL === undefined ||
+    !url.startsWith("file:") ||
+    !parentURL.startsWith("file:")
+  ) {
+    return false;
+  }
+  const parentFile = fileURLToPath(parentURL);
+  if (moduleFormat(parentFile, moduleOptionForSource(parentFile)) !== "module") {
+    return false;
+  }
+  const filename = fileURLToPath(url);
+  return (
+    isTypeScriptSource(filename) &&
+    moduleFormat(filename, moduleOptionForSource(filename)) === "commonjs"
+  );
+}
+
+function moduleOptionForSource(filename: string): string | undefined {
+  if (!isTypeScriptSource(filename)) {
+    return undefined;
+  }
+  const real = realPath(filename);
+  const m = manifest();
+  if (m !== null && isWithin(real, m.rootDir)) {
+    return m.moduleOption;
+  }
+  const tsconfig = nearestTsconfig(real);
+  if (tsconfig === null) {
+    return undefined;
+  }
+  if (moduleOptionCache.has(tsconfig)) {
+    return moduleOptionCache.get(tsconfig);
+  }
+  let moduleOption: string | undefined;
+  try {
+    const project = readProjectConfig({ cwd: path.dirname(tsconfig), tsconfig });
+    moduleOption =
+      typeof project.compilerOptions.module === "string"
+        ? project.compilerOptions.module
+        : undefined;
+  } catch {
+    moduleOption = undefined;
+  }
+  moduleOptionCache.set(tsconfig, moduleOption);
+  return moduleOption;
 }
 
 /**
@@ -249,11 +347,11 @@ function load(
 function resolveServedSource(
   filename: string,
   url: string = pathToFileURL(filename).href,
-): { source: string; moduleOption?: string } {
+): ServedSource {
   const real = realPath(filename);
   const served = serveEntryEmit(real);
   if (served !== null) {
-    return { moduleOption: manifest()?.moduleOption, source: served };
+    return { moduleOption: manifest()?.moduleOption, ...served };
   }
   const built = serveDependencyEmit(real);
   if (built !== null) {
@@ -261,6 +359,7 @@ function resolveServedSource(
   }
   return {
     moduleOption: undefined,
+    sourceFile: filename,
     source: transformOrphanSource(filename, url),
   };
 }
@@ -363,6 +462,61 @@ function emitOrphanAsCommonJs(filename: string): string | null {
 }
 
 /**
+ * Emit a source file only for CommonJS export-name discovery.
+ *
+ * This intentionally does not read or write the runtime orphan cache. Name
+ * discovery may inspect a source dependency without executing it, so sharing
+ * that output with the runtime fallback would let a speculative scan affect a
+ * later load path.
+ */
+function emitCommonJsForNameScan(filename: string): string | null {
+  const real = realPath(filename);
+  const cached = commonJsNameScanSources.get(real);
+  if (cached !== undefined) {
+    return cached;
+  }
+  let tsgo: string;
+  try {
+    tsgo = resolveTsgo({ cwd: path.dirname(real) }).binary;
+  } catch {
+    commonJsNameScanSources.set(real, null);
+    return null;
+  }
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "ttsx-export-scan-"));
+  try {
+    const res = spawnNative(
+      tsgo,
+      [
+        real,
+        "--ignoreConfig",
+        "--module",
+        "commonjs",
+        "--target",
+        "es2022",
+        "--noCheck",
+        "--skipLibCheck",
+        "--outDir",
+        outDir,
+        "--listEmittedFiles",
+      ],
+      { cwd: path.dirname(real), encoding: "utf8" },
+    );
+    const emitted = pickEmittedJavaScript(
+      real,
+      parseEmittedFiles(outputText(res.stdout)),
+    );
+    const lowered = emitted === null ? null : readFileOrNull(emitted);
+    commonJsNameScanSources.set(real, lowered);
+    return lowered;
+  } catch {
+    commonJsNameScanSources.set(real, null);
+    return null;
+  } finally {
+    fs.rmSync(outDir, { force: true, recursive: true });
+  }
+}
+
+/**
  * Cache root for lowered orphan sources, shared per run (and across runs when
  * `TTSC_CACHE_DIR` points at a persisted directory).
  */
@@ -423,6 +577,245 @@ function parseFirstEmittedFile(stdout: string): string | null {
   return null;
 }
 
+/** `TSFILE:` paths tsgo printed under `--listEmittedFiles`. */
+function parseEmittedFiles(stdout: string): string[] {
+  const files: string[] = [];
+  for (const line of stdout.split(/\r?\n/)) {
+    const match = line.match(/^TSFILE:\s*(.+)$/);
+    if (match?.[1]) {
+      files.push(match[1].trim());
+    }
+  }
+  return files;
+}
+
+/** Pick the emitted JavaScript corresponding to the source file requested. */
+function pickEmittedJavaScript(
+  filename: string,
+  emittedFiles: readonly string[],
+): string | null {
+  const stem = path
+    .basename(filename)
+    .replace(/\.[cm]?tsx?$/i, "")
+    .toLowerCase();
+  const candidates = emittedFiles.filter((file) => {
+    const parsed = path.parse(file);
+    return (
+      parsed.name.toLowerCase() === stem && /\.(?:[cm]?js)$/i.test(parsed.base)
+    );
+  });
+  if (candidates.length === 1) {
+    return candidates[0]!;
+  }
+  return emittedFiles.find((file) => /\.(?:[cm]?js)$/i.test(file)) ?? null;
+}
+
+/**
+ * Make TypeScript-Go's CommonJS `export *` output visible to Node's
+ * ESM-from-CJS named export scanner.
+ *
+ * Tsgo lowers star re-exports to `__exportStar(require("./x"), exports)`.
+ * Runtime CommonJS consumers see the getters that helper installs, but Node's
+ * ESM linker only exposes named imports it can statically identify from
+ * `exports.name = ...` assignments. For relative star re-exports whose emitted
+ * target is available, replace the helper call with explicit configurable
+ * export placeholders followed by the same `__createBinding` getter install.
+ */
+function exposeCommonJsStarExports(
+  source: string,
+  emittedFile: string | undefined,
+  sourceFile: string | undefined,
+): string {
+  if (!source.includes("__exportStar(")) {
+    return source;
+  }
+  const reserved = collectStaticCommonJsExportNames(source);
+  let index = 0;
+  return source.replace(
+    /^(\s*)__exportStar\(\s*require\((["'])([^"']+)\2\)\s*,\s*exports\s*\);/gm,
+    (statement: string, indent: string, _quote: string, specifier: string) => {
+      const names = [
+        ...collectStarExportNames(emittedFile, sourceFile, specifier),
+      ].filter(
+        (name) =>
+          name !== "default" &&
+          name !== "__esModule" &&
+          isIdentifierName(name) &&
+          !reserved.has(name),
+      );
+      if (names.length === 0) {
+        return statement;
+      }
+      for (const name of names) {
+        reserved.add(name);
+      }
+      const receiver = `__ttsx_export_star_${index++}`;
+      return [
+        ...names.map((name) => `${indent}exports.${name} = void 0;`),
+        `${indent}var ${receiver} = require(${JSON.stringify(specifier)});`,
+        ...names.map(
+          (name) =>
+            `${indent}__createBinding(exports, ${receiver}, ${JSON.stringify(name)});`,
+        ),
+      ].join("\n");
+    },
+  );
+}
+
+function collectStarExportNames(
+  emittedFile: string | undefined,
+  sourceFile: string | undefined,
+  specifier: string,
+): Set<string> {
+  if (emittedFile !== undefined) {
+    const emittedTarget = resolveEmittedRequire(emittedFile, specifier);
+    if (emittedTarget !== null) {
+      return collectCommonJsExportNames(emittedTarget, new Set());
+    }
+  }
+  if (sourceFile !== undefined) {
+    const sourceTarget = resolveSourceSpecifier(sourceFile, specifier);
+    if (sourceTarget !== null) {
+      return collectSourceCommonJsExportNames(sourceTarget, new Set());
+    }
+  }
+  return new Set();
+}
+
+function collectCommonJsExportNames(
+  emittedFile: string,
+  seen: Set<string>,
+): Set<string> {
+  const real = realPath(emittedFile);
+  if (seen.has(real)) {
+    return new Set();
+  }
+  seen.add(real);
+  const source = readFileOrNull(real);
+  if (source === null) {
+    return new Set();
+  }
+  const names = collectStaticCommonJsExportNames(source);
+  for (const specifier of collectExportStarSpecifiers(source)) {
+    const target = resolveEmittedRequire(real, specifier);
+    if (target === null) {
+      continue;
+    }
+    for (const name of collectCommonJsExportNames(target, seen)) {
+      if (name !== "default" && name !== "__esModule" && !names.has(name)) {
+        names.add(name);
+      }
+    }
+  }
+  return names;
+}
+
+function collectStaticCommonJsExportNames(source: string): Set<string> {
+  const names = new Set<string>();
+  const pattern =
+    /(?:^|[^\w$])(?:exports|module\.exports)\.([A-Za-z_$][\w$]*)\s*=/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(source)) !== null) {
+    names.add(match[1]!);
+  }
+  return names;
+}
+
+function collectSourceCommonJsExportNames(
+  sourceFile: string,
+  seen: Set<string>,
+): Set<string> {
+  const real = realPath(sourceFile);
+  if (seen.has(real)) {
+    return new Set();
+  }
+  seen.add(real);
+  const source = emitCommonJsForNameScan(real);
+  if (source === null) {
+    return new Set();
+  }
+  const names = collectStaticCommonJsExportNames(source);
+  for (const specifier of collectExportStarSpecifiers(source)) {
+    const target = resolveSourceSpecifier(real, specifier);
+    if (target === null) {
+      continue;
+    }
+    for (const name of collectSourceCommonJsExportNames(target, seen)) {
+      if (name !== "default" && name !== "__esModule" && !names.has(name)) {
+        names.add(name);
+      }
+    }
+  }
+  return names;
+}
+
+function collectExportStarSpecifiers(source: string): string[] {
+  const specifiers: string[] = [];
+  const pattern =
+    /^(\s*)__exportStar\(\s*require\((["'])([^"']+)\2\)\s*,\s*exports\s*\);/gm;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(source)) !== null) {
+    specifiers.push(match[3]!);
+  }
+  return specifiers;
+}
+
+function resolveEmittedRequire(
+  emittedFile: string,
+  specifier: string,
+): string | null {
+  if (!isRelativeSpecifier(specifier)) {
+    return null;
+  }
+  const base = path.resolve(path.dirname(emittedFile), specifier);
+  if (path.extname(base).length !== 0) {
+    return isFile(base) ? base : null;
+  }
+  for (const extension of [".js", ".cjs", ".mjs"] as const) {
+    const candidate = base + extension;
+    if (isFile(candidate)) {
+      return candidate;
+    }
+  }
+  for (const extension of [".js", ".cjs", ".mjs"] as const) {
+    const candidate = path.join(base, `index${extension}`);
+    if (isFile(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function resolveSourceSpecifier(
+  sourceFile: string,
+  specifier: string,
+): string | null {
+  if (!isRelativeSpecifier(specifier)) {
+    return null;
+  }
+  const base = path.resolve(path.dirname(sourceFile), specifier);
+  if (path.extname(base).length !== 0) {
+    return isFile(base) ? base : null;
+  }
+  for (const extension of TYPESCRIPT_EXTENSIONS) {
+    const candidate = base + extension;
+    if (isFile(candidate)) {
+      return candidate;
+    }
+  }
+  for (const extension of TYPESCRIPT_EXTENSIONS) {
+    const candidate = path.join(base, `index${extension}`);
+    if (isFile(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function isIdentifierName(name: string): boolean {
+  return /^[A-Za-z_$][\w$]*$/.test(name);
+}
+
 /**
  * Serve the entry project's pre-built JavaScript for a source file the build
  * emitted, or `null` when the file is outside the build or its emit is
@@ -435,7 +828,7 @@ function parseFirstEmittedFile(stdout: string): string | null {
  * `rootDir` cannot have a mirrored emit, so it falls through to the dependency
  * paths.
  */
-function serveEntryEmit(real: string): string | null {
+function serveEntryEmit(real: string): ServedSource | null {
   const m = manifest();
   if (m === null) {
     return null;
@@ -449,7 +842,13 @@ function serveEntryEmit(real: string): string | null {
     projectRoot: m.rootDir,
     sourceFile: real,
   });
-  return readFileOrNull(emitted);
+  if (emitted === null) {
+    return null;
+  }
+  const source = readFileOrNull(emitted);
+  return source === null
+    ? null
+    : { emittedFile: emitted, source, sourceFile: real };
 }
 
 /**
@@ -474,9 +873,7 @@ function isWithin(real: string, directory: string): boolean {
  * tsconfig (transform plugins included), so a source-shipping package that
  * needs a transform behaves correctly at runtime.
  */
-function serveDependencyEmit(
-  real: string,
-): { source: string; moduleOption?: string } | null {
+function serveDependencyEmit(real: string): ServedSource | null {
   const tsconfig = nearestTsconfig(real);
   if (tsconfig === null) {
     return null;
@@ -489,14 +886,35 @@ function serveDependencyEmit(
     // this single file rather than failing the whole run.
     return null;
   }
+  const served = serveBuiltDependency(built, real);
+  if (served !== null) {
+    return served;
+  }
+  return null;
+}
+
+function serveBuiltDependency(
+  built: BuiltProject,
+  real: string,
+): ServedSource | null {
   const emitted = resolveEmittedJavaScript({
     emittedFiles: built.emittedFiles,
     outDir: built.emitDir,
     projectRoot: built.rootDir,
     sourceFile: real,
   });
+  if (emitted === null) {
+    return null;
+  }
   const source = readFileOrNull(emitted);
-  return source === null ? null : { moduleOption: built.moduleOption, source };
+  return source === null
+    ? null
+    : {
+        emittedFile: emitted,
+        moduleOption: built.moduleOption,
+        source,
+        sourceFile: real,
+      };
 }
 
 /** On-disk completion marker for a built dependency, shared across processes. */
@@ -522,15 +940,7 @@ function ensureProjectBuilt(tsconfig: string): BuiltProject {
   if (cached !== undefined) {
     return cached;
   }
-  const key = crypto
-    .createHash("sha256")
-    .update(tsconfig)
-    .digest("hex")
-    .slice(0, 16);
-  const root = dependencyCacheRoot();
-  const emitDir = path.join(root, key);
-  const metaPath = path.join(root, `${key}.json`);
-  const lockDir = path.join(root, `${key}.lock`);
+  const { emitDir, lockDir, metaPath, root } = dependencyCachePaths(tsconfig);
 
   const reuse = readDependencyCache(emitDir, metaPath);
   if (reuse !== null) {
@@ -544,6 +954,28 @@ function ensureProjectBuilt(tsconfig: string): BuiltProject {
   );
   builtProjects.set(tsconfig, built);
   return built;
+}
+
+interface DependencyCachePaths {
+  emitDir: string;
+  lockDir: string;
+  metaPath: string;
+  root: string;
+}
+
+function dependencyCachePaths(tsconfig: string): DependencyCachePaths {
+  const key = crypto
+    .createHash("sha256")
+    .update(tsconfig)
+    .digest("hex")
+    .slice(0, 16);
+  const root = dependencyCacheRoot();
+  return {
+    emitDir: path.join(root, key),
+    lockDir: path.join(root, `${key}.lock`),
+    metaPath: path.join(root, `${key}.json`),
+    root,
+  };
 }
 
 /** Reuse a dependency another process (or an earlier import) already built. */
@@ -677,12 +1109,15 @@ function buildDependency(
     typeof project.compilerOptions.module === "string"
       ? project.compilerOptions.module
       : undefined;
-  fs.writeFileSync(
-    metaPath,
-    JSON.stringify({ moduleOption, rootDir } satisfies DependencyCacheMeta),
-    "utf8",
-  );
+  writeDependencyMeta(metaPath, { moduleOption, rootDir });
   return { emitDir, emittedFiles: undefined, moduleOption, rootDir };
+}
+
+function writeDependencyMeta(
+  metaPath: string,
+  meta: DependencyCacheMeta,
+): void {
+  fs.writeFileSync(metaPath, JSON.stringify(meta), "utf8");
 }
 
 function dependencyCacheRoot(): string {
@@ -694,6 +1129,7 @@ function dependencyCacheRoot(): string {
 
 /** Owning-tsconfig cache keyed by directory, mirroring `packageTypeCache`. */
 const tsconfigCache = new Map<string, string | null>();
+const moduleOptionCache = new Map<string, string | undefined>();
 
 /**
  * The nearest `tsconfig.json` at or above `file`'s directory, or `null`. The

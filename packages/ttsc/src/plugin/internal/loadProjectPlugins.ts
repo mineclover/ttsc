@@ -1,5 +1,7 @@
+import childProcess from "node:child_process";
 import fs from "node:fs";
 import { createRequire } from "node:module";
+import os from "node:os";
 import path from "node:path";
 
 import { findNearestGoMod } from "../../compiler/internal/paths";
@@ -27,6 +29,7 @@ type ProjectPluginEntry = {
 type PackageManifest = {
   dependencies?: Record<string, unknown>;
   devDependencies?: Record<string, unknown>;
+  exports?: unknown;
   name?: unknown;
   ttsc?: unknown;
 };
@@ -579,7 +582,7 @@ function loadPluginEntry(
     }
 
     const request = resolvePluginRequest(specifier, baseDir);
-    const mod = require(request) as {
+    const mod = requirePluginEntry(request, context) as {
       createTtscPlugin?: TtscPluginFactory;
       default?: ITtscPlugin | TtscPluginFactory;
     } & Partial<Record<"plugin", ITtscPlugin | TtscPluginFactory>>;
@@ -606,6 +609,123 @@ function loadPluginEntry(
       `ttsc: plugin "${specifier}" does not export a valid ttsc plugin`,
     );
   });
+}
+
+/**
+ * Require a plugin descriptor entry, falling back to `ttsx` when Node cannot
+ * load a `.ts` source entry directly.
+ *
+ * A descriptor entry that is `.ts` source — especially a package root that
+ * re-exports a runtime alongside the descriptor — fails Node's loader on its
+ * first extensionless import or un-stripped type, and its imports can fan out
+ * into a whole transitive graph of source packages. Rather than reimplement
+ * that graph build, run the entry through `ttsx`, which already builds each
+ * `.ts` dependency on demand. The run is forced plugins-off across the whole
+ * graph (`--no-plugins` for the entry, `TTSC_PLUGIN_DESCRIPTOR_LOAD` for every
+ * dependency), so the descriptor's own — possibly self-hosting — transform
+ * never runs and cannot deadlock. A package that loads directly (a compiled
+ * descriptor, or Bun's native `.ts`) never reaches the fallback.
+ */
+function requirePluginEntry(
+  request: string,
+  context: ITtscPluginFactoryContext,
+): unknown {
+  try {
+    return require(request);
+  } catch (error) {
+    if (!TS_SOURCE_PATTERN.test(request)) {
+      throw error;
+    }
+    const descriptor = loadDescriptorViaTtsx(request, context);
+    if (descriptor === undefined) {
+      throw error;
+    }
+    return { default: descriptor };
+  }
+}
+
+const TS_SOURCE_PATTERN = /\.(?:[cm]?ts|tsx)$/i;
+
+/**
+ * Evaluate a `.ts` plugin descriptor entry in a child `ttsx` process and return
+ * the descriptor it produces. A generated shim imports the entry, invokes its
+ * factory with `context`, and writes the descriptor as JSON; `ttsx` runs the
+ * shim with plugins disabled across the whole graph. Returns `undefined` when
+ * `ttsx` is unavailable, so the caller can rethrow the original load error.
+ */
+function loadDescriptorViaTtsx(
+  request: string,
+  context: ITtscPluginFactoryContext,
+): unknown {
+  const node = process.env.TTSC_NODE_BINARY ?? process.execPath;
+  const ttsx = process.env.TTSC_TTSX_BINARY;
+  if (ttsx === undefined || ttsx.length === 0) {
+    return undefined;
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ttsc-plugin-descriptor-"));
+  const out = path.join(dir, "descriptor.json");
+  const shim = path.join(dir, "load-descriptor.mts");
+  // ttsx type-checks and builds the shim's own project, so it needs a tsconfig
+  // to anchor on; a minimal one is enough (the shim is `@ts-nocheck`).
+  fs.writeFileSync(
+    path.join(dir, "tsconfig.json"),
+    JSON.stringify({
+      compilerOptions: {
+        module: "nodenext",
+        moduleResolution: "nodenext",
+        skipLibCheck: true,
+        target: "es2022",
+      },
+    }),
+  );
+  fs.writeFileSync(
+    shim,
+    [
+      `// @ts-nocheck`,
+      `import { writeFileSync } from "node:fs";`,
+      `import { pathToFileURL } from "node:url";`,
+      `const mod = await import(pathToFileURL(process.env.TTSC_PLUGIN_ENTRY).href);`,
+      `const context = JSON.parse(process.env.TTSC_PLUGIN_CONTEXT);`,
+      `const candidate = mod.createTtscPlugin ?? mod.default ?? mod.plugin ?? mod;`,
+      `const descriptor =`,
+      `  typeof candidate === "function" ? candidate(context) : candidate;`,
+      `writeFileSync(process.env.TTSC_PLUGIN_DESCRIPTOR_OUT, JSON.stringify(descriptor));`,
+      ``,
+    ].join("\n"),
+  );
+  try {
+    const result = childProcess.spawnSync(node, [ttsx, "--no-plugins", shim], {
+      cwd: context.projectRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        TTSC_PLUGIN_CONTEXT: JSON.stringify({
+          binary: context.binary,
+          cwd: context.cwd,
+          plugin: context.plugin,
+          projectRoot: context.projectRoot,
+          tsconfig: context.tsconfig,
+        }),
+        TTSC_PLUGIN_DESCRIPTOR_LOAD: "1",
+        TTSC_PLUGIN_DESCRIPTOR_OUT: out,
+        TTSC_PLUGIN_ENTRY: request,
+      },
+      windowsHide: true,
+    });
+    if (result.status !== 0 || !fs.existsSync(out)) {
+      throw new Error(
+        [
+          `ttsc: failed to load plugin descriptor "${request}" through ttsx`,
+          result.stderr || result.stdout || "",
+        ]
+          .filter((line) => line.trim().length !== 0)
+          .join("\n"),
+      );
+    }
+    return JSON.parse(fs.readFileSync(out, "utf8"));
+  } finally {
+    fs.rmSync(dir, { force: true, recursive: true });
+  }
 }
 
 function withPluginLoaderEnv<T>(run: () => T): T {
@@ -861,7 +981,178 @@ function resolvePluginRequest(specifier: string, projectRoot: string): string {
   if (isRelativePluginSpecifier(specifier)) {
     return resolveRealPath(path.resolve(projectRoot, specifier));
   }
+  // A package whose main `.` entry is a runtime barrel cannot double as a
+  // plugin descriptor entry: loading it during plugin bootstrap drags the
+  // runtime in (and, for a self-hosting transform like typia, deadlocks —
+  // loading the transform would have to build the runtime the transform
+  // emits). Such a package opts in with a `ttsc` export condition that points
+  // at a runtime-free descriptor; honour it here, scoped to plugin resolution.
+  const conditioned = resolvePluginExportCondition(specifier, projectRoot);
+  if (conditioned !== null) {
+    return conditioned;
+  }
   return resolveRealPath(require.resolve(specifier, { paths: [projectRoot] }));
+}
+
+/** Condition names ttsc activates when resolving a plugin entry's package `exports`. */
+const PLUGIN_EXPORT_CONDITIONS: readonly string[] = [
+  "ttsc",
+  "node",
+  "require",
+  "default",
+];
+
+/**
+ * Resolve a bare plugin specifier under the dedicated `ttsc` export condition.
+ *
+ * A package whose `.` entry is a runtime barrel (e.g. `typia`, whose index
+ * re-exports the whole validator runtime) cannot serve as the plugin descriptor
+ * entry: loading it during plugin bootstrap pulls the runtime in and, for a
+ * self-hosting transform, forms a cycle. Such a package opts in by adding a
+ * `ttsc` condition to its `exports` that points at a runtime-free descriptor:
+ *
+ *   "exports": { ".": { "ttsc": "./lib/transform.js", "default": "./lib/index.js" } }
+ *
+ * The condition is honoured ONLY here, scoped to plugin-entry resolution. A
+ * process-wide `--conditions=ttsc` would also redirect the package's normal
+ * `import`s to the descriptor and break its runtime, so it must not be used.
+ *
+ * Returns an absolute path when the package opts in, or `null` to fall back to
+ * the normal `require.resolve` — no `exports`, no `ttsc` branch for the
+ * requested subpath, or an unresolved/missing target — so a package that does
+ * not opt in resolves exactly as it did before.
+ */
+function resolvePluginExportCondition(
+  specifier: string,
+  baseDir: string,
+): string | null {
+  const split = splitPackageSpecifier(specifier);
+  if (split === null) {
+    return null;
+  }
+  const packageJson = resolveDependencyPackageJson(split.packageName, baseDir);
+  if (packageJson === undefined) {
+    return null;
+  }
+  const exportsField = readPackageManifest(packageJson)?.exports;
+  if (exportsField === undefined) {
+    return null;
+  }
+  const target = selectExportTarget(exportsField, split.subpath);
+  // Only take over when the package actually opts in with a `ttsc` condition
+  // for this subpath; otherwise defer so behaviour is unchanged for every
+  // package that does not.
+  if (target === undefined || !containsCondition(target, "ttsc")) {
+    return null;
+  }
+  const resolved = resolveConditionalTarget(target, PLUGIN_EXPORT_CONDITIONS);
+  if (resolved === null || !resolved.startsWith("./")) {
+    return null;
+  }
+  const file = path.resolve(path.dirname(packageJson), resolved);
+  return fs.existsSync(file) ? resolveRealPath(file) : null;
+}
+
+/**
+ * Split a bare specifier into its package name and the `.`-prefixed subpath it
+ * addresses (`"typia"` → `.`, `"typia/lib/transform"` → `./lib/transform`,
+ * `"@scope/pkg/sub"` → `./sub`). Returns `null` for a relative/empty specifier
+ * or a malformed scoped name.
+ */
+function splitPackageSpecifier(
+  specifier: string,
+): { packageName: string; subpath: string } | null {
+  if (specifier.length === 0 || specifier.startsWith(".")) {
+    return null;
+  }
+  const segments = specifier.split("/");
+  const nameSegments = specifier.startsWith("@") ? 2 : 1;
+  if (segments.length < nameSegments) {
+    return null;
+  }
+  const rest = segments.slice(nameSegments).join("/");
+  return {
+    packageName: segments.slice(0, nameSegments).join("/"),
+    subpath: rest.length === 0 ? "." : `./${rest}`,
+  };
+}
+
+/**
+ * The `exports` entry addressing `subpath`, applying Node's rule that an
+ * `exports` value with no `.`-prefixed keys is sugar for the `.` target.
+ * Returns `undefined` when no entry addresses the subpath.
+ */
+function selectExportTarget(exportsField: unknown, subpath: string): unknown {
+  if (typeof exportsField === "string" || Array.isArray(exportsField)) {
+    return subpath === "." ? exportsField : undefined;
+  }
+  if (typeof exportsField !== "object" || exportsField === null) {
+    return undefined;
+  }
+  const record = exportsField as Record<string, unknown>;
+  const isSubpathMap = Object.keys(record).some(
+    (key) => key === "." || key.startsWith("./"),
+  );
+  if (!isSubpathMap) {
+    // Conditions object: the whole value is the `.` target.
+    return subpath === "." ? exportsField : undefined;
+  }
+  return subpath in record ? record[subpath] : undefined;
+}
+
+/** True when condition key `condition` appears anywhere in a (nested) target. */
+function containsCondition(target: unknown, condition: string): boolean {
+  if (Array.isArray(target)) {
+    return target.some((entry) => containsCondition(entry, condition));
+  }
+  if (typeof target !== "object" || target === null) {
+    return false;
+  }
+  return Object.entries(target).some(
+    ([key, value]) => key === condition || containsCondition(value, condition),
+  );
+}
+
+/**
+ * Resolve a (possibly conditional) export target to a relative file string,
+ * honouring `conditions` — a string is the target, an array is a fallback list,
+ * an object picks the first key in the active condition set (package key order
+ * wins, as Node does), and an explicit `null` blocks the target.
+ */
+function resolveConditionalTarget(
+  target: unknown,
+  conditions: readonly string[],
+): string | null {
+  if (typeof target === "string") {
+    return target;
+  }
+  if (target === null || target === undefined) {
+    return null;
+  }
+  if (Array.isArray(target)) {
+    for (const entry of target) {
+      const resolved = resolveConditionalTarget(entry, conditions);
+      if (resolved !== null) {
+        return resolved;
+      }
+    }
+    return null;
+  }
+  if (typeof target !== "object") {
+    return null;
+  }
+  const active = new Set(conditions);
+  for (const [key, value] of Object.entries(
+    target as Record<string, unknown>,
+  )) {
+    if (active.has(key)) {
+      const resolved = resolveConditionalTarget(value, conditions);
+      if (resolved !== null) {
+        return resolved;
+      }
+    }
+  }
+  return null;
 }
 
 function resolveRealPath(location: string): string {

@@ -1,11 +1,13 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022"],
-    "module": "commonjs",
-    "moduleResolution": "bundler",
-    "ignoreDeprecations": "6.0",
-    "types": ["node"],
+    "target": "esnext",
+    "lib": [
+      "DOM",
+      "ESNext"
+    ],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["*"],
     "resolveJsonModule": true,
     "declaration": true,
     "sourceMap": true,

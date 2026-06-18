@@ -1,17 +1,29 @@
-import nodeResolve from "@rollup/plugin-node-resolve";
-import { globSync } from "tinyglobby";
+import terser from "@rollup/plugin-terser";
+import typescript from "@rollup/plugin-typescript";
 
-// Re-emit the compiled `lib/**/*.js` tree as `[name].mjs` siblings via rollup;
-// nodeResolve resolves extensionless / directory-index relative imports.
 export default {
-  input: globSync("./lib/**/*.js"),
+  input: "./src/index.ts",
   output: {
-    dir: "./lib",
+    dir: "lib",
     format: "esm",
-    sourcemap: true,
     entryFileNames: "[name].mjs",
-    preserveModules: true,
-    preserveModulesRoot: "lib",
+    sourcemap: true,
   },
-  plugins: [nodeResolve({ extensions: [".js"] })],
+  plugins: [
+    typescript({
+      tsconfig: "tsconfig.json",
+      module: "ES2020",
+      target: "ES2020",
+    }),
+    terser({
+      format: {
+        comments: "some",
+        beautify: true,
+        ecma: "2020",
+      },
+      compress: false,
+      mangle: false,
+      module: true,
+    }),
+  ],
 };

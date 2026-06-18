@@ -1,7 +1,7 @@
 {
   "extends": "../../config/tsconfig.json",
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
+    "module": "commonjs",
     "moduleResolution": "bundler",
     "outDir": "lib",
     "rootDir": "src"

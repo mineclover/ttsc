@@ -98,6 +98,8 @@ npm install -D @ttsc/unplugin
 
 Add the adapter for your bundler. It reads the same `tsconfig.json`, so your plugins and `lint.config.ts` apply unchanged, no extra config for most projects.
 
+### Vite
+
 ```ts
 // vite.config.ts
 import ttsc from "@ttsc/unplugin/vite";
@@ -107,6 +109,8 @@ export default defineConfig({
   plugins: [ttsc()],
 });
 ```
+
+### Rollup
 
 ```ts
 // rollup.config.ts
@@ -118,6 +122,8 @@ export default {
   plugins: [ttsc()],
 };
 ```
+
+### Other bundlers
 
 Adapters ship for Vite, Rollup, Rolldown, esbuild, Webpack, Rspack, Next.js, Turbopack, Farm, and Bun. Import the entrypoint that matches your bundler (`@ttsc/unplugin/webpack`, `@ttsc/unplugin/esbuild`, and so on). See [Bundler integration](/docs/ttsc/bundler) for every adapter, the `project` / `compilerOptions` / `plugins` options, and watch-mode behavior.
 

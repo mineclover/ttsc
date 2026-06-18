@@ -1,17 +1,26 @@
-import nodeResolve from "@rollup/plugin-node-resolve";
-import { globSync } from "tinyglobby";
+import typescript from "@rollup/plugin-typescript";
 
-// Re-emit the compiled `lib/**/*.js` tree as `[name].mjs` siblings via rollup;
-// nodeResolve resolves extensionless / directory-index relative imports.
 export default {
-  input: globSync("./lib/**/*.js"),
+  input: "src/index.ts",
   output: {
-    dir: "./lib",
+    dir: "lib",
     format: "esm",
-    sourcemap: true,
-    entryFileNames: "[name].mjs",
+    // Emit one .mjs per source module (mirroring tsgo's per-file CJS .js)
+    // instead of bundling everything into a single file.
     preserveModules: true,
-    preserveModulesRoot: "lib",
+    preserveModulesRoot: "src",
+    entryFileNames: "[name].mjs",
+    sourcemap: true,
   },
-  plugins: [nodeResolve({ extensions: [".js"] })],
+  plugins: [
+    typescript({
+      tsconfig: "tsconfig.json",
+      module: "esnext",
+      moduleResolution: "bundler",
+      declaration: false,
+      declarationMap: false,
+      outDir: "lib",
+      sourceMap: true,
+    }),
+  ],
 };

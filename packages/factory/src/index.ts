@@ -20,7 +20,7 @@ import * as factory from "./factory/index";
  * @author Jeongho Nam - https://github.com/samchon
  */
 export * as factory from "./factory/index";
-export { SyntaxKind, NodeFlags, tokenToString } from "./syntax";
+export { SyntaxKind, NodeFlags } from "./syntax";
 export { TsPrinter } from "./TsPrinter";
 export type { TsPrinterOptions } from "./TsPrinter";
 export {

@@ -201,12 +201,12 @@ The first fires during `ttsc build` / `ttsc check`; the second during `ttsc tran
 Executable plugins that want to share one compiler host can opt in through the `composes` field on their descriptor:
 
 ```ts
-module.exports = {
+module.exports = (context) => ({
   name: "my-aggregate-plugin",
-  source: path.resolve(__dirname, "go-plugin"),
+  source: path.resolve(context.dirname, "go-plugin"),
   stage: "transform",
   composes: ["my-feature-a", "my-feature-b"],
-};
+});
 ```
 
 When ttsc loads the descriptors of `my-feature-a` and `my-feature-b` from the project's `compilerOptions.plugins`, it reroutes their build target to the aggregate's `source`. All three names remain in the `--plugins-json` payload so the aggregate sidecar can dispatch by `name`. The aggregate must implement the dispatch logic itself; ttsc only redirects the binary.
@@ -232,7 +232,7 @@ import path from "node:path";
 
 module.exports = (context) => ({
   name: "@ttsc/lint",
-  source: path.resolve(__dirname, "plugin"),
+  source: path.resolve(context.dirname, "plugin"),
   stage: "check",
   contributors: [
     { name: "demo", source: "/abs/path/to/lint-contributor-demo/rules" },

@@ -40,9 +40,11 @@ import ttsc from "@ttsc/unplugin/rollup"; // or "@ttsc/unplugin/rolldown"
 export default {
   input: "src/index.ts",
   output: { dir: "dist", format: "esm" },
-  plugins: [ttsc()],
+  plugins: [ttsc(), typescript()],
 };
 ```
+
+The adapter emits transformed **TypeScript**, not JavaScript. Rollup and Rolldown have no built-in TypeScript handling, so pair `ttsc()` with a downstream TypeScript-to-JavaScript step (`@rollup/plugin-typescript`, `@rollup/plugin-esbuild`, …) or the build fails parsing the type syntax. Vite, esbuild, webpack, and Bun transpile TypeScript themselves, so they need no extra step.
 
 ## esbuild
 

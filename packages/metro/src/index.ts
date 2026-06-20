@@ -8,13 +8,14 @@
  * project's existing Expo/React-Native Babel transformer.
  *
  * @example
- *   Expo```js
+ *   Expo project
+ *   ```js
  *   // metro.config.js
  *   const { getDefaultConfig } = require("expo/metro-config");
  *   const { withTtsc } = require("@ttsc/metro");
  *
  *   module.exports = withTtsc(getDefaultConfig(__dirname));
- *   ```;
+ *   ```
  *
  * @example
  *   Bare React Native

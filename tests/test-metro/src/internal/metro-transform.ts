@@ -149,11 +149,16 @@ export async function assertRunsTtscPluginPassOnTypeScript(): Promise<void> {
     params: {
       src: TestUnpluginProject.mainSource(root),
       filename: "src/main.ts",
-      options: { projectRoot: root },
+      options: { projectRoot: root, platform: "ios" },
+      plugins: ["babel-plugin-foo"],
     },
   });
   assert.equal(result.ast.__fakeUpstream, true);
   TestUnpluginProject.assertTransformedToPlugin(result.ast.src as string);
+  // The transform-path spread must preserve sibling params (options/plugins),
+  // not just `src` — a regression dropping them would break Metro's Babel stage.
+  assert.equal((result.ast.options as Record<string, unknown>).platform, "ios");
+  assert.deepEqual(result.ast.plugins, ["babel-plugin-foo"]);
 }
 
 /**
@@ -173,6 +178,11 @@ export async function assertResolvesRelativeFilenameAgainstProjectRoot(): Promis
   // No projectRoot → falls back to cwd.
   assert.equal(
     mod.resolveAbsoluteFilename("src/app.ts", {}),
+    path.resolve(process.cwd(), "src/app.ts"),
+  );
+  // No options object at all → also falls back to cwd.
+  assert.equal(
+    mod.resolveAbsoluteFilename("src/app.ts"),
     path.resolve(process.cwd(), "src/app.ts"),
   );
 }
@@ -327,6 +337,20 @@ export async function assertCacheKeySurvivesMissingUpstream(): Promise<void> {
 }
 
 /**
+ * Asserts `getCacheKey` does not throw when the upstream's own `getCacheKey`
+ * throws — the inner guard must swallow it and still produce a valid key.
+ */
+export async function assertCacheKeySurvivesThrowingUpstreamCacheKey(): Promise<void> {
+  const throwing = TestMetroRuntime.fakeUpstreamThrowingCacheKeyOnDisk();
+  const key = await TestMetroRuntime.withTransformerEnv(
+    { upstreamTransformer: throwing },
+    (mod) => mod.getCacheKey({ projectRoot: "/a" }),
+  );
+  assert.equal(typeof key, "string");
+  assert.equal(key.length, 64);
+}
+
+/**
  * End-to-end: asserts a file outside the tsconfig program passes through
  * untransformed rather than failing the build (the `isFileOutsideProject` =>
  * swallow path). Requires the native compiler → CI-only.
@@ -365,6 +389,11 @@ export async function assertGenuineCompileErrorPropagates(): Promise<void> {
         options: { projectRoot: root },
       },
     }),
-    (error: Error) => !/did not return output/.test(error.message),
+    // Load-bearing: must reject with the actual plugin error (mentions
+    // goUpper), not the out-of-project swallow string, and not a vacuous
+    // environment failure.
+    (error: Error) =>
+      /goUpper/.test(error.message) &&
+      !/did not return output/.test(error.message),
   );
 }

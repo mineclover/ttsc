@@ -59,7 +59,7 @@ module.exports = withTtsc(getDefaultConfig(__dirname), {
 - `compilerOptions`: a temporary overlay layered on the selected project config.
 - `plugins`: an explicit `ttsc` plugin list override, or `false` to disable project plugins.
 - `upstreamTransformer`: an explicit module path for the Babel transformer to delegate to, when auto-detection is not what you want.
-- `include` / `exclude`: substring path patterns selecting which files run through the `ttsc` pass (`.ts`/`.tsx`/`.cts`/`.mts` only; declaration and JavaScript files always pass straight through).
+- `include` / `exclude`: substring patterns matched against the project-relative file path, selecting which files run through the `ttsc` pass (`.ts`/`.tsx`/`.cts`/`.mts` only; declaration and JavaScript files always pass straight through).
 
 Options are forwarded from the Metro **config** process to Metro's **worker** processes through the `TTSC_METRO_OPTIONS` environment variable, so they must stay JSON-serialisable (hence substring patterns rather than `RegExp`).
 

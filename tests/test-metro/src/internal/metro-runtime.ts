@@ -125,6 +125,35 @@ export namespace TestMetroRuntime {
     return file;
   }
 
+  let fakeUpstreamThrowingCacheKeyPath: string | undefined;
+
+  /**
+   * A fake upstream whose `getCacheKey` throws, to exercise the inner catch in
+   * `upstreamCacheKey` (a throwing upstream key must not crash cache keying).
+   */
+  export function fakeUpstreamThrowingCacheKeyOnDisk(): string {
+    if (fakeUpstreamThrowingCacheKeyPath !== undefined) {
+      return fakeUpstreamThrowingCacheKeyPath;
+    }
+    const dir = TestProject.tmpdir("ttsc-metro-upstream-throw-");
+    const file = path.join(dir, "upstream.cjs");
+    fs.writeFileSync(
+      file,
+      [
+        "exports.transform = async function (params) {",
+        "  return { ast: { __fakeUpstream: true, src: params.src } };",
+        "};",
+        "exports.getCacheKey = function () {",
+        '  throw new Error("upstream getCacheKey boom");',
+        "};",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    fakeUpstreamThrowingCacheKeyPath = file;
+    return file;
+  }
+
   /**
    * Set the worker-env options, load a fresh transformer, run `body`, and
    * always restore the previous env. Used by transform and cache-key tests that

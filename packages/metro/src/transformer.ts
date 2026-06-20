@@ -94,9 +94,12 @@ export async function transform(params: {
 }): Promise<{ ast: object }> {
   const opts = options();
   const upstream = resolveUpstreamTransformer(opts.upstreamTransformer);
-  const filename = resolveAbsoluteFilename(params.filename, params.options);
 
-  if (!shouldTransform(filename, opts)) {
+  // Gate on the project-relative path Metro supplies, so include/exclude
+  // substrings match what the user writes (e.g. "src/generated") and never
+  // collide with an absolute ancestor directory name. The absolute path is used
+  // only to address the file inside the compiled program.
+  if (!shouldTransform(params.filename, opts)) {
     return upstream.transform(params);
   }
 
@@ -104,7 +107,7 @@ export async function transform(params: {
   try {
     unpluginOptions ??= resolveOptions(opts.ttsc);
     const result = await transformTtsc(
-      filename,
+      resolveAbsoluteFilename(params.filename, params.options),
       params.src,
       unpluginOptions,
       undefined,
@@ -238,7 +241,7 @@ function stableStringify(value: unknown): string {
   }
   if (value !== null && typeof value === "object") {
     return `{${Object.entries(value)
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
       .join(",")}}`;
   }

@@ -215,6 +215,10 @@ type LoadProgramOptions struct {
   // TypeScript-Go's own command-line parser into a CompilerOptions overlay
   // that wins over the tsconfig, exactly as `tsgo`'s CLI merges them.
   TsgoArgs []string
+  // FS overrides the filesystem the program is built on. When nil, DefaultFS
+  // is used. A resident Session passes an overlay FS so in-memory edits stay
+  // visible to the program and to incremental UpdateProgram calls.
+  FS vfs.FS
 }
 
 // Close releases the checker pool lease acquired by LoadProgram.
@@ -342,7 +346,10 @@ func LoadProgram(cwd, tsconfigPath string, options LoadProgramOptions) (*Program
   if preamble != "" {
     options.SourcePreamble += preamble
   }
-  fs := DefaultFS()
+  fs := options.FS
+  if fs == nil {
+    fs = DefaultFS()
+  }
   if options.SourcePreamble != "" {
     fs = sourcePreambleFS{
       FS:       fs,

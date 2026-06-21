@@ -4,14 +4,20 @@ import (
   shimtspath "github.com/microsoft/typescript-go/shim/tspath"
 )
 
-// Session is a resident compiler host: it keeps a loaded program alive and
-// updates it incrementally as files change, instead of recompiling the whole
-// project per request. It is the driver-level foundation for an incremental
-// @ttsc/metro and @ttsc/unplugin host (samchon/ttsc#255).
+// Session is a resident compiler host for incremental type-checking: it keeps a
+// loaded program alive and re-parses only the changed file on each edit (reusing
+// the unchanged ASTs and the pinned checker through UpdateProgram), instead of
+// recompiling the whole project per request.
 //
-// Construct one per project, feed file edits through Apply, and read the
-// resident program's source through SourceText. Apply reuses the existing
-// program when the edited file's import/reference graph is unchanged.
+// It is the driver-level incremental type-check primitive. The resident
+// transform path (utility-host `serve`) deliberately does not use it: the
+// linked-plugin pass mutates source ASTs in place, so a transform cannot reuse a
+// warm clean program and must rebuild a fresh one per edit. Session therefore
+// provides type-check reuse, not transform reuse (samchon/ttsc#255).
+//
+// Construct one per project (cwd absolute), feed file edits through Apply, and
+// read the resident program's source through SourceText. Apply reuses the
+// existing program when the edited file's import/reference graph is unchanged.
 type Session struct {
   cwd     string
   overlay *OverlayFS

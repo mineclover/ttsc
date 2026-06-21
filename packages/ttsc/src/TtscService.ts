@@ -10,17 +10,21 @@ import type { ITtscCompilerContext } from "./structures/ITtscCompilerContext";
  * Where {@link TtscCompiler.transform} spawns a fresh process and recompiles the
  * whole project on every call, `TtscService` keeps one long-lived host warm: it
  * compiles the project once and then answers per-file transform requests from
- * that warm program. This is the resident host of samchon/ttsc#255: a single
- * service shared across Metro workers or an editor session pays the project
- * compile once instead of once per file.
+ * that warm program. A single service instance transforms many files (a watch
+ * server, an editor session, a codegen tool) while paying the project compile
+ * once instead of once per file. Sharing one host across separate worker
+ * processes (a Metro worker pool) is tracked in samchon/ttsc#255.
  *
  * The shape mirrors a legacy TypeScript `LanguageService`: construct it against
  * a project context, ask it to transform individual files, and dispose it when
- * done. Construction is synchronous (it launches the host); the host compiles
- * lazily, so the first {@link transformFile} resolves once that compile lands.
+ * done. Construction is synchronous (it launches the host); the host compiles in
+ * the background, so the first {@link transformFile} resolves once that compile
+ * lands.
  *
  * Resident mode runs through the linked-plugin shared host, so the project must
  * declare at least one transform-stage plugin; the constructor throws otherwise.
+ * It does not run check-stage plugins (unlike {@link TtscCompiler.transform});
+ * only the program's own type-checking gates an {@link updateFile}.
  */
 export class TtscService {
   private readonly resident: ResidentTransformProcess;

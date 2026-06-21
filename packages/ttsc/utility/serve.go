@@ -79,11 +79,20 @@ func RunServe(in io.Reader, out io.Writer, args []string) int {
       continue
     }
     if req.Update != "" {
-      overlay.Set(resolveServePath(opts.cwd, req.Update), req.Content)
+      abs := resolveServePath(opts.cwd, req.Update)
+      prev, had := overlay.Get(abs)
+      overlay.Set(abs, req.Content)
       if rebuilt, ok := buildServeCache(opts); ok {
         cache = rebuilt
         _ = encoder.Encode(serveUpdateResponse{Updated: true})
       } else {
+        // Roll the failed edit back so a file that does not compile does not
+        // poison every later rebuild; the previous transform stays in effect.
+        if had {
+          overlay.Set(abs, prev)
+        } else {
+          overlay.Unset(abs)
+        }
         _ = encoder.Encode(serveUpdateResponse{Updated: false})
       }
       continue

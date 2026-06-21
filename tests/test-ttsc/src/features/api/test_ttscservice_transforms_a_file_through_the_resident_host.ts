@@ -57,6 +57,24 @@ export const test_ttscservice_transforms_a_file_through_the_resident_host =
       // A file outside the compiled program is absent, not an error.
       const outside = await service.transformFile(path.join(root, "stray.ts"));
       assert.equal(outside, undefined);
+
+      // Concurrent (pipelined) requests stay matched to their own replies: an
+      // in-program and an out-of-program request fired together each resolve to
+      // their own result, which a FIFO desync would swap.
+      const [mainAgain, strayConcurrent] = await Promise.all([
+        service.transformFile("src/main.ts"),
+        service.transformFile(path.join(root, "stray.ts")),
+      ]);
+      assert.equal(mainAgain, first, "concurrent in-program request was misrouted");
+      assert.equal(
+        strayConcurrent,
+        undefined,
+        "concurrent out-of-program request was misrouted",
+      );
+
+      // dispose terminates the host and rejects any later request.
+      service.dispose();
+      await assert.rejects(() => service.transformFile("src/main.ts"));
     } finally {
       service.dispose();
     }

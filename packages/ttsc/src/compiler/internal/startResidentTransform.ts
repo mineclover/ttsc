@@ -25,13 +25,14 @@ export interface StartedResidentTransform {
  * Mirrors the plugin spawn of `transformProjectInMemory`, but launches the
  * shared host's `serve` subcommand as one long-lived process instead of a
  * per-call `transform` subprocess. The host compiles the whole project once at
- * startup and then answers per-file requests, so a caller (a Metro worker, an
- * incremental API consumer) pays the project compile once and reuses it.
+ * startup and then answers per-file requests, so one caller pays the project
+ * compile once and reuses it across its own per-file requests.
  *
  * Resident mode runs through the linked-plugin shared host (`cmd/utility-host`),
  * which is the only binary that exposes `serve`. It therefore requires at least
  * one transform-stage plugin; executable transform hosts that own their own
- * process are not served and must use the per-call transform path.
+ * process are not served and must use the per-call transform path. Check-stage
+ * plugins are not run by the resident host.
  */
 export function startResidentTransform(
   context: ITtscCompilerContext,
@@ -55,7 +56,8 @@ export function startResidentTransform(
   );
   if (transformers.length === 0) {
     throw new Error(
-      "ttsc: TtscService resident mode requires at least one transform-stage plugin",
+      "ttsc: TtscService resident mode requires at least one transform-stage plugin; " +
+        "use TtscCompiler.transform for projects with only check-stage plugins or none",
     );
   }
   assertSharedHostCompatibility(transformers, "source-to-source");

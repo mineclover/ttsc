@@ -87,4 +87,83 @@ func TestUtilityServeReflectsOverlayUpdate(t *testing.T) {
   if !after.Found || !strings.Contains(after.TypeScript, "2") {
     t.Fatalf("resident host did not reflect the overlay update: %q", lines[2])
   }
+  // The edit must replace, not append: the original value must be gone.
+  if strings.Contains(after.TypeScript, "= 1") {
+    t.Fatalf("update did not replace the original value: %q", lines[2])
+  }
+}
+
+// TestUtilityServeUpdateFailureKeepsPreviousTransform verifies that an update
+// that does not compile leaves the previous transform in effect (reply
+// updated:false), and that the failed edit is rolled back so a later valid
+// update still succeeds rather than staying wedged on the broken buffer.
+//
+// This is the load-bearing half of the update contract (samchon/ttsc#255): an
+// editor sends a transient broken buffer mid-keystroke, and the resident host
+// must neither crash nor corrupt the cache, and must recover on the next good
+// edit.
+//
+// 1. Transform index.ts (value 1).
+// 2. Update with a type error; assert updated:false and that a transform still
+//    returns the original value 1.
+// 3. Update with valid new content; assert updated:true and the new value, which
+//    only holds if the broken edit was rolled back out of the overlay.
+func TestUtilityServeUpdateFailureKeepsPreviousTransform(t *testing.T) {
+  root := t.TempDir()
+  writeProjectFile(t, root, "tsconfig.json", `{
+  "compilerOptions": { "module": "commonjs", "target": "es2020", "noEmit": true },
+  "files": ["index.ts"]
+}
+`)
+  writeProjectFile(t, root, "index.ts", `export const value: number = 1;
+`)
+  index := filepath.Join(root, "index.ts")
+
+  requests := serveUpdateLine(t, index, "export const value: number = \"oops\";\n") + "\n" +
+    serveRequestLine(t, index) + "\n" +
+    serveUpdateLine(t, index, "export const value: number = 3;\n") + "\n" +
+    serveRequestLine(t, index) + "\n"
+
+  var out bytes.Buffer
+  code := utility.RunServe(strings.NewReader(requests), &out, []string{"--cwd", root})
+  if code != 0 {
+    t.Fatalf("RunServe exit %d; output=%q", code, out.String())
+  }
+
+  lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+  if len(lines) != 4 {
+    t.Fatalf("expected one reply per request, got %d: %q", len(lines), out.String())
+  }
+
+  var failed serveUpdateReply
+  if err := json.Unmarshal([]byte(lines[0]), &failed); err != nil {
+    t.Fatalf("decode reply 0: %v (%q)", err, lines[0])
+  }
+  if failed.Updated {
+    t.Fatalf("expected the type-erroring update to fail: %q", lines[0])
+  }
+
+  var stale serveResponse
+  if err := json.Unmarshal([]byte(lines[1]), &stale); err != nil {
+    t.Fatalf("decode reply 1: %v (%q)", err, lines[1])
+  }
+  if !stale.Found || !strings.Contains(stale.TypeScript, "= 1") {
+    t.Fatalf("failed update did not keep the previous transform: %q", lines[1])
+  }
+
+  var recovered serveUpdateReply
+  if err := json.Unmarshal([]byte(lines[2]), &recovered); err != nil {
+    t.Fatalf("decode reply 2: %v (%q)", err, lines[2])
+  }
+  if !recovered.Updated {
+    t.Fatalf("a valid update after a failed one should succeed (rollback): %q", lines[2])
+  }
+
+  var after serveResponse
+  if err := json.Unmarshal([]byte(lines[3]), &after); err != nil {
+    t.Fatalf("decode reply 3: %v (%q)", err, lines[3])
+  }
+  if !after.Found || !strings.Contains(after.TypeScript, "3") {
+    t.Fatalf("resident host did not recover to the valid update: %q", lines[3])
+  }
 }

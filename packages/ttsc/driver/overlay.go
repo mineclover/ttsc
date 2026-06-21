@@ -37,6 +37,18 @@ func (o *OverlayFS) Set(path, content string) {
   o.overrides[o.key(path)] = content
 }
 
+// Get returns the in-memory override for path, if one is set.
+func (o *OverlayFS) Get(path string) (string, bool) {
+  content, ok := o.overrides[o.key(path)]
+  return content, ok
+}
+
+// Unset removes the in-memory override for path, so reads fall back to the
+// inner filesystem.
+func (o *OverlayFS) Unset(path string) {
+  delete(o.overrides, o.key(path))
+}
+
 func (o *OverlayFS) ReadFile(path string) (string, bool) {
   if content, ok := o.overrides[o.key(path)]; ok {
     return content, true

@@ -1,6 +1,9 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { createInterface, type Interface } from "node:readline";
 
+/** Cap on retained stderr so a long-lived host cannot grow it without bound. */
+const STDERR_TAIL_LIMIT = 64 * 1024;
+
 /** Options for spawning the resident transform host. */
 export interface ResidentTransformProcessOptions {
   args: readonly string[];
@@ -18,15 +21,15 @@ interface PendingRequest {
  * Async client for the long-lived `utility-host serve` process.
  *
  * The host transforms the whole project once at startup, caches every file's
- * transformed TypeScript, then answers newline-delimited per-file requests. This
- * class speaks that protocol: each {@link transformFile} writes one
- * `{"file":...}` line and the host replies with one
- * `{"typescript":...,"found":...}` line. The host answers in FIFO order, so
- * replies are matched to a queue of pending requests.
+ * transformed TypeScript, then answers newline-delimited requests. This class
+ * speaks that protocol: each {@link request} writes one JSON line and the host
+ * replies with one line, matched FIFO. A transform request (`{"file":...}`) is
+ * answered with `{"typescript":...,"found":...}`, and an update request
+ * (`{"update":...,"content":...}`) with `{"updated":...}`.
  *
- * One resident process replaces the per-call `transform` subprocess every Metro
- * worker would otherwise spawn, which is the cross-worker recompile this removes
- * (samchon/ttsc#255).
+ * One resident process answers every request from one service instead of
+ * spawning a fresh `transform` subprocess per call, so a single process pays the
+ * project compile once (samchon/ttsc#255).
  */
 export class ResidentTransformProcess {
   private readonly child: ChildProcess;
@@ -48,6 +51,7 @@ export class ResidentTransformProcess {
     });
     const stdout = this.child.stdout;
     if (stdout === null || this.child.stdin === null) {
+      this.child.kill();
       throw new Error("ttsc: resident transform host has no stdio pipes");
     }
     this.reader = createInterface({ input: stdout });
@@ -58,7 +62,10 @@ export class ResidentTransformProcess {
     // exit-time rejection.
     this.reader.on("close", () => this.onReaderClose());
     this.child.stderr?.on("data", (chunk: Buffer | string) => {
-      this.stderr += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      // Keep only the tail: stderr is consulted for the crash message, and a
+      // long resident session can write diagnostics on every failed update.
+      this.stderr = (this.stderr + text).slice(-STDERR_TAIL_LIMIT);
     });
     this.child.on("error", (error) => this.fail(error));
     this.child.on("exit", (code, signal) => {
@@ -102,7 +109,14 @@ export class ResidentTransformProcess {
    * call more than once.
    */
   public dispose(): void {
-    this.failure ??= new Error("ttsc: resident transform host disposed");
+    if (this.failure === undefined) {
+      // If the host already died, reject with its real exit error (stderr +
+      // exit code) rather than a bland "disposed" message.
+      this.failure =
+        this.child.exitCode !== null || this.child.signalCode !== null
+          ? this.exitError()
+          : new Error("ttsc: resident transform host disposed");
+    }
     const stdin = this.child.stdin;
     if (stdin !== null && !stdin.destroyed) {
       stdin.end();
@@ -121,7 +135,16 @@ export class ResidentTransformProcess {
     }
     const request = this.pending.shift();
     if (request === undefined) {
-      return; // unsolicited line; nothing is waiting for it
+      // The host must emit exactly one reply per request, so an unmatched line
+      // is a protocol violation that would desync every later reply into the
+      // wrong request. Fail fast rather than silently returning wrong output.
+      // A line arriving after teardown (failure already set) is benign.
+      if (this.failure === undefined) {
+        this.fail(
+          new Error("ttsc: resident transform host sent an unsolicited reply"),
+        );
+      }
+      return;
     }
     request.resolve(parseReply(trimmed));
   }

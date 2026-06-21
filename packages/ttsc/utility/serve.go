@@ -67,46 +67,63 @@ func RunServe(in io.Reader, out io.Writer, args []string) int {
     return 2
   }
   encoder := json.NewEncoder(out)
-  scanner := bufio.NewScanner(in)
-  scanner.Buffer(make([]byte, 0, 64*1024), 64*1024*1024)
-  for scanner.Scan() {
-    line := strings.TrimSpace(scanner.Text())
-    if line == "" {
-      continue
+  // ReadString imposes no line-length limit. An update request carries a whole
+  // file's content on one line, so the line is as large as that content; a
+  // bufio.Scanner cap would be an arbitrary ceiling at which the resident host
+  // dies, and there is no such natural ceiling on source size.
+  reader := bufio.NewReader(in)
+  for {
+    raw, err := reader.ReadString('\n')
+    if line := strings.TrimSpace(raw); line != "" {
+      cache = handleServeLine(line, opts, overlay, cache, encoder)
     }
-    var req serveRequest
-    if err := json.Unmarshal([]byte(line), &req); err != nil {
-      _ = encoder.Encode(serveResponse{})
-      continue
-    }
-    if req.Update != "" {
-      abs := resolveServePath(opts.cwd, req.Update)
-      prev, had := overlay.Get(abs)
-      overlay.Set(abs, req.Content)
-      if rebuilt, ok := buildServeCache(opts); ok {
-        cache = rebuilt
-        _ = encoder.Encode(serveUpdateResponse{Updated: true})
-      } else {
-        // Roll the failed edit back so a file that does not compile does not
-        // poison every later rebuild; the previous transform stays in effect.
-        if had {
-          overlay.Set(abs, prev)
-        } else {
-          overlay.Unset(abs)
-        }
-        _ = encoder.Encode(serveUpdateResponse{Updated: false})
+    if err != nil {
+      if err != io.EOF {
+        fmt.Fprintf(os.Stderr, "ttsc utility serve: read error: %v\n", err)
+        return 2
       }
-      continue
+      return 0
     }
-    key := apiOutputKey(opts.cwd, resolveServePath(opts.cwd, req.File))
-    text, found := cache[key]
-    _ = encoder.Encode(serveResponse{TypeScript: text, Found: found})
   }
-  if err := scanner.Err(); err != nil {
-    fmt.Fprintf(os.Stderr, "ttsc utility serve: read error: %v\n", err)
-    return 2
+}
+
+// handleServeLine answers one request line and returns the cache to use for the
+// next request: the rebuilt cache after a successful update, the unchanged cache
+// otherwise.
+func handleServeLine(
+  line string,
+  opts hostOptions,
+  overlay *driver.OverlayFS,
+  cache map[string]string,
+  encoder *json.Encoder,
+) map[string]string {
+  var req serveRequest
+  if err := json.Unmarshal([]byte(line), &req); err != nil {
+    _ = encoder.Encode(serveResponse{})
+    return cache
   }
-  return 0
+  if req.Update != "" {
+    abs := resolveServePath(opts.cwd, req.Update)
+    prev, had := overlay.Get(abs)
+    overlay.Set(abs, req.Content)
+    if rebuilt, ok := buildServeCache(opts); ok {
+      _ = encoder.Encode(serveUpdateResponse{Updated: true})
+      return rebuilt
+    }
+    // Roll the failed edit back so a file that does not compile does not poison
+    // every later rebuild; the previous transform stays in effect.
+    if had {
+      overlay.Set(abs, prev)
+    } else {
+      overlay.Unset(abs)
+    }
+    _ = encoder.Encode(serveUpdateResponse{Updated: false})
+    return cache
+  }
+  key := apiOutputKey(opts.cwd, resolveServePath(opts.cwd, req.File))
+  text, found := cache[key]
+  _ = encoder.Encode(serveResponse{TypeScript: text, Found: found})
+  return cache
 }
 
 // buildServeCache runs the whole-project transform once over the current overlay

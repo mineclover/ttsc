@@ -134,3 +134,39 @@ func TestUtilityServeMalformedRequestStaysFIFOAligned(t *testing.T) {
     t.Fatalf("valid request after a malformed line did not resolve: %q", lines[1])
   }
 }
+
+// TestUtilityServeProcessesFinalLineWithoutNewline verifies a request that is
+// not newline-terminated (the input ends mid-line at EOF) is still answered
+// exactly once. ReadString returns the final line together with io.EOF, so the
+// loop must process it before terminating; a naive loop would drop it.
+func TestUtilityServeProcessesFinalLineWithoutNewline(t *testing.T) {
+  root := t.TempDir()
+  writeProjectFile(t, root, "tsconfig.json", `{
+  "compilerOptions": { "module": "commonjs", "target": "es2020", "noEmit": true },
+  "files": ["index.ts"]
+}
+`)
+  writeProjectFile(t, root, "index.ts", `export const value: number = 1;
+`)
+
+  // The request line has no trailing newline.
+  requests := serveRequestLine(t, filepath.Join(root, "index.ts"))
+
+  var out bytes.Buffer
+  code := utility.RunServe(strings.NewReader(requests), &out, []string{"--cwd", root})
+  if code != 0 {
+    t.Fatalf("RunServe exit %d; output=%q", code, out.String())
+  }
+
+  lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+  if len(lines) != 1 {
+    t.Fatalf("expected exactly one reply for a newline-less request, got %d: %q", len(lines), out.String())
+  }
+  var reply serveResponse
+  if err := json.Unmarshal([]byte(lines[0]), &reply); err != nil {
+    t.Fatalf("decode reply: %v (%q)", err, lines[0])
+  }
+  if !reply.Found || !strings.Contains(reply.TypeScript, "value") {
+    t.Fatalf("newline-less request was not answered correctly: %q", lines[0])
+  }
+}

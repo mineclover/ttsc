@@ -21,8 +21,8 @@ func Build(prog *driver.Program) *Graph {
 }
 
 // collectDeclarations records a node for each top-level declaration statement in
-// file. Nested declarations (methods, locals) are added by later passes; this
-// pass establishes the top-level symbol nodes that cross-file edges connect.
+// file. Nested declarations (methods, locals) are not modeled; this pass
+// establishes the top-level symbol nodes that cross-file edges connect.
 func collectDeclarations(g *Graph, file *shimast.SourceFile) {
   if file.Statements == nil {
     return

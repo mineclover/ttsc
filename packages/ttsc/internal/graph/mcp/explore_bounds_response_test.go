@@ -85,10 +85,11 @@ func TestExploreBoundsResponse(t *testing.T) {
     t.Fatalf("graph_explore did not truncate the long body:\n%s", big)
   }
 
-  // (b) A node with 13 incoming edges carries a "more" tail past the 12 cap.
+  // (b) A node with 13 incoming edges carries a "<- (1 more)" tail: 13 minus the
+  // 12-edge cap, and the direction (incoming) is pinned, not just any "more".
   hub := toolText(t, server, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"graph_explore","arguments":{"query":"Hub"}}}`)
-  if !strings.Contains(hub, "more)") {
-    t.Fatalf("graph_explore did not cap the incoming edges:\n%s", hub)
+  if !strings.Contains(hub, "<- (1 more)") {
+    t.Fatalf("graph_explore did not cap the incoming edges at 12 with a '<- (1 more)' tail:\n%s", hub)
   }
 
   // (c) Three large bodies cross the char budget, collapsing later matches.

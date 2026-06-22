@@ -42,8 +42,9 @@ const (
   // EdgeHeritage is an `extends` / `implements` relationship from a class or
   // interface to a base it derives from.
   EdgeHeritage EdgeKind = "heritage"
-  // EdgeValueCall is a runtime call from one declaration to the function,
-  // method, or constructor it invokes.
+  // EdgeValueCall is a runtime call from one top-level declaration to the
+  // top-level function it invokes. Method calls and `new` constructor calls are
+  // not modeled in this v1.
   EdgeValueCall EdgeKind = "value-call"
   // EdgeTypeRef is a type-position reference from one declaration to a named
   // type it mentions (a parameter, return, property, or alias type). It is not a

@@ -50,6 +50,9 @@ func TestRunHelpVersionAndBadFlagsExitCodes(t *testing.T) {
   if code := run([]string{"--bogus"}); code != 2 {
     t.Fatalf("run --bogus exit = %d, want 2", code)
   }
+  if !strings.Contains(badErr.String(), "not defined") {
+    t.Fatalf("run --bogus exited 2 but did not report the undefined flag:\n%s", badErr.String())
+  }
 
   // A getwd failure (no --cwd given) is an invalid invocation -> 2, explained.
   var wdErr bytes.Buffer

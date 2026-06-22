@@ -3,6 +3,7 @@ package mcp
 import (
   "encoding/json"
   "fmt"
+  "path/filepath"
   "sort"
   "strings"
 
@@ -18,7 +19,7 @@ func toolsListResult() any {
     "tools": []any{
       map[string]any{
         "name":        "graph_explore",
-        "description": "The compiler's own code graph for a symbol or file: returns its source plus what it calls, is called by, references as types, and inherits — all checker-resolved, not guessed — with its blast radius. Authoritative: use it instead of grepping or opening files to learn how the code works.",
+        "description": "The compiler's own graph of the project's top-level declarations. For a symbol or file, returns its source plus its checker-resolved calls, type references, and heritage (in both directions) and its blast radius. Use it first to trace how the code works; open files for detail below the top level (method bodies, variable-bound callables).",
         "inputSchema": map[string]any{
           "type": "object",
           "properties": map[string]any{
@@ -386,6 +387,9 @@ func (s *Server) diagnostics(args json.RawMessage) (any, *rpcError) {
 // "src/main.ts" but not "src/domain.ts"). Returning all matches lets the caller
 // reject an ambiguous fragment instead of silently picking an arbitrary file.
 func (s *Server) resolveFile(file string) []string {
+  // tsgo normalizes FileName() to forward slashes, so normalize the argument too
+  // — otherwise a Windows-style "src\main.ts" never matches "…/src/main.ts".
+  file = filepath.ToSlash(file)
   for _, source := range s.prog.SourceFiles() {
     if source.FileName() == file {
       return []string{file}

@@ -41,18 +41,14 @@ Read the coverage as the codegraph-style flex: 92.2% of symbol-bearing files hav
 A faithful port of codegraph's headline benchmark (its `scripts/agent-eval`). For codegraph's verbatim question per repo it runs the Claude Code CLI headless twice, once with the `@ttsc/graph` MCP server and once with an empty MCP config, both under `--strict-mcp-config`, and reports codegraph's metrics: tokens summed per assistant turn (not last-turn `result.usage`), tool-call count, cost, and wall time, median over N runs. Only codegraph's two TypeScript repos are runnable by a checker-resolved graph, `excalidraw` and `vscode` (the other five are Python/Rust/Java/Go/Swift). It spends real Claude credits, is non-deterministic, and is not wired into CI. Requires `claude` and `go` on `PATH`.
 
 ```bash
-node experimental/graph-bench/agent-ab.mjs --repo=excalidraw --runs=4
-node experimental/graph-bench/agent-ab.mjs --repo=vscode --runs=4 --model=opus
+node experimental/graph-bench/agent-ab.mjs --repo=excalidraw --runs=10 --model=sonnet
+node experimental/graph-bench/agent-ab.mjs --repo=vscode --runs=10 --model=sonnet
 ```
 
-Median of 3 runs on `excalidraw`, codegraph's question "How does Excalidraw render and update canvas elements?", Sonnet:
+A cross-model companion, `agent-ab-codex.mjs`, drives OpenAI's codex (GPT-5.5) through a minimal temp `CODEX_HOME` (a copied auth + a generated config) so the user's global config does not leak into the measurement:
 
-```
-                graph vs empty-MCP baseline
-  tokens        354,126 vs 1,730,912   80% saved
-  tool calls    4       vs 45          91% saved
-  cost          $0.170  vs $0.280      39% saved
-  wall time     51s     vs 169s        70% saved
+```bash
+node experimental/graph-bench/agent-ab-codex.mjs --repo=excalidraw --runs=4
 ```
 
-In all three graph runs the agent read zero files (`read 0, grep 0`): it answered from graph_explore alone. This is on codegraph's own harness, question, metrics, and empty-MCP baseline, and exceeds codegraph's reported headline (16% cheaper, 47% fewer tokens, 58% fewer tool calls). The unlock was lazy-init: the server must answer the MCP handshake before it finishes type-checking the project, or it sits "pending" with no tools advertised and the agent falls back to grep. Numbers move with model and repo; take a larger median for a published figure.
+The published figures and the full method live at https://ttsc.dev/docs/graph/benchmark, the single source of truth. The headline: on Claude Sonnet 4.6 the graph cuts an agent's tokens by ~70% and tool calls by ~83% across the two repos, with the agent reading few or no files — and the win is model-dependent, since a thorough model like Opus reads source regardless of the tool. Running this surfaced the cold-start race: the server must answer the MCP handshake before it finishes type-checking, or it sits "pending" with no tools advertised and the agent falls back to grep; lazy init fixes it.

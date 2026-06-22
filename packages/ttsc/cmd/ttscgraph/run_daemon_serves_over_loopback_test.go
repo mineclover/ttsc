@@ -2,7 +2,6 @@ package main
 
 import (
   "bufio"
-  "bytes"
   "encoding/json"
   "net"
   "os"
@@ -27,10 +26,6 @@ import (
 //  2. Poll the port file for the 127.0.0.1:<port> line, then dial it.
 //  3. Send one initialize request and assert result.serverInfo.name.
 func TestRunDaemonServesOverLoopback(t *testing.T) {
-  oldStderr := stderr
-  defer func() { stderr = oldStderr }()
-  stderr = &bytes.Buffer{}
-
   root := t.TempDir()
   writeDaemonFixture(t, root)
   portFile := filepath.Join(root, "port")

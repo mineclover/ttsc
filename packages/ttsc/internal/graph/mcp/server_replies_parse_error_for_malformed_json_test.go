@@ -58,7 +58,9 @@ func TestServerRepliesParseErrorForMalformedJson(t *testing.T) {
   if errObj["code"] != float64(-32700) {
     t.Fatalf("parse error code was not -32700: %v", errObj["code"])
   }
-  if envelope["id"] != nil {
-    t.Fatalf("parse error reply did not carry a null id: %v", envelope["id"])
+  // JSON-RPC 2.0 §4.2 requires the id be present AND null, not merely absent — a
+  // missing map key and an explicit null both read as nil, so check presence too.
+  if id, present := envelope["id"]; !present || id != nil {
+    t.Fatalf("parse error reply must carry a present, null id (present=%v, value=%v)", present, id)
   }
 }

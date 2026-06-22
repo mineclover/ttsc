@@ -88,9 +88,10 @@ func (g *Graph) heritageEdges(checker *shimchecker.Checker, path string, node *s
 }
 
 // collectCalls records a value-call edge from each top-level function or class to
-// every function, method, or constructor it invokes. A call is attributed to the
-// nearest enclosing top-level declaration the graph has a node for; nested calls
-// (a call inside another call's arguments) attribute to the same declaration.
+// every top-level function it invokes (method and `new` constructor calls are not
+// modeled). A call is attributed to the nearest enclosing top-level declaration
+// the graph has a node for; nested calls (a call inside another call's arguments)
+// attribute to the same declaration.
 func (g *Graph) collectCalls(checker *shimchecker.Checker, file *shimast.SourceFile) {
   if file.Statements == nil {
     return
@@ -107,9 +108,10 @@ func (g *Graph) collectCalls(checker *shimchecker.Checker, file *shimast.SourceF
 
 // containerNodeID returns the node id of a top-level declaration that can
 // contain references (a function, class, interface, or type alias) and whether
-// statement is one. Variable-bound callables are added by a later pass. Calls
-// only occur in function/class bodies, so attributing a call walk to an
-// interface or type alias is harmless: it finds none.
+// statement is one. Variable-bound callables (a top-level `const fn = () => …`)
+// are intentionally not walked in this v1, so their initializer's calls and type
+// references are not edges. Calls only occur in function/class bodies, so
+// attributing a call walk to an interface or type alias is harmless: it finds none.
 func containerNodeID(path string, statement *shimast.Node) (string, bool) {
   symbol := statement.Symbol()
   if symbol == nil || symbol.Name == "" {
@@ -213,6 +215,11 @@ func (g *Graph) typeRefEdge(checker *shimchecker.Checker, from string, typeName 
 func (g *Graph) ensureTargetNode(target *Target) string {
   kind := symbolNodeKind(target.Symbol)
   if kind == "" {
+    return ""
+  }
+  // A synthesized symbol without a declaration file would key a fileless ghost
+  // node ("#name:kind") that could collide across distinct symbols; skip it.
+  if target.File == "" {
     return ""
   }
   id := nodeID(target.File, target.Symbol.Name, kind)

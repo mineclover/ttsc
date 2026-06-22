@@ -189,6 +189,35 @@ Lint **fixes** stay off-save by default (they can change code meaning), opt in w
 
 Full reference: [`@ttsc/vscode`](https://github.com/samchon/ttsc/tree/master/packages/vscode).
 
+## Coding agents (@ttsc/graph)
+
+[`@ttsc/graph`](/docs/graph) is an MCP server that gives a coding agent a checker-resolved code graph and diagnostics for your project, so it answers structural questions ("what relates to this symbol", "what is the blast radius of this change", "what are the type errors in this file") from the warm type checker instead of grepping and re-reading source on every turn.
+
+### Install
+
+```bash
+npm install -D ttsc @ttsc/graph typescript@rc
+```
+
+`@ttsc/graph` resolves the native `ttscgraph` binary from the `ttsc` platform package, so `ttsc` must be installed.
+
+### Configure your agent
+
+Add the server to your MCP client. For Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "ttsc-graph": {
+      "command": "npx",
+      "args": ["-y", "@ttsc/graph"]
+    }
+  }
+}
+```
+
+Start the agent from your project root, or pass `--cwd` and `--tsconfig`. Usage guidance is delivered in the MCP `initialize` response; the server never writes into your `CLAUDE.md` or `AGENTS.md`. On codegraph's own agent-cost benchmark it cuts an agent's tokens by 80% and tool calls by 91% with the agent reading zero files; see [Code Graph](/docs/graph) and its [Benchmark](/docs/graph/benchmark).
+
 ## See also
 
 - [FAQ](/docs/faq): common questions, gotchas, and migration tips.

@@ -23,6 +23,10 @@ In all three graph runs the agent read zero files. It answered the architecture 
 
 The numbers move with the model and the repository, so treat any single figure as a shape rather than a fixed claim, and take a larger median for a published number. The mechanism is stable: the graph hands the agent the relevant declarations, their checker-resolved relationships, and their source in a few calls, so it stops fanning out across files.
 
+### VS Code
+
+Excalidraw is the measured TypeScript case here. VS Code is codegraph's headline TypeScript repository, but it exposes a real tradeoff: codegraph indexes with tree-sitter, which is cheap, while `@ttsc/graph` builds a full TypeScript-Go `Program`. Type-checking VS Code's ~7,000 `src` files did not finish within a five-minute startup, so a per-session A/B (which spawns a fresh server per agent run) is not practical for it yet. The lazy-init server still answers the handshake instantly; what is missing is a persistent daemon that builds the `Program` once and serves many sessions, the way codegraph's daemon does. That is a deferred feature, not a wall: the cost is paid once, then amortized. Until it lands, the agent-cost number is published on Excalidraw, where the build is about a second.
+
 ### What made the difference
 
 Running this benchmark surfaced a real bug. The server originally type-checked the whole project before answering the MCP handshake, so on a repository of any size it sat in the `pending` state with no tools advertised, and the agent fell back to grep and read. The fix is lazy init: the server answers `initialize` and `tools/list` immediately and builds the resident `Program` in the background, so the agent always sees the tools and the first query blocks on the build. Two smaller fixes followed, ranking declarations against a natural-language query by name match and edge centrality so a flow question surfaces the right symbols, and bounding the response (edge cap, per-node source cap, total budget) so a broad match returns a few kilobytes instead of tens.
@@ -53,5 +57,6 @@ node experimental/graph-bench/bench.mjs --project=/abs/path --runs=5
 
 # Agent cost: codegraph's question, with vs without the graph, median of N
 node experimental/graph-bench/agent-ab.mjs --repo=excalidraw --runs=4
+# vscode is wired up but needs the persistent daemon (above); its per-session build is too slow today
 node experimental/graph-bench/agent-ab.mjs --repo=vscode --runs=4 --model=opus
 ```

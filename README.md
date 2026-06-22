@@ -130,6 +130,29 @@ Lint fixes stay off-save by default; opt in with `"editor.codeActionsOnSave": { 
 
 See [`@ttsc/vscode`](https://github.com/samchon/ttsc/tree/master/packages/vscode) for requirements and settings.
 
+### Coding Agents (MCP)
+
+`@ttsc/graph` is an MCP server that gives a coding agent a checker-resolved code graph and diagnostics for your project, so it answers "what relates to this symbol" or "what is the blast radius of this change" from the type checker instead of grepping and re-reading files.
+
+```bash
+npm install -D ttsc @ttsc/graph typescript@rc
+```
+
+Point your agent's MCP client at it. For Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "ttsc-graph": {
+      "command": "npx",
+      "args": ["-y", "@ttsc/graph"]
+    }
+  }
+}
+```
+
+On codegraph's own agent-cost benchmark it cuts an agent's tokens by 80% and tool calls by 91% on an architecture question, with the agent reading zero files. See [`@ttsc/graph`](https://github.com/samchon/ttsc/tree/master/packages/graph) and the [benchmark](https://ttsc.dev/docs/graph/benchmark).
+
 ## Plugins
 
 Plugins let libraries add compile-time checks, transforms, and type-driven code generation to normal `ttsc` and `ttsx` runs.

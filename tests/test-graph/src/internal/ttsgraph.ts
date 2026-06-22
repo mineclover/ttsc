@@ -1,10 +1,11 @@
 import { TestProject } from "@ttsc/testing";
-import nodeAssert from "node:assert/strict";
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import path from "node:path";
 
-/** Re-exported so feature files import one assertion surface. */
-export const assert = nodeAssert;
+// Re-export the binding directly (not a re-bound const) so its assertion-function
+// signatures survive: `assert.ok` narrows only when the call target carries an
+// explicit type, and a `const assert = nodeAssert` copy would drop that (TS2775).
+export { default as assert } from "node:assert/strict";
 
 /**
  * Resolve the native `ttscgraph` MCP server binary the same way the @ttsc/graph

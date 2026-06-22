@@ -18,16 +18,16 @@ It builds the `cmd/graphbench` metrics binary once, runs it `--runs` times (plus
 
 ## What it reports
 
-The layout below is illustrative; run it for your own figures.
+A CI run against this repo's `packages/ttsc` (53 source files) reported:
 
 ```
 Result (counts deterministic; timings indicative):
-  source files:  152
-  nodes:         1843 (271 external boundary leaves)
-  edges:         2104 (heritage 96, value-call 1187, type-ref 821)
-  fair coverage: 86.8% (132/152 symbol-bearing files cross-linked)
-  load time:     980 ms (median)
-  graph build:   41 ms (median), 4.2% on top of the load it rides
+  source files:  53
+  nodes:         575 (66 external boundary leaves)
+  edges:         1402 (heritage 2, value-call 1016, type-ref 384)
+  fair coverage: 92.2% (47/51 symbol-bearing files cross-linked)
+  load time:     81 ms (median)
+  graph build:   37 ms (median), 45.7% on top of the load it rides
 ```
 
-The `graph build ... % on top of the load it rides` line is the point: extraction is a small fraction of the compile the graph rides, which is why a resident server answers queries without a fresh compile.
+Read the coverage as the codegraph-style flex: 92.2% of symbol-bearing files have at least one checker-resolved cross-file edge. The `graph build ... % on top of the load it rides` line is honest about cost: on a small project the walk is a real fraction of the (already fast) load, and the ratio shrinks as type-checking dominates on larger trees. The point is not that extraction is free, but that it rides the `Program` the compiler already built, so the server answers queries without a second compile or an external language-server round-trip.

@@ -1,0 +1,79 @@
+import { Tabs } from "nextra/components";
+
+# Code Graph (MCP)
+
+`@ttsc/graph` is a Model Context Protocol server that gives a coding agent a checker-resolved code graph and diagnostics for your TypeScript project. It runs `ttscgraph`, a native binary that builds one resident `Program` from your `tsconfig.json` and answers every query from that warm type checker.
+
+The point of difference is precision. Every edge the graph reports is resolved by the real TypeScript-Go checker, not a syntactic heuristic: a call through a barrel re-export lands on the sibling source that declares the symbol, a `workspace:*` dependency is followed as your own code, and a `node_modules` or `.d.ts` declaration is reported as an external boundary leaf the walk does not descend into. Because the server holds the `Program` open, a query is a method call on an already-built checker, not a fresh compile and not an external language-server round-trip.
+
+## Install
+
+`@ttsc/graph` resolves the native binary from the `ttsc` platform package, so install `ttsc` alongside it.
+
+```bash
+npm install -D ttsc @ttsc/graph typescript@rc
+```
+
+## Configure your agent
+
+Add the server to your MCP client. For Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "ttsc-graph": {
+      "command": "npx",
+      "args": ["-y", "@ttsc/graph"]
+    }
+  }
+}
+```
+
+Start the agent from your project root, or point the server at a project explicitly:
+
+```bash
+npx @ttsc/graph --cwd ./packages/app --tsconfig tsconfig.json
+```
+
+Usage guidance is delivered in the MCP `initialize` response. The server never writes into your `CLAUDE.md`, `AGENTS.md`, or any other agent config file, so installing it has no side effects on your repository.
+
+## Tools
+
+<Tabs items={["graph_explore", "graph_diagnostics"]}>
+<Tabs.Tab>
+
+The primary tool. Given a symbol name or a file-path fragment, it returns the matching nodes and, for each, the verbatim line-numbered declaration source, its checker-resolved incoming and outgoing edges (`heritage`, `value-call`, `type-ref`), and a blast-radius count of transitive dependents. One call is usually enough context to stop, instead of fanning out to read files.
+
+```json
+{ "name": "graph_explore", "arguments": { "query": "PaymentService" } }
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+The tsc semantic diagnostics for one file, in the same code and location `tsgo` reports, read straight from the shared `Program`.
+
+```json
+{ "name": "graph_diagnostics", "arguments": { "file": "src/payment/service.ts" } }
+```
+
+</Tabs.Tab>
+</Tabs>
+
+## Edge kinds
+
+| Kind | Meaning |
+| --- | --- |
+| `heritage` | A class or interface `extends` / `implements` a base. |
+| `value-call` | A declaration calls a function, method, or constructor at runtime. |
+| `type-ref` | A declaration mentions a named type in a type position. |
+
+Splitting `value-call` from `type-ref` lets an impact query separate "used at runtime" from "depends on this type".
+
+## Scope
+
+This is a v1. The graph covers top-level declarations and the edge kinds above, with diagnostics from the tsc semantic pass. A file watcher, on-disk persistence, and lint-merged diagnostics are not included yet; the node identity is position-invariant so an incremental layer can be added later without re-keying the graph.
+
+## Environment
+
+- `TTSC_GRAPH_BINARY`: an absolute path to a `ttscgraph` binary, overriding platform resolution.

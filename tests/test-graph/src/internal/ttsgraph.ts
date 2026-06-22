@@ -1,8 +1,7 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import nodeAssert from "node:assert/strict";
-import path from "node:path";
-
 import { TestProject } from "@ttsc/testing";
+import nodeAssert from "node:assert/strict";
+import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import path from "node:path";
 
 /** Re-exported so feature files import one assertion surface. */
 export const assert = nodeAssert;

@@ -7,8 +7,8 @@ interface ToolResult {
 }
 
 /**
- * Verifies the built ttscgraph binary serves the graph and diagnostics to an MCP
- * client end to end over stdio.
+ * Verifies the built ttscgraph binary serves the graph and diagnostics to an
+ * MCP client end to end over stdio.
  *
  * The Go unit tests pin the server logic in-process; this case proves the
  * shipped binary actually spawns, builds a resident Program for a real project,
@@ -20,8 +20,8 @@ interface ToolResult {
  *    error, then spawn ttscgraph against it.
  * 2. Drive initialize, tools/list, and tools/call for graph_explore and
  *    graph_diagnostics.
- * 3. Assert the explore relationship map, the TS2322 diagnostic, and a clean
- *    exit on stdin close.
+ * 3. Assert the explore relationship map, the TS2322 diagnostic, and a clean exit
+ *    on stdin close.
  */
 export const test_ttscgraph_serves_explore_and_diagnostics_over_mcp =
   async () => {

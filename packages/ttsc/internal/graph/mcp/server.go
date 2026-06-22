@@ -27,17 +27,13 @@ const defaultProtocolVersion = "2025-06-18"
 
 // serverInstructions is shipped in the initialize response. It is the only
 // channel through which the server advises an agent; nothing is written to disk.
-const serverInstructions = "ttsc-graph is a checker-resolved code graph of this TypeScript project, " +
-  "pre-walked by the real type checker. Start ANY question about how the code works (a flow, an " +
-  "architecture, what calls or relates to a symbol, a blast radius, where something lives) by calling " +
-  "graph_explore with the key term(s): a symbol name, OR the salient nouns of the question (for " +
-  "\"how does it render and update canvas elements\", query \"render update canvas element\"). It " +
-  "ranks the matching declarations and returns, for each, the verbatim source, the exact incoming " +
-  "and outgoing edges, and the transitive-dependent count, so you can trace the design without " +
-  "grepping or opening files; answer from it and only read a file for detail it does not cover. Use " +
-  "graph_diagnostics for a file's type errors. Edges are type-resolved (barrel re-exports and " +
-  "cross-package references are followed to the real declaration); a node_modules or .d.ts target is " +
-  "an external leaf the graph does not walk into."
+const serverInstructions = "ttsc-graph is this project's checker-resolved code graph: deterministic " +
+  "ground truth from the TypeScript compiler, not a textual guess. For any question about how the code " +
+  "works, call graph_explore first — a symbol name, or the salient nouns of the question (e.g. \"render " +
+  "update canvas element\", not the whole sentence). It returns each declaration's source, its calls, " +
+  "type references, and heritage in both directions, and its blast radius. Trust these edges instead of " +
+  "grepping or re-reading to confirm them; open a file only for a body it truncates. Use " +
+  "graph_diagnostics for type errors."
 
 // Server answers MCP requests from a resident Program and the graph built from
 // it. The Program/graph may be supplied eagerly or built in the background; ready

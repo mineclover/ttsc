@@ -18,7 +18,7 @@ func toolsListResult() any {
     "tools": []any{
       map[string]any{
         "name":        "graph_explore",
-        "description": "Explore the checker-resolved code graph around a symbol or file: returns the matching nodes and their relationships (what they extend/implement and what derives from them). Start here for structural questions before reading files.",
+        "description": "The compiler's own code graph for a symbol or file: returns its source plus what it calls, is called by, references as types, and inherits — all checker-resolved, not guessed — with its blast radius. Authoritative: use it instead of grepping or opening files to learn how the code works.",
         "inputSchema": map[string]any{
           "type": "object",
           "properties": map[string]any{
@@ -32,7 +32,7 @@ func toolsListResult() any {
       },
       map[string]any{
         "name":        "graph_diagnostics",
-        "description": "Return the tsc semantic diagnostics for one file, in the same code and location tsgo reports.",
+        "description": "The TypeScript compiler's type errors for one file, with the exact tsc code and location.",
         "inputSchema": map[string]any{
           "type": "object",
           "properties": map[string]any{

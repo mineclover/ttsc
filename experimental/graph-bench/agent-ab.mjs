@@ -69,10 +69,30 @@ if (!fs.existsSync(repoDir)) {
   runOrThrow("git", ["clone", "--depth", "1", spec.url, repoDir], corpus, process.env);
 }
 
-// 3. WITH = @ttsc/graph MCP server; WITHOUT = empty config. Both --strict-mcp-config.
+// 3. WITH = @ttsc/graph; WITHOUT = empty config. Both --strict-mcp-config.
+// A large repo (VS Code) is type-checked once by a daemon the per-session proxy
+// connects to, instead of rebuilt per session; small repos use the single-process
+// server directly.
+const useDaemon = args.daemon === "1" || args.daemon === "true" || repoKey === "vscode";
+let daemon = null;
+let withArgs;
+if (useDaemon) {
+  const portFile = path.join(os.tmpdir(), `ttscgraph-daemon-${process.pid}.port`);
+  console.log("Starting daemon (build once)...");
+  daemon = cp.spawn(binary, ["--daemon", "--cwd", repoDir, "--tsconfig", tsconfig, "--port-file", portFile, "--idle", "0"], { stdio: "ignore", windowsHide: true });
+  const addr = waitForPort(portFile, 30_000);
+  console.log(`  daemon at ${addr}; warming (type-checking ${repoKey}, this can take minutes)...`);
+  const warmStart = Date.now();
+  warmDaemon(binary, addr);
+  console.log(`  warm in ${((Date.now() - warmStart) / 1000).toFixed(0)}s`);
+  withArgs = ["--connect", addr];
+} else {
+  withArgs = ["--stdio", "--cwd", repoDir, "--tsconfig", tsconfig];
+}
+
 const withCfg = path.join(os.tmpdir(), `mcp-graph-${process.pid}.json`);
 const emptyCfg = path.join(os.tmpdir(), `mcp-empty-${process.pid}.json`);
-fs.writeFileSync(withCfg, JSON.stringify({ mcpServers: { "ttsc-graph": { command: binary, args: ["--stdio", "--cwd", repoDir, "--tsconfig", tsconfig] } } }));
+fs.writeFileSync(withCfg, JSON.stringify({ mcpServers: { "ttsc-graph": { command: binary, args: withArgs } } }));
 fs.writeFileSync(emptyCfg, JSON.stringify({ mcpServers: {} }));
 
 const arms = [
@@ -113,7 +133,35 @@ line("wall time", "durMs", (x) => `${(x / 1000).toFixed(0)}s`);
 console.log(`\nTotal spend this run: $${spent.toFixed(2)}`);
 
 fs.writeFileSync(path.join(here, "agent-ab-report.json"), `${JSON.stringify({ repo: repoKey, model, runs, question: spec.question, samples }, null, 2)}\n`);
+if (daemon) daemon.kill();
 try { fs.rmSync(binary, { force: true }); fs.rmSync(withCfg, { force: true }); fs.rmSync(emptyCfg, { force: true }); } catch { /* best effort */ }
+
+// waitForPort polls the daemon's port file until it reports a host:port address.
+function waitForPort(portFile, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (fs.existsSync(portFile)) {
+      const addr = fs.readFileSync(portFile, "utf8").trim();
+      if (addr) return addr;
+    }
+    syncSleep(150);
+  }
+  throw new Error("daemon did not report a port in time");
+}
+
+// warmDaemon drives one graph_explore through the proxy, which blocks until the
+// daemon's background type-check lands, so the timed sessions hit a warm server.
+function warmDaemon(bin, addr) {
+  const init = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
+  const call = JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "graph_explore", arguments: { query: "main" } } });
+  const result = cp.spawnSync(bin, ["--connect", addr], { input: `${init}\n${call}\n`, encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024, timeout: 1_200_000 });
+  if (result.status !== 0) throw new Error(`daemon warm-up failed: ${(result.stderr || "").slice(0, 300)}`);
+}
+
+// syncSleep blocks for ms without async, so the synchronous setup can poll.
+function syncSleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
 
 function runClaude(question, cfg) {
   const result = cp.spawnSync(

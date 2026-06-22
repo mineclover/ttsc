@@ -12,7 +12,7 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const goRoot = path.join(os.homedir(), "go-sdk", "go", "bin");
-const result = cp.spawnSync("go", ["test", "-count=1", "./internal/graph"], {
+const result = cp.spawnSync("go", ["test", "-count=1", "./internal/graph/..."], {
   cwd: path.join(root, "packages", "ttsc"),
   env: {
     ...process.env,

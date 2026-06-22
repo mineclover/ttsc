@@ -87,47 +87,90 @@ func (g *Graph) heritageEdges(checker *shimchecker.Checker, path string, node *s
   }
 }
 
-// collectCalls records a value-call edge from each top-level function or class to
-// every top-level function it invokes (method and `new` constructor calls are not
-// modeled). A call is attributed to the nearest enclosing top-level declaration
-// the graph has a node for; nested calls (a call inside another call's arguments)
-// attribute to the same declaration.
+// collectCalls records a value-call edge from each declaration to every function,
+// method, or constructor it invokes. The reference walk is attributed to the
+// nearest enclosing graph node: a top-level function, a class/interface method, a
+// top-level variable binding, or the class itself for a member that is not a
+// method (a property initializer).
 func (g *Graph) collectCalls(checker *shimchecker.Checker, file *shimast.SourceFile) {
+  forEachContainer(file.FileName(), file, func(from string, node *shimast.Node) {
+    g.callsWithin(checker, from, node)
+  })
+}
+
+// forEachContainer calls fn(nodeID, subtree) for every graph node that can hold
+// call or type references, paired with the subtree to walk for it. A class or
+// interface is split: each method member is attributed to its own method node, and
+// every other member (a property initializer) to the type node, so a call made
+// inside one method is not confused with another's.
+func forEachContainer(path string, file *shimast.SourceFile, fn func(string, *shimast.Node)) {
   if file.Statements == nil {
     return
   }
-  path := file.FileName()
   for _, statement := range file.Statements.Nodes {
-    from, ok := containerNodeID(path, statement)
-    if !ok {
-      continue
+    switch statement.Kind {
+    case shimast.KindFunctionDeclaration:
+      if id := topLevelID(path, statement, NodeFunction); id != "" {
+        fn(id, statement)
+      }
+    case shimast.KindTypeAliasDeclaration:
+      if id := topLevelID(path, statement, NodeTypeAlias); id != "" {
+        fn(id, statement)
+      }
+    case shimast.KindClassDeclaration:
+      forEachMember(path, statement, NodeClass, fn)
+    case shimast.KindInterfaceDeclaration:
+      forEachMember(path, statement, NodeInterface, fn)
+    case shimast.KindVariableStatement:
+      forEachVariable(path, statement, fn)
     }
-    g.callsWithin(checker, from, statement)
   }
 }
 
-// containerNodeID returns the node id of a top-level declaration that can
-// contain references (a function, class, interface, or type alias) and whether
-// statement is one. Variable-bound callables (a top-level `const fn = () => …`)
-// are intentionally not walked in this v1, so their initializer's calls and type
-// references are not edges. Calls only occur in function/class bodies, so
-// attributing a call walk to an interface or type alias is harmless: it finds none.
-func containerNodeID(path string, statement *shimast.Node) (string, bool) {
+// topLevelID returns the node id for a named top-level declaration, or "".
+func topLevelID(path string, statement *shimast.Node, kind NodeKind) string {
   symbol := statement.Symbol()
   if symbol == nil || symbol.Name == "" {
-    return "", false
+    return ""
   }
-  switch statement.Kind {
-  case shimast.KindFunctionDeclaration:
-    return nodeID(path, symbol.Name, NodeFunction), true
-  case shimast.KindClassDeclaration:
-    return nodeID(path, symbol.Name, NodeClass), true
-  case shimast.KindInterfaceDeclaration:
-    return nodeID(path, symbol.Name, NodeInterface), true
-  case shimast.KindTypeAliasDeclaration:
-    return nodeID(path, symbol.Name, NodeTypeAlias), true
-  default:
-    return "", false
+  return nodeID(path, symbol.Name, kind)
+}
+
+// forEachMember attributes a class/interface's method members to their method
+// node and its remaining members to the type node.
+func forEachMember(path string, statement *shimast.Node, kind NodeKind, fn func(string, *shimast.Node)) {
+  containerID := topLevelID(path, statement, kind)
+  for _, member := range classMembers(statement) {
+    if isMethodMember(member.Kind) {
+      if name := methodName(member.Symbol()); name != "" {
+        fn(nodeID(path, name, NodeMethod), member)
+        continue
+      }
+    }
+    if containerID != "" {
+      fn(containerID, member)
+    }
+  }
+}
+
+// forEachVariable attributes each binding of a top-level variable statement to
+// its variable node, so a call or type reference inside `const fn = () => …` is
+// an edge from fn.
+func forEachVariable(path string, statement *shimast.Node, fn func(string, *shimast.Node)) {
+  variables := statement.AsVariableStatement()
+  if variables == nil || variables.DeclarationList == nil {
+    return
+  }
+  list := variables.DeclarationList.AsVariableDeclarationList()
+  if list == nil || list.Declarations == nil {
+    return
+  }
+  for _, binding := range list.Declarations.Nodes {
+    symbol := binding.Symbol()
+    if symbol == nil || symbol.Name == "" {
+      continue
+    }
+    fn(nodeID(path, symbol.Name, NodeVariable), binding)
   }
 }
 
@@ -135,9 +178,14 @@ func containerNodeID(path string, statement *shimast.Node) (string, bool) {
 // the resolved target of every call expression it finds.
 func (g *Graph) callsWithin(checker *shimchecker.Checker, from string, node *shimast.Node) {
   node.ForEachChild(func(child *shimast.Node) bool {
-    if child.Kind == shimast.KindCallExpression {
+    switch child.Kind {
+    case shimast.KindCallExpression:
       if call := child.AsCallExpression(); call != nil && call.Expression != nil {
         g.callEdge(checker, from, call.Expression)
+      }
+    case shimast.KindNewExpression:
+      if newExpr := child.AsNewExpression(); newExpr != nil && newExpr.Expression != nil {
+        g.callEdge(checker, from, newExpr.Expression)
       }
     }
     g.callsWithin(checker, from, child)
@@ -166,17 +214,9 @@ func (g *Graph) callEdge(checker *shimchecker.Checker, from string, callee *shim
 // the unit of truth: an `import type` or annotation-only dependency relates two
 // symbols without any runtime call.
 func (g *Graph) collectTypeRefs(checker *shimchecker.Checker, file *shimast.SourceFile) {
-  if file.Statements == nil {
-    return
-  }
-  path := file.FileName()
-  for _, statement := range file.Statements.Nodes {
-    from, ok := containerNodeID(path, statement)
-    if !ok {
-      continue
-    }
-    g.typeRefsWithin(checker, from, statement)
-  }
+  forEachContainer(file.FileName(), file, func(from string, node *shimast.Node) {
+    g.typeRefsWithin(checker, from, node)
+  })
 }
 
 // typeRefsWithin walks node's subtree and records a type-ref edge from `from` to
@@ -222,6 +262,21 @@ func (g *Graph) ensureTargetNode(target *Target) string {
   if target.File == "" {
     return ""
   }
+  if kind == NodeMethod {
+    // A method node is class-qualified and only modeled when it belongs to the
+    // workspace (Build recorded it). A call into a dependency's method stops at
+    // the boundary rather than spawning an external method leaf for every
+    // `.map` / `.push` into a library type.
+    name := methodName(target.Symbol)
+    if name == "" {
+      return ""
+    }
+    id := nodeID(target.File, name, NodeMethod)
+    if _, exists := g.Nodes[id]; exists {
+      return id
+    }
+    return ""
+  }
   id := nodeID(target.File, target.Symbol.Name, kind)
   if _, exists := g.Nodes[id]; !exists {
     g.Nodes[id] = &Node{
@@ -251,6 +306,8 @@ func symbolNodeKind(symbol *shimast.Symbol) NodeKind {
     return NodeEnum
   case symbol.Flags&shimast.SymbolFlagsFunction != 0:
     return NodeFunction
+  case symbol.Flags&(shimast.SymbolFlagsMethod|shimast.SymbolFlagsConstructor|shimast.SymbolFlagsGetAccessor|shimast.SymbolFlagsSetAccessor) != 0:
+    return NodeMethod
   case symbol.Flags&shimast.SymbolFlagsVariable != 0:
     return NodeVariable
   default:

@@ -1,6 +1,8 @@
 package graph
 
 import (
+  "strings"
+
   shimast "github.com/microsoft/typescript-go/shim/ast"
 
   "github.com/samchon/ttsc/packages/ttsc/driver"
@@ -21,8 +23,9 @@ func Build(prog *driver.Program) *Graph {
 }
 
 // collectDeclarations records a node for each top-level declaration statement in
-// file. Nested declarations (methods, locals) are not modeled; this pass
-// establishes the top-level symbol nodes that cross-file edges connect.
+// file, plus a method node for each callable member of a class or interface, so
+// method-to-method calls have both endpoints. This pass establishes the symbol
+// nodes that cross-file edges connect.
 func collectDeclarations(g *Graph, file *shimast.SourceFile) {
   if file.Statements == nil {
     return
@@ -34,8 +37,10 @@ func collectDeclarations(g *Graph, file *shimast.SourceFile) {
       addNode(g, path, statement, NodeFunction)
     case shimast.KindClassDeclaration:
       addNode(g, path, statement, NodeClass)
+      collectMethods(g, path, statement)
     case shimast.KindInterfaceDeclaration:
       addNode(g, path, statement, NodeInterface)
+      collectMethods(g, path, statement)
     case shimast.KindTypeAliasDeclaration:
       addNode(g, path, statement, NodeTypeAlias)
     case shimast.KindEnumDeclaration:
@@ -83,4 +88,70 @@ func addNode(g *Graph, path string, node *shimast.Node, kind NodeKind) {
     Pos:  node.Pos(),
     End:  node.End(),
   }
+}
+
+// collectMethods records a method node for each callable member (method,
+// constructor, accessor) of a class or interface declaration, keyed by its
+// class-qualified name so a resolved method call lands on the same node.
+func collectMethods(g *Graph, path string, statement *shimast.Node) {
+  for _, member := range classMembers(statement) {
+    if !isMethodMember(member.Kind) {
+      continue
+    }
+    name := methodName(member.Symbol())
+    if name == "" {
+      continue
+    }
+    id := nodeID(path, name, NodeMethod)
+    if _, exists := g.Nodes[id]; exists {
+      continue
+    }
+    g.Nodes[id] = &Node{
+      ID:   id,
+      Name: name,
+      Kind: NodeMethod,
+      File: path,
+      Pos:  member.Pos(),
+      End:  member.End(),
+    }
+  }
+}
+
+// classMembers returns the member nodes of a class or interface declaration, or
+// nil for anything else.
+func classMembers(statement *shimast.Node) []*shimast.Node {
+  switch statement.Kind {
+  case shimast.KindClassDeclaration:
+    if decl := statement.AsClassDeclaration(); decl != nil && decl.Members != nil {
+      return decl.Members.Nodes
+    }
+  case shimast.KindInterfaceDeclaration:
+    if decl := statement.AsInterfaceDeclaration(); decl != nil && decl.Members != nil {
+      return decl.Members.Nodes
+    }
+  }
+  return nil
+}
+
+// isMethodMember reports whether a class/interface member kind is a callable the
+// graph models as a method node.
+func isMethodMember(kind shimast.Kind) bool {
+  switch kind {
+  case shimast.KindMethodDeclaration, shimast.KindMethodSignature,
+    shimast.KindConstructor, shimast.KindGetAccessor, shimast.KindSetAccessor:
+    return true
+  default:
+    return false
+  }
+}
+
+// methodName returns the class-qualified, printable name of a method symbol
+// ("Class.method"), or "" when it has no named parent (a synthesized member).
+// symbol.Parent is the class/interface symbol, set by the binder for every
+// member. The internal-name prefix on a constructor (\xFE) is escaped to "__".
+func methodName(symbol *shimast.Symbol) string {
+  if symbol == nil || symbol.Name == "" || symbol.Parent == nil || symbol.Parent.Name == "" {
+    return ""
+  }
+  return symbol.Parent.Name + "." + strings.ReplaceAll(symbol.Name, "\xFE", "__")
 }

@@ -10,6 +10,10 @@ const (
   NodeTypeAlias NodeKind = "type"
   NodeEnum      NodeKind = "enum"
   NodeVariable  NodeKind = "variable"
+  // NodeMethod is a class or interface member (a method, constructor, or
+  // accessor). Its id is class-qualified ("path#Class.method:method") so a
+  // resolved method call lands on the same node the build pass recorded.
+  NodeMethod NodeKind = "method"
 )
 
 // Provenance marks how a node or edge was derived. Every relationship in this
@@ -42,9 +46,9 @@ const (
   // EdgeHeritage is an `extends` / `implements` relationship from a class or
   // interface to a base it derives from.
   EdgeHeritage EdgeKind = "heritage"
-  // EdgeValueCall is a runtime call from one top-level declaration to the
-  // top-level function it invokes. Method calls and `new` constructor calls are
-  // not modeled in this v1.
+  // EdgeValueCall is a runtime call from one declaration to the function, method,
+  // or constructor it invokes; a `new T()` links to T's class node. Calls into a
+  // dependency's method are not modeled (the boundary stops at the external type).
   EdgeValueCall EdgeKind = "value-call"
   // EdgeTypeRef is a type-position reference from one declaration to a named
   // type it mentions (a parameter, return, property, or alias type). It is not a

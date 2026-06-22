@@ -54,6 +54,7 @@ export class Unrelated {
   derived := nodeID(path, "Derived", NodeInterface)
   impl := nodeID(path, "Impl", NodeClass)
   unrelated := nodeID(path, "Unrelated", NodeClass)
+  greet := nodeID(path, "Unrelated.greet", NodeMethod)
 
   // Interface `extends`: Derived inherits Base.
   if !hasEdge(graph, derived, base, EdgeHeritage) {
@@ -63,12 +64,13 @@ export class Unrelated {
   if !hasEdge(graph, impl, base, EdgeHeritage) {
     t.Fatalf("missing heritage edge Impl -> Base (class implements); edges: %v", graph.Edges)
   }
-  // Negative twin: Unrelated only names Base as a parameter type, so it is a
-  // type-ref dependency, never a heritage relationship.
-  if hasEdge(graph, unrelated, base, EdgeHeritage) {
+  // Negative twin: the base named only in a method parameter type is a type-ref
+  // dependency of that method (Unrelated.greet -> Base), never a heritage edge —
+  // not from the class and not from the method.
+  if hasEdge(graph, unrelated, base, EdgeHeritage) || hasEdge(graph, greet, base, EdgeHeritage) {
     t.Fatalf("a parameter-type reference to Base was misclassified as a heritage edge; edges: %v", graph.Edges)
   }
-  if !hasEdge(graph, unrelated, base, EdgeTypeRef) {
-    t.Fatalf("missing type-ref edge Unrelated -> Base (parameter type); edges: %v", graph.Edges)
+  if !hasEdge(graph, greet, base, EdgeTypeRef) {
+    t.Fatalf("missing type-ref edge Unrelated.greet -> Base (parameter type); edges: %v", graph.Edges)
   }
 }

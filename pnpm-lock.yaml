@@ -122,6 +122,22 @@ importers:
         specifier: catalog:typescript
         version: 7.0.1-rc
 
+  packages/graph:
+    dependencies:
+      ttsc:
+        specifier: workspace:*
+        version: link:../ttsc
+    devDependencies:
+      '@types/node':
+        specifier: catalog:utils
+        version: 25.9.1
+      rimraf:
+        specifier: catalog:utils
+        version: 6.1.3
+      typescript:
+        specifier: catalog:typescript
+        version: 7.0.1-rc
+
   packages/lint:
     devDependencies:
       '@types/node':

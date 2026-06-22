@@ -37,6 +37,9 @@ const (
   // EdgeHeritage is an `extends` / `implements` relationship from a class or
   // interface to a base it derives from.
   EdgeHeritage EdgeKind = "heritage"
+  // EdgeValueCall is a runtime call from one declaration to the function,
+  // method, or constructor it invokes.
+  EdgeValueCall EdgeKind = "value-call"
 )
 
 // Edge is a directed, checker-resolved relationship from one node to another,

@@ -16,7 +16,20 @@ func (g *Graph) addEdges(prog *driver.Program) {
   checker := prog.Checker
   for _, file := range prog.SourceFiles() {
     g.collectHeritage(checker, file)
+    g.collectCalls(checker, file)
   }
+}
+
+// addEdge records a from->to edge of the given kind, skipping a duplicate so a
+// caller that invokes the same function several times yields one edge, not one
+// per call site.
+func (g *Graph) addEdge(from, to string, kind EdgeKind) {
+  for _, edge := range g.Edges {
+    if edge.From == from && edge.To == to && edge.Kind == kind {
+      return
+    }
+  }
+  g.Edges = append(g.Edges, &Edge{From: from, To: to, Kind: kind})
 }
 
 // collectHeritage adds a heritage edge for every base of every top-level class
@@ -68,9 +81,73 @@ func (g *Graph) heritageEdges(checker *shimchecker.Checker, path string, node *s
       if to == "" {
         continue
       }
-      g.Edges = append(g.Edges, &Edge{From: from, To: to, Kind: EdgeHeritage})
+      g.addEdge(from, to, EdgeHeritage)
     }
   }
+}
+
+// collectCalls records a value-call edge from each top-level function or class to
+// every function, method, or constructor it invokes. A call is attributed to the
+// nearest enclosing top-level declaration the graph has a node for; nested calls
+// (a call inside another call's arguments) attribute to the same declaration.
+func (g *Graph) collectCalls(checker *shimchecker.Checker, file *shimast.SourceFile) {
+  if file.Statements == nil {
+    return
+  }
+  path := file.FileName()
+  for _, statement := range file.Statements.Nodes {
+    from, ok := topLevelNodeID(path, statement)
+    if !ok {
+      continue
+    }
+    g.callsWithin(checker, from, statement)
+  }
+}
+
+// topLevelNodeID returns the node id of a top-level declaration that can contain
+// calls (a function or class) and whether statement is one. Variable-bound
+// callables are added by a later pass.
+func topLevelNodeID(path string, statement *shimast.Node) (string, bool) {
+  symbol := statement.Symbol()
+  if symbol == nil || symbol.Name == "" {
+    return "", false
+  }
+  switch statement.Kind {
+  case shimast.KindFunctionDeclaration:
+    return nodeID(path, symbol.Name, NodeFunction), true
+  case shimast.KindClassDeclaration:
+    return nodeID(path, symbol.Name, NodeClass), true
+  default:
+    return "", false
+  }
+}
+
+// callsWithin walks node's subtree and records a value-call edge from `from` to
+// the resolved target of every call expression it finds.
+func (g *Graph) callsWithin(checker *shimchecker.Checker, from string, node *shimast.Node) {
+  node.ForEachChild(func(child *shimast.Node) bool {
+    if child.Kind == shimast.KindCallExpression {
+      if call := child.AsCallExpression(); call != nil && call.Expression != nil {
+        g.callEdge(checker, from, call.Expression)
+      }
+    }
+    g.callsWithin(checker, from, child)
+    return false
+  })
+}
+
+// callEdge resolves a callee expression to its declaration and records a
+// value-call edge, skipping an unresolved callee and a self-call.
+func (g *Graph) callEdge(checker *shimchecker.Checker, from string, callee *shimast.Node) {
+  target := Resolve(checker, callee)
+  if target == nil || target.Symbol == nil {
+    return
+  }
+  to := g.ensureTargetNode(target)
+  if to == "" || to == from {
+    return
+  }
+  g.addEdge(from, to, EdgeValueCall)
 }
 
 // ensureTargetNode returns the node id for a resolved edge target, creating the

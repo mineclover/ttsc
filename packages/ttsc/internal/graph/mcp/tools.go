@@ -78,7 +78,11 @@ func textResult(text string) any {
 // matched nodes render as a signature (header, edges, blast radius) without their
 // body, so one call does not flood the agent's context with source it did not ask
 // for, the adaptive-sizing idea codegraph uses.
-const maxExploreChars = 12000
+const maxExploreChars = 7000
+
+// maxEdgesPerDirection caps the incoming/outgoing edges listed per node so a
+// central symbol does not dump hundreds of relationships into the response.
+const maxEdgesPerDirection = 12
 
 // explore returns the nodes matching a query and their checker-resolved
 // relationships: each node's incoming/outgoing edges, blast radius, and verbatim
@@ -90,6 +94,9 @@ func (s *Server) explore(args json.RawMessage) (any, *rpcError) {
   }
   if err := json.Unmarshal(args, &in); err != nil || strings.TrimSpace(in.Query) == "" {
     return nil, &rpcError{Code: codeInvalidParams, Message: "graph_explore requires a non-empty 'query'"}
+  }
+  if err := s.ensureLoaded(); err != nil {
+    return nil, &rpcError{Code: codeInternal, Message: "graph not available: " + err.Error()}
   }
   matches := s.matchNodes(in.Query)
   if len(matches) == 0 {
@@ -110,29 +117,99 @@ func (s *Server) explore(args json.RawMessage) (any, *rpcError) {
   return textResult(strings.TrimRight(b.String(), "\n")), nil
 }
 
-// maxExploreNodes caps a file-fragment fallback so a broad query does not dump a
-// whole directory's symbols (and their source) into the agent's context.
+// maxExploreNodes caps how many ranked nodes a query returns, so a broad
+// keyword query surfaces the most relevant declarations without flooding context.
 const maxExploreNodes = 12
 
-// matchNodes resolves a query to nodes: an exact symbol-name match is returned
-// alone (the precise, common case), and only when nothing is named query does it
-// fall back to a capped file-path-fragment match. The earlier "name OR file
-// contains" rule returned every symbol in any file whose path contained the
-// query, which bloated responses (a symbol name is usually also a path fragment).
-func (s *Server) matchNodes(query string) []*graph.Node {
-  named := make([]*graph.Node, 0)
-  for _, node := range s.graph.Nodes {
-    if node.Name == query {
-      named = append(named, node)
+// queryStopwords are dropped so the salient nouns of a natural-language question
+// drive the match.
+var queryStopwords = map[string]bool{
+  "how": true, "does": true, "do": true, "the": true, "is": true, "are": true,
+  "of": true, "to": true, "and": true, "or": true, "in": true, "on": true,
+  "for": true, "with": true, "what": true, "where": true, "which": true,
+  "this": true, "that": true, "it": true, "its": true, "work": true, "works": true,
+  "use": true, "uses": true, "using": true, "from": true, "by": true, "an": true,
+}
+
+// queryTokens lowercases query and splits it into salient alphanumeric tokens,
+// dropping stopwords and single characters, so a natural-language question
+// reduces to the nouns that name symbols.
+func queryTokens(query string) []string {
+  fields := strings.FieldsFunc(strings.ToLower(query), func(r rune) bool {
+    return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9')
+  })
+  tokens := make([]string, 0, len(fields))
+  for _, field := range fields {
+    if len(field) < 2 || queryStopwords[field] {
+      continue
     }
+    tokens = append(tokens, field)
   }
-  if len(named) > 0 {
-    sort.Slice(named, func(i, j int) bool { return named[i].ID < named[j].ID })
-    return named
+  return tokens
+}
+
+// matchNodes ranks declarations by relevance to query, which may be a symbol name
+// or the salient nouns of a natural-language question. A name is scored per query
+// token (exact > prefix > substring) plus a small centrality bonus (edge degree),
+// so "render update canvas element" surfaces the rendering symbols rather than
+// forcing the agent to grep. The top maxExploreNodes are returned; a capped
+// file-path match is the fallback when nothing scores on names.
+func (s *Server) matchNodes(query string) []*graph.Node {
+  whole := strings.ToLower(strings.TrimSpace(query))
+  tokens := queryTokens(query)
+
+  type scored struct {
+    node  *graph.Node
+    score int
   }
+  ranked := make([]scored, 0)
+  for _, node := range s.graph.Nodes {
+    name := strings.ToLower(node.Name)
+    score := 0
+    if name == whole {
+      score += 1000
+    }
+    for _, token := range tokens {
+      switch {
+      case name == token:
+        score += 100
+      case strings.HasPrefix(name, token):
+        score += 40
+      case strings.Contains(name, token):
+        score += 20
+      }
+    }
+    if score == 0 {
+      continue
+    }
+    if degree := s.degree[node.ID]; degree > 0 {
+      if degree > 20 {
+        degree = 20
+      }
+      score += degree
+    }
+    ranked = append(ranked, scored{node, score})
+  }
+  if len(ranked) > 0 {
+    sort.Slice(ranked, func(i, j int) bool {
+      if ranked[i].score != ranked[j].score {
+        return ranked[i].score > ranked[j].score
+      }
+      return ranked[i].node.ID < ranked[j].node.ID
+    })
+    out := make([]*graph.Node, 0, maxExploreNodes)
+    for _, r := range ranked {
+      if len(out) >= maxExploreNodes {
+        break
+      }
+      out = append(out, r.node)
+    }
+    return out
+  }
+
   byFile := make([]*graph.Node, 0)
   for _, node := range s.graph.Nodes {
-    if strings.Contains(node.File, query) {
+    if strings.Contains(strings.ToLower(node.File), whole) {
       byFile = append(byFile, node)
     }
   }
@@ -154,17 +231,45 @@ func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSo
   }
   source, line := s.nodeSource(node)
   fmt.Fprintf(b, "%s %s%s  %s:%d\n", node.Kind, node.Name, external, node.File, line)
+  if !withSource {
+    return // past the budget: a one-line signature, no edges or body
+  }
+  outgoing := make([]string, 0, maxEdgesPerDirection)
+  incoming := make([]string, 0, maxEdgesPerDirection)
+  outMore, inMore := 0, 0
   for _, edge := range s.graph.Edges {
     if edge.From == node.ID {
       if to := s.graph.Nodes[edge.To]; to != nil {
-        fmt.Fprintf(b, "  -> %s %s (%s)\n", to.Kind, to.Name, edge.Kind)
+        if len(outgoing) < maxEdgesPerDirection {
+          outgoing = append(outgoing, fmt.Sprintf("  -> %s %s (%s)", to.Kind, to.Name, edge.Kind))
+        } else {
+          outMore++
+        }
       }
     }
     if edge.To == node.ID {
       if from := s.graph.Nodes[edge.From]; from != nil {
-        fmt.Fprintf(b, "  <- %s %s (%s)\n", from.Kind, from.Name, edge.Kind)
+        if len(incoming) < maxEdgesPerDirection {
+          incoming = append(incoming, fmt.Sprintf("  <- %s %s (%s)", from.Kind, from.Name, edge.Kind))
+        } else {
+          inMore++
+        }
       }
     }
+  }
+  for _, edge := range outgoing {
+    b.WriteString(edge)
+    b.WriteByte('\n')
+  }
+  if outMore > 0 {
+    fmt.Fprintf(b, "  -> (%d more)\n", outMore)
+  }
+  for _, edge := range incoming {
+    b.WriteString(edge)
+    b.WriteByte('\n')
+  }
+  if inMore > 0 {
+    fmt.Fprintf(b, "  <- (%d more)\n", inMore)
   }
   if dependents := s.dependentCount(node); dependents > 0 {
     fmt.Fprintf(b, "  blast radius: %d transitive dependent(s)\n", dependents)
@@ -199,11 +304,21 @@ func isSpace(c byte) bool {
   return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }
 
+// maxSourceLines caps the verbatim body shown per node, so one large declaration
+// (a giant union type, a long class) cannot blow the whole response open.
+const maxSourceLines = 32
+
 // numberLines prefixes each line of source with its absolute line number so the
-// agent can cite or edit by line without re-reading the file.
+// agent can cite or edit by line without re-reading the file, truncating a long
+// body to maxSourceLines.
 func numberLines(source string, startLine int) string {
+  lines := strings.Split(source, "\n")
   var b strings.Builder
-  for i, line := range strings.Split(source, "\n") {
+  for i, line := range lines {
+    if i >= maxSourceLines {
+      fmt.Fprintf(&b, "  ... (%d more lines)\n", len(lines)-maxSourceLines)
+      break
+    }
     fmt.Fprintf(&b, "  %d\t%s\n", startLine+i, line)
   }
   return b.String()
@@ -235,6 +350,9 @@ func (s *Server) diagnostics(args json.RawMessage) (any, *rpcError) {
   }
   if err := json.Unmarshal(args, &in); err != nil || strings.TrimSpace(in.File) == "" {
     return nil, &rpcError{Code: codeInvalidParams, Message: "graph_diagnostics requires a non-empty 'file'"}
+  }
+  if err := s.ensureLoaded(); err != nil {
+    return nil, &rpcError{Code: codeInternal, Message: "graph not available: " + err.Error()}
   }
   path, ok := s.resolveFile(in.File)
   if !ok {

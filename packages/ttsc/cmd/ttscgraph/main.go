@@ -37,12 +37,8 @@ var (
   stdin  io.Reader = os.Stdin
 )
 
-// Seams command tests substitute to avoid building a real program or touching
-// the process working directory.
-var (
-  loadProgram = driver.LoadProgram
-  getwd       = os.Getwd
-)
+// getwd is the seam command tests use to simulate a working-directory failure.
+var getwd = os.Getwd
 
 func main() {
   os.Exit(run(os.Args[1:]))
@@ -88,18 +84,12 @@ func runServe(args []string) int {
   }
 
   mcp.Version = version
-  prog, _, err := loadProgram(cwd, strings.TrimSpace(*tsconfigFlag), driver.LoadProgramOptions{})
-  if err != nil {
-    fmt.Fprintf(stderr, "ttscgraph: could not load project: %v\n", err)
-    return 1
-  }
-  if prog == nil {
-    fmt.Fprintf(stderr, "ttscgraph: could not load project %q\n", strings.TrimSpace(*tsconfigFlag))
-    return 1
-  }
-  defer func() { _ = prog.Close() }()
-
-  if err := mcp.NewServer(prog).Serve(stdin, stdout); err != nil {
+  // NewLazyServer answers the MCP handshake immediately and type-checks the
+  // project in the background, so an agent sees the tools without waiting on a
+  // large project's load (and never hits the cold-start "tool not available"
+  // race). The first tool call blocks until the build lands.
+  server := mcp.NewLazyServer(cwd, strings.TrimSpace(*tsconfigFlag), driver.LoadProgramOptions{})
+  if err := server.Serve(stdin, stdout); err != nil {
     fmt.Fprintf(stderr, "ttscgraph: %v\n", err)
     return 1
   }

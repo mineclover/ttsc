@@ -148,7 +148,7 @@ func (s *Server) diagnostics(args json.RawMessage) (any, *rpcError) {
   }
   var b strings.Builder
   for _, d := range found {
-    fmt.Fprintf(b, "%s:%d:%d TS%d %s\n", d.File, d.Line, d.Column, d.Code, d.Message)
+    fmt.Fprintf(&b, "%s:%d:%d TS%d %s\n", d.File, d.Line, d.Column, d.Code, d.Message)
   }
   return textResult(strings.TrimRight(b.String(), "\n")), nil
 }

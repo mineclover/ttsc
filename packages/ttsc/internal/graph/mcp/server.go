@@ -198,12 +198,13 @@ func (s *Server) refreshDiagnostics() {
   s.diagsByNode = attributeDiagnostics(s.graph, s.nodeLineRanges, fused)
 }
 
-// diagKey identifies a diagnostic by file, code, and line, the key the merge
-// uses to drop an injected duplicate of a tsc diagnostic. Lint/plugin codes live
-// in a hash band tsc never uses, so a lint finding never collides with a real
-// type error here.
+// diagKey identifies a diagnostic by file, code, and full position, the key the
+// merge uses to drop an injected duplicate of a tsc diagnostic. The column is
+// part of the key so two distinct findings on the same line with the same code —
+// reachable when string-coded plugin findings all carry the fallback code — are
+// not collapsed into one.
 func diagKey(d driver.Diagnostic) string {
-  return fmt.Sprintf("%s\x00%d\x00%d", d.File, d.Code, d.Line)
+  return fmt.Sprintf("%s\x00%d\x00%d\x00%d", d.File, d.Code, d.Line, d.Column)
 }
 
 // attributeDiagnostics maps each diagnostic to the smallest graph node that

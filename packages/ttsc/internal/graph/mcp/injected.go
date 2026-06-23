@@ -3,6 +3,7 @@ package mcp
 import (
   "encoding/json"
   "os"
+  "strings"
 
   "github.com/samchon/ttsc/packages/ttsc/driver"
 )
@@ -33,7 +34,12 @@ func ParseInjectedDiagnostics(data []byte) ([]driver.Diagnostic, error) {
   out := make([]driver.Diagnostic, 0, len(in))
   for _, d := range in {
     out = append(out, driver.Diagnostic{
-      File:    d.File,
+      // Normalize to forward slashes: the launcher resolves the file with the
+      // OS separator (backslashes on Windows), but tsgo's FileName() — which the
+      // graph nodes and tsc diagnostics use — is always forward-slash, so an
+      // un-normalized path would never match a node or a tsc twin and the whole
+      // injected set would silently fail to fuse on Windows.
+      File:    strings.ReplaceAll(d.File, "\\", "/"),
       Start:   d.Start,
       Line:    d.Line,
       Column:  d.Column,

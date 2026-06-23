@@ -106,9 +106,9 @@ The graph fuses static structure and live diagnostics into one checker-resolved 
 
 ### Agent cost: does the graph save an agent's tokens
 
-This is a faithful port of codegraph's headline benchmark. For codegraph's own question it runs the Claude Code CLI headless twice against the same repository: once with the `@ttsc/graph` MCP server configured, once with an empty MCP config, both under `--strict-mcp-config` so the only difference is the graph. It records codegraph's metrics, total tokens summed across every assistant turn, tool-call count, cost, and wall time. Aggregation mirrors codegraph exactly: within a repository each metric is the median of N runs, and across repositories the saving percentages are averaged.
+This is a faithful port of codegraph's headline benchmark. For codegraph's own question it runs the agent CLI headless twice against the same repository: once with the `@ttsc/graph` MCP server configured, once with an empty MCP config, both under `--strict-mcp-config` so the only difference is the graph. It records codegraph's metrics, total tokens summed across every assistant turn, tool-call count, cost, and wall time. Within a repository and model each metric is the median of N runs, as codegraph aggregates.
 
-Every run below uses **Claude Sonnet 4.6** (`claude-sonnet-4-6`) at reasoning effort `high`; the model and effort are held fixed across both arms, so the only variable is the graph. Figures move with the model, so they are a shape rather than a fixed claim.
+The Excalidraw table below is **Claude Sonnet 4.6** (`claude-sonnet-4-6`) at reasoning effort `high`. Within each model both arms hold the model and effort fixed, so the only variable is the graph. The cross-model section repeats the same A/B on Opus 4.8 and GPT-5.5, because the figures move with the model.
 
 A checker-resolved graph is TypeScript-only, so of codegraph's seven benchmark repositories only the two TypeScript ones are runnable: Excalidraw and VS Code. The other five are Python, Rust, Java, Go, and Swift.
 
@@ -118,52 +118,38 @@ Codegraph's question, "How does Excalidraw render and update canvas elements?", 
 
 | Metric     | Empty-MCP baseline | `@ttsc/graph` | Saved |
 | ---------- | ------------------ | ------------- | ----- |
-| Tokens     | 1,771,534          | 591,899       | 67%   |
-| Tool calls | 45.5               | 8             | 82%   |
-| Cost       | $0.310             | $0.173        | 44%   |
-| Wall time  | 140s               | 61s           | 56%   |
+| Tokens     | 1,877,370          | 396,283       | 79%   |
+| Tool calls | 51.5               | 4.5           | 91%   |
+| Cost       | $0.305             | $0.149        | 51%   |
+| Wall time  | 159s               | 56s           | 65%   |
 
-In most graph runs the agent read zero files and answered from `graph_explore` alone; a few opened a handful, where the baseline read 14 to 30 files per run to reconstruct the same flow.
+The agent read zero files in all ten graph runs. It answered from `graph_explore` alone. The baseline read 18 to 29 files per run to reconstruct the same flow.
 
-The numbers move with the model and the repository, so treat any single figure as a shape rather than a fixed claim. The mechanism is stable: the graph hands the agent the relevant declarations, their checker-resolved relationships, and their source in a few calls, so it stops fanning out across files.
+The mechanism is simple. The graph hands the agent the relevant declarations, their checker-resolved relationships, and their source in a few calls, so it stops fanning out across files.
 
-#### VS Code
+#### The win holds across models
 
-VS Code is codegraph's headline TypeScript repository, around 7,000 `src` files. A full TypeScript-Go `Program` over it builds in about three minutes, far too slow to repeat for every agent session, so `@ttsc/graph` runs it through a daemon: `ttscgraph --daemon` type-checks the project once and serves every session behind a localhost port, and each session spawns a thin `ttscgraph --connect` proxy. Codegraph's question, "How does the extension host communicate with the main process?", median of 10 runs on Claude Sonnet 4.6 against the warm daemon:
+The same Excalidraw A/B on two more models. Every figure is the median of the runs published to `graph.json`.
 
-| Metric     | Empty-MCP baseline | `@ttsc/graph` | Saved |
-| ---------- | ------------------ | ------------- | ----- |
-| Tokens     | 1,465,342          | 410,077       | 72%   |
-| Tool calls | 31.5               | 5             | 84%   |
-| Cost       | $0.234             | $0.150        | 36%   |
-| Wall time  | 103s               | 43s           | 59%   |
+| Model (Excalidraw) | Tokens saved | Tool calls saved | Graph behavior |
+| --- | --- | --- | --- |
+| Claude Sonnet 4.6 | 79% | 91% | answers from the graph, reads 0 files |
+| Claude Opus 4.8 | 68% | 86% | answers from the graph, reads 0 files |
+| GPT-5.5 (via codex) | 25% | 8% | rarely calls the graph; explores with the shell |
 
-The agent read zero files in all ten graph runs, against a baseline that read 14 to 24 files. Codegraph reports 64% fewer tokens, 81% fewer tool calls, and 18% cheaper on this same VS Code question; the graph beats each. The one-time three-minute build is the price of a real type checker over tree-sitter; the daemon pays it once and amortizes it across every session.
+Both Claude models read zero files in all ten graph runs and answer from the graph. Opus is the most thorough reader, and on an earlier graph it opened source throughout; on the current graph it stops at `graph_explore`.
 
-#### Average across both repositories
+The outlier is the codex harness driving GPT-5.5, which leans on the shell and calls the graph rarely. Where a model reaches for the graph it trusts the resolved relationships enough to stop reading files; where it does not, the graph cannot help it.
 
-Codegraph's published headline is the average of its per-repository savings, so the same average over the two TypeScript repositories is the directly comparable number:
+Codegraph's own cross-repository headline, over its seven repositories, is 47% fewer tokens and 58% fewer tool calls. On this Excalidraw question a checker-resolved graph saves more, because the resolved relationships are exact enough that the agent stops re-reading the source.
 
-| Metric     | Average saved |
-| ---------- | ------------- |
-| Tokens     | 70%           |
-| Tool calls | 83%           |
-| Cost       | 40%           |
-| Wall time  | 58%           |
+#### VS Code, the large-repository path
 
-Codegraph's own cross-repository headline, over its seven repositories, is 47% fewer tokens, 58% fewer tool calls, and 16% cheaper. A checker-resolved graph saves more on every axis, because the agent trusts the resolved relationships enough to stop reading files entirely.
+VS Code is codegraph's other TypeScript repository, around 7,000 `src` files. A full TypeScript-Go `Program` over it builds in about three minutes, too slow to repeat for every agent session.
 
-#### The win is model-dependent
+So `@ttsc/graph` serves it through a daemon. `ttscgraph --daemon` type-checks the project once and serves every session behind a localhost port; each session spawns a thin `ttscgraph --connect` proxy. The one-time build is the price of a real type checker over tree-sitter, paid once and amortized across every session.
 
-All the numbers above are Claude Sonnet 4.6. The same Excalidraw A/B on two stronger models tells a sharper story: the graph helps most where an agent would otherwise fan out across files, and a model that reads source exhaustively no matter what it is told benefits far less.
-
-| Model (Excalidraw) | Tokens saved | Graph behavior |
-| --- | --- | --- |
-| Claude Sonnet 4.6 | 67% | answers from the graph, reads ~0 files |
-| Claude Opus 4.8 | 24% | calls the graph but still reads source throughout |
-| GPT-5.5 (via codex) | 25% | rarely calls the graph; explores with the shell |
-
-This is not a defect of the descriptions: rewriting the tool to state, concisely, that the graph is the compiler's own deterministic resolution (ground truth, to be trusted over re-reading) did not change it. Opus and GPT-5.5 read the source regardless. So the graph is a large, direct win for the cost-efficient models you would run agent fleets on, and a modest one for the most thorough models, which already navigate code well on their own.
+The VS Code A/B is not in the published `graph.json` yet. Run it with the daemon (see [Reproduce](#reproduce-1)) to add it.
 
 #### What made the difference
 

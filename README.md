@@ -157,7 +157,7 @@ Point your agent's MCP client at it. For Claude Code:
 }
 ```
 
-On codegraph's own agent-cost benchmark it cuts an agent's tokens by 70% and tool calls by 83%, averaged across two repositories, with the agent reading zero files. See [`@ttsc/graph`](https://github.com/samchon/ttsc/tree/master/packages/graph) and the [benchmark](https://ttsc.dev/docs/benchmark#code-graph-mcp).
+On codegraph's own agent-cost benchmark, Claude agents answer reading zero files, cutting tokens by 68% to 79% and tool calls by 86% to 91%. See [`@ttsc/graph`](https://github.com/samchon/ttsc/tree/master/packages/graph) and the [benchmark](https://ttsc.dev/docs/benchmark#code-graph-mcp).
 
 ## Plugins
 

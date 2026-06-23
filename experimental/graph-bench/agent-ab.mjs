@@ -120,6 +120,10 @@ const repoDir = args["repo-dir"]
 // nudge, since a tool-conservative harness (codex) ignores MCP instructions but
 // honors a project file.
 const guidance = args.guidance === "1" || args.guidance === "true";
+const toolSetupMs =
+  args["tool-setup-ms"] === undefined
+    ? undefined
+    : Number(args["tool-setup-ms"]);
 // --cg points the "graph" arm at codegraph (colbymchenry/codegraph) instead of
 // @ttsc/graph, so the exact same A/B and guidance condition can be run against the
 // tool we ported, for an apples-to-apples comparison. The repo must already be
@@ -306,7 +310,7 @@ console.log(`\nTotal spend this run: $${spent.toFixed(2)}`);
 const reportName = `agent-ab-report${guidance ? "-guided" : ""}.json`;
 fs.writeFileSync(
   path.join(here, reportName),
-  `${JSON.stringify({ tool: cg ? "codegraph" : "ttsc-graph", repo: repoKey, fixtureBranch, repoDir, model, daemon: useDaemon, runs, guidance, question, samples }, null, 2)}\n`,
+  `${JSON.stringify({ tool: cg ? "codegraph" : "ttsc-graph", ...(toolSetupMs !== undefined ? { toolSetupMs } : {}), repo: repoKey, fixtureBranch, repoDir, model, daemon: useDaemon, runs, guidance, question, samples }, null, 2)}\n`,
 );
 if (daemon) daemon.kill();
 try {

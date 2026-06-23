@@ -124,6 +124,10 @@ const repoDir = args["repo-dir"]
 // codegraph. codex ignores an MCP server's own instructions but honors a project
 // AGENTS.md, so this measures the tool with and without that nudge.
 const guidance = args.guidance === "1" || args.guidance === "true";
+const toolSetupMs =
+  args["tool-setup-ms"] === undefined
+    ? undefined
+    : Number(args["tool-setup-ms"]);
 // --cg points the graph arm at codegraph instead of @ttsc/graph (repo must be
 // indexed with `codegraph init`), for an apples-to-apples comparison on codex.
 const cg = args.cg === "1" || args.cg === "true";
@@ -302,7 +306,7 @@ line("wall time", "durMs", (x) => `${(x / 1000).toFixed(0)}s`);
 const reportName = `agent-ab-codex-report${guidance ? "-guided" : ""}.json`;
 fs.writeFileSync(
   path.join(here, reportName),
-  `${JSON.stringify({ tool: cg ? "codegraph" : "ttsc-graph", repo: repoKey, fixtureBranch, repoDir, model, effort, daemon: useDaemon, runs, guidance, question, samples }, null, 2)}\n`,
+  `${JSON.stringify({ tool: cg ? "codegraph" : "ttsc-graph", ...(toolSetupMs !== undefined ? { toolSetupMs } : {}), repo: repoKey, fixtureBranch, repoDir, model, effort, daemon: useDaemon, runs, guidance, question, samples }, null, 2)}\n`,
 );
 if (daemon) daemon.kill();
 cleanup([binary, withHome, withoutHome]);

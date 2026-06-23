@@ -95,11 +95,11 @@ function foldAgent(report, harness) {
       c.repo,
       c.model,
       c.effort ?? "",
-      c.fixtureBranch ?? "",
+      c.fixtureBranch ?? "ttsc",
       c.daemon === true ? "daemon" : "single",
     ]);
   const at = out.agent.cells.findIndex((c) => key(c) === key(cell));
-  if (at >= 0) out.agent.cells[at] = cell;
+  if (at >= 0) out.agent.cells[at] = { ...out.agent.cells[at], ...cell };
   else out.agent.cells.push(cell);
   const n = (report.samples?.graph ?? []).length;
   console.log(

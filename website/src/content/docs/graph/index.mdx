@@ -40,7 +40,13 @@ A text search or a tree-sitter parse stops where the syntax stops. A real type c
 - `@ttsc/lint` rule violations.
 - Transform-plugin errors, from plugins like typia and nestia.
 
-It can show all of them because it rides the real `ttsc` compile, plugins and all. It reports exactly what `ttsc` reports, at the same code and location.
+The type errors come from the graph's resident `Program`.
+
+The lint and plugin findings come from a background `ttsc` check that runs your project's plugins, fused onto the same graph.
+
+So it reports what `ttsc` reports, at the same code and location.
+
+When that background check cannot run (no `ttsc`, no Go toolchain, or a project that does not compile), the graph falls back to the type errors alone.
 
 ## Install
 
@@ -91,7 +97,7 @@ One call is usually enough context to stop, instead of fanning out to read files
 </Tabs.Tab>
 <Tabs.Tab>
 
-Every diagnostic for one file: type errors, `@ttsc/lint` violations, and transform-plugin findings, at the same code and location `ttsc` reports, read straight from the shared `Program`.
+Every diagnostic for one file: type errors, `@ttsc/lint` violations, and transform-plugin findings, at the same code and location `ttsc` reports.
 
 ```json
 { "name": "graph_diagnostics", "arguments": { "file": "src/payment/service.ts" } }

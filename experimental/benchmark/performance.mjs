@@ -1032,13 +1032,16 @@ function installLocalTarballs(project, dir, branch) {
             ? `pnpm add -w -D --config.minimumReleaseAge=0 ${specs}`
             : `pnpm add --ignore-workspace -D --config.minimumReleaseAge=0 ${specs}`
           : pm === "yarn"
-            ? `YARN_CACHE_FOLDER=.yarn-cache yarn add --dev --force --update-checksums --ignore-engines --ignore-workspace-root-check ${specs}`
+            ? `yarn add --dev --force --update-checksums --ignore-engines --ignore-workspace-root-check ${specs}`
             : `npm install --legacy-peer-deps --save-dev ${specs}`);
       process.stdout.write(
         `Installing local tarballs into ${path.basename(dir)}: ` +
           `${targets.map((target) => target.name).join(", ")}\n`,
       );
-      sh(cmd, dir, { label: `install local tarballs ${path.basename(dir)}` });
+      sh(cmd, dir, {
+        label: `install local tarballs ${path.basename(dir)}`,
+        env: pm === "yarn" ? yarnCacheEnv() : undefined,
+      });
     });
   });
 }

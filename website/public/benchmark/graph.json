@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-23T22:17:56.922Z",
+  "generatedAt": "2026-06-23T22:24:15.188Z",
   "structural": {
     "project": "packages/ttsc",
     "tsconfig": "tsconfig.json",
@@ -2300,6 +2300,69 @@
               "other": 0,
               "cost": 0.4061275,
               "durMs": 43588,
+              "ok": true
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "codegraph",
+        "toolSetupMs": 679477.2477,
+        "repo": "vscode",
+        "model": "gpt-5.5",
+        "effort": "high",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Where does an extension host message get forwarded toward the main process?",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 874442,
+              "cached": 742400,
+              "turns": 1,
+              "tools": 32,
+              "shell": 32,
+              "graph": 0,
+              "types": {
+                "agent_message": 7,
+                "command_execution": 32
+              },
+              "durMs": 134397,
+              "ok": true
+            }
+          ],
+          "graph": [
+            {
+              "tokens": 784263,
+              "cached": 656256,
+              "turns": 1,
+              "tools": 27,
+              "shell": 25,
+              "graph": 2,
+              "types": {
+                "agent_message": 13,
+                "command_execution": 25,
+                "mcp_tool_call": 2
+              },
+              "durMs": 137002,
+              "ok": true
+            }
+          ],
+          "guided": [
+            {
+              "tokens": 438313,
+              "cached": 389632,
+              "turns": 1,
+              "tools": 10,
+              "shell": 0,
+              "graph": 10,
+              "types": {
+                "agent_message": 8,
+                "mcp_tool_call": 10
+              },
+              "durMs": 103312,
               "ok": true
             }
           ]

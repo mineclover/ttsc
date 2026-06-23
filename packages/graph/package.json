@@ -29,12 +29,10 @@
     "lib",
     "src"
   ],
-  "dependencies": {
-    "ttsc": "workspace:*"
-  },
   "devDependencies": {
     "@types/node": "catalog:utils",
     "rimraf": "catalog:utils",
+    "ttsc": "workspace:*",
     "typescript": "catalog:typescript"
   },
   "repository": {

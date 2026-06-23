@@ -1331,8 +1331,27 @@ function linkPackageBins(packageDir, nodeModules) {
     const link = path.join(binDir, name);
     const target = path.relative(binDir, path.join(packageDir, bin));
     fs.rmSync(link, { force: true });
-    fs.symlinkSync(target, link);
+    fs.rmSync(`${link}.cmd`, { force: true });
+    try {
+      fs.symlinkSync(target, link);
+    } catch (error) {
+      if (process.platform !== "win32" || error?.code !== "EPERM") throw error;
+      writeWindowsBinShim(link, target);
+    }
   }
+}
+
+function writeWindowsBinShim(link, target) {
+  const cmdTarget = target.replace(/\//g, "\\");
+  const shTarget = target.replace(/\\/g, "/");
+  fs.writeFileSync(
+    `${link}.cmd`,
+    `@ECHO off\r\nnode "%~dp0\\${cmdTarget}" %*\r\n`,
+  );
+  fs.writeFileSync(
+    link,
+    `#!/bin/sh\nbasedir=$(dirname "$(echo "$0" | sed -e 's,\\\\,/,g')")\nexec node "$basedir/${shTarget}" "$@"\n`,
+  );
 }
 
 function installPinnedTypeScriptGoRuntimeDeps(project, dir, branch) {

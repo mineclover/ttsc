@@ -60,7 +60,7 @@ export const bad: number = "not a number";
   if info, _ := init["serverInfo"].(map[string]any); info == nil || info["name"] != "ttsc-graph" {
     t.Fatalf("initialize serverInfo missing or wrong: %v", init["serverInfo"])
   }
-  if text, _ := init["instructions"].(string); !strings.Contains(text, "checker-resolved") {
+  if text, _ := init["instructions"].(string); !strings.Contains(text, "graph_explore") {
     t.Fatalf("initialize did not ship server instructions: %v", init["instructions"])
   }
 

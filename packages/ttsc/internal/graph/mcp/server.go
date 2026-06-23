@@ -46,19 +46,16 @@ const defaultProtocolVersion = "2025-06-18"
 
 // serverInstructions is shipped in the initialize response. It is the only
 // channel through which the server advises an agent; nothing is written to disk.
-const serverInstructions = "For any question about how this project's code works — architecture, flow, call " +
-  "paths, change impact — call graph_explore first and answer from it; trust its resolved edges rather than " +
-  "grepping or re-reading the source. ttsc-graph is the project's checker-resolved code graph: its nodes are " +
-  "the declarations and their methods, and its edges (calls, type references, heritage) are the TypeScript " +
-  "compiler's own resolution, so every relationship down to a method-to-method or constructor call that you " +
-  "would otherwise grep for is already an edge. graph_explore takes a symbol name or the salient nouns of " +
-  "the question (e.g. \"render update canvas element\"); it also shows a symbol's own diagnostics and how " +
-  "much of its blast radius is already broken, so you can judge a change's safety before making it. Name " +
-  "several related symbols in one query rather than drilling one at a time: the response returns each match " +
-  "with its source and its neighbors' names and locations, so a few broad queries resolve a flow where many " +
-  "narrow follow-up calls just re-pay for the growing context. Open a " +
-  "file only for statement-level detail inside a body it summarizes. Use graph_diagnostics for one file's " +
-  "errors: TypeScript type errors plus the project's @ttsc/lint and transform-plugin findings."
+const serverInstructions = "ttsc-graph is this project's code graph, resolved by the TypeScript compiler itself.\n\n" +
+  "To learn how any code works, call graph_explore once with every symbol the question involves — for example " +
+  "\"render update canvas Scene Renderer\". It returns each matching declaration's source with the " +
+  "compiler-resolved calls, types, and references between them, their file:line locations, and any errors on " +
+  "them.\n\n" +
+  "Answer from that result. It is the compiler's exact resolution, so do not grep, read files, or call again " +
+  "one symbol at a time — a single broad query already holds the whole flow. Widen the query to follow it " +
+  "further.\n\n" +
+  "For one file's errors, call graph_diagnostics: TypeScript, plus the project's @ttsc/lint and " +
+  "transform-plugin findings."
 
 // Server answers MCP requests from a resident Program and the graph built from
 // it. The Program/graph may be supplied eagerly or built in the background; ready

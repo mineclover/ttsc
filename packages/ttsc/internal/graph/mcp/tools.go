@@ -19,7 +19,7 @@ func toolsListResult() any {
     "tools": []any{
       map[string]any{
         "name":        "graph_explore",
-        "description": "Call this first for any question about how the code works — architecture, flow, call paths, change impact — instead of grepping or reading files. It returns the compiler's own code graph for a symbol or file: the source plus every checker-resolved relationship — what it calls (method-to-method and constructor calls included), the types it references, and its heritage, in both directions — with its blast radius and any live diagnostics on it. The blast radius reports how many transitive dependents currently have errors, so before editing a symbol you can see the reach of the change over what is already broken; the edges are what you would otherwise grep for.",
+        "description": "The project's compiler-resolved code graph. Given a query naming the symbols (or salient nouns) a question involves, it returns each matching declaration's source plus the TypeScript compiler's own resolution of the calls, types, and references between them — both directions, with file:line locations, diagnostics, and each symbol's change-impact. Name every symbol the question involves in one query and answer from the result, rather than grepping, reading files, or exploring one symbol per call.",
         "inputSchema": map[string]any{
           "type": "object",
           "properties": map[string]any{
@@ -159,9 +159,9 @@ func (s *Server) explore(args json.RawMessage) (any, *rpcError) {
 // this is a deterministic computation by the type checker, authoritative for the
 // relationships it reports, so re-reading the source to confirm is redundant
 // recomputation, not verification.
-const exploreHeader = "This is the type checker's own deterministic resolution of your code, authoritative for the " +
-  "relationships it reports. Re-reading the source only re-derives what the compiler already resolved; answer from " +
-  "the graph.\n\n"
+const exploreHeader = "The compiler's own resolution — exact for the relationships it reports. Answer from it, not by " +
+  "re-reading the source; to follow the flow further, widen this query with more symbols rather than calling again " +
+  "one at a time.\n\n"
 
 // maxExploreNodes caps how many ranked nodes a query returns, so a broad
 // keyword query surfaces the most relevant declarations without flooding context.

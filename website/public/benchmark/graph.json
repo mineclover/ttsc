@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-23T21:15:02.556Z",
+  "generatedAt": "2026-06-23T21:18:44.741Z",
   "structural": {
     "project": "packages/ttsc",
     "tsconfig": "tsconfig.json",
@@ -1311,6 +1311,68 @@
               "other": 0,
               "cost": 0.396427,
               "durMs": 35459,
+              "ok": true
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "codegraph",
+        "toolSetupMs": 48022.9344,
+        "repo": "typeorm",
+        "model": "gpt-5.5",
+        "effort": "high",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "How are relation options applied when repository.find() builds its query?",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 474269,
+              "cached": 385920,
+              "turns": 1,
+              "tools": 21,
+              "shell": 21,
+              "graph": 0,
+              "types": {
+                "agent_message": 6,
+                "command_execution": 21
+              },
+              "durMs": 103979,
+              "ok": true
+            }
+          ],
+          "graph": [
+            {
+              "tokens": 367424,
+              "cached": 280704,
+              "turns": 1,
+              "tools": 9,
+              "shell": 0,
+              "graph": 9,
+              "types": {
+                "agent_message": 5,
+                "mcp_tool_call": 9
+              },
+              "durMs": 57034,
+              "ok": true
+            }
+          ],
+          "guided": [
+            {
+              "tokens": 87969,
+              "cached": 34816,
+              "turns": 1,
+              "tools": 2,
+              "shell": 0,
+              "graph": 2,
+              "types": {
+                "agent_message": 3,
+                "mcp_tool_call": 2
+              },
+              "durMs": 57542,
               "ok": true
             }
           ]

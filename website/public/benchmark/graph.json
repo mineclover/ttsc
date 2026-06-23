@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-23T21:10:33.220Z",
+  "generatedAt": "2026-06-23T21:15:02.556Z",
   "structural": {
     "project": "packages/ttsc",
     "tsconfig": "tsconfig.json",
@@ -1259,6 +1259,58 @@
                 "mcp_tool_call": 2
               },
               "durMs": 25882,
+              "ok": true
+            }
+          ]
+        }
+      },
+      {
+        "harness": "claude-code",
+        "tool": "codegraph",
+        "toolSetupMs": 48022.9344,
+        "repo": "typeorm",
+        "model": "opus",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "How are relation options applied when repository.find() builds its query?",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 1525275,
+              "tools": 42,
+              "reads": 18,
+              "grep": 5,
+              "graph": 0,
+              "other": 19,
+              "cost": 0.4159321,
+              "durMs": 160400,
+              "ok": true
+            }
+          ],
+          "graph": [
+            {
+              "tokens": 767115,
+              "tools": 7,
+              "reads": 2,
+              "grep": 1,
+              "graph": 2,
+              "other": 2,
+              "cost": 0.624453,
+              "durMs": 67038,
+              "ok": true
+            }
+          ],
+          "guided": [
+            {
+              "tokens": 271199,
+              "tools": 2,
+              "reads": 0,
+              "grep": 0,
+              "graph": 2,
+              "other": 0,
+              "cost": 0.396427,
+              "durMs": 35459,
               "ok": true
             }
           ]

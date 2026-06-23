@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-23T21:40:38.142Z",
+  "generatedAt": "2026-06-23T21:42:44.222Z",
   "structural": {
     "project": "packages/ttsc",
     "tsconfig": "tsconfig.json",
@@ -1970,6 +1970,68 @@
               "other": 0,
               "cost": 0.3897105,
               "durMs": 24539,
+              "ok": true
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "codegraph",
+        "toolSetupMs": 17412.2349,
+        "repo": "nestjs",
+        "model": "gpt-5.5",
+        "effort": "high",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Which code invokes the selected controller method for an HTTP route?",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 242032,
+              "cached": 159104,
+              "turns": 1,
+              "tools": 13,
+              "shell": 13,
+              "graph": 0,
+              "types": {
+                "agent_message": 4,
+                "command_execution": 13
+              },
+              "durMs": 53749,
+              "ok": true
+            }
+          ],
+          "graph": [
+            {
+              "tokens": 156418,
+              "cached": 46848,
+              "turns": 1,
+              "tools": 4,
+              "shell": 0,
+              "graph": 4,
+              "types": {
+                "agent_message": 4,
+                "mcp_tool_call": 4
+              },
+              "durMs": 42272,
+              "ok": true
+            }
+          ],
+          "guided": [
+            {
+              "tokens": 80420,
+              "cached": 53760,
+              "turns": 1,
+              "tools": 2,
+              "shell": 0,
+              "graph": 2,
+              "types": {
+                "agent_message": 3,
+                "mcp_tool_call": 2
+              },
+              "durMs": 26203,
               "ok": true
             }
           ]

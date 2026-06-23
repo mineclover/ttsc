@@ -15,7 +15,6 @@
 // Usage:
 //   node experimental/graph-bench/agent-ab.mjs --repo=excalidraw --runs=2
 //   node experimental/graph-bench/agent-ab.mjs --repo=vscode --runs=4 --model=opus
-
 import cp from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -31,47 +30,82 @@ const REPOS = {
   excalidraw: {
     url: "https://github.com/excalidraw/excalidraw",
     tsconfig: "tsconfig.json",
-    question: "How does Excalidraw redraw the scene when an element changes?",
+    questions: {
+      headline: "How does Excalidraw redraw the scene when an element changes?",
+      medium:
+        "Which code path schedules a scene redraw after an element is changed?",
+    },
   },
   vscode: {
     url: "https://github.com/microsoft/vscode",
     tsconfig: "src/tsconfig.json",
-    question: "How does a VS Code extension send a message to the main process?",
+    questions: {
+      headline:
+        "How does a VS Code extension send a message to the main process?",
+      medium:
+        "Where does an extension host message get forwarded toward the main process?",
+    },
   },
   nestjs: {
     url: "https://github.com/nestjs/nest",
     tsconfig: "tsconfig.graph.json",
-    question: "How does NestJS route an incoming request to a controller method?",
+    questions: {
+      headline:
+        "How does NestJS route an incoming request to a controller method?",
+      medium:
+        "Which code invokes the selected controller method for an HTTP route?",
+    },
   },
   vue: {
     url: "https://github.com/vuejs/core",
     tsconfig: "tsconfig.graph.json",
-    question: "How does Vue re-render a component when a ref changes?",
+    questions: {
+      headline: "How does Vue re-render a component when a ref changes?",
+      medium:
+        "Which code schedules a component update after a ref value changes?",
+    },
   },
   zod: {
     url: "https://github.com/colinhacks/zod",
     tsconfig: "tsconfig.graph.json",
-    question: "What happens when you call a Zod schema's parse() method?",
+    questions: {
+      headline: "What happens when you call a Zod schema's parse() method?",
+      medium: "Which internal parse method does a Zod schema's parse() call?",
+    },
   },
   typeorm: {
     url: "https://github.com/typeorm/typeorm",
     tsconfig: "tsconfig.graph.json",
-    question: "What happens when you call a repository's find() method?",
+    questions: {
+      headline: "What happens when you call a repository's find() method?",
+      medium:
+        "How are relation options applied when repository.find() builds its query?",
+    },
   },
   rxjs: {
     url: "https://github.com/ReactiveX/rxjs",
     tsconfig: "tsconfig.graph.json",
-    question: "What happens when you subscribe to an observable?",
+    questions: {
+      headline: "What happens when you subscribe to an observable?",
+      medium: "Which code creates the Subscriber used by Observable.subscribe?",
+    },
   },
 };
 
 const args = parseArgs(process.argv.slice(2));
 const repoKey = args.repo ?? "excalidraw";
 const spec = REPOS[repoKey];
-if (!spec) throw new Error(`unknown --repo ${repoKey}; choose ${Object.keys(REPOS).join(" | ")}`);
+if (!spec)
+  throw new Error(
+    `unknown --repo ${repoKey}; choose ${Object.keys(REPOS).join(" | ")}`,
+  );
 const runs = Number(args.runs ?? 2);
 const model = args.model ?? "sonnet";
 const tsconfig = args.tsconfig ?? spec.tsconfig;
+const difficulty = args.difficulty ?? "medium";
+const question =
+  spec.questions?.[difficulty] ?? spec.questions?.medium ?? spec.question;
+if (!question) throw new Error(`repo ${repoKey} has no ${difficulty} question`);
 
 const corpus = args.corpus ?? path.join(os.tmpdir(), "graph-corpus");
 const repoDir = path.join(corpus, repoKey);
@@ -91,7 +125,9 @@ const guidance = args.guidance === "1" || args.guidance === "true";
 const cg = args.cg === "1" || args.cg === "true";
 const GUIDANCE = `# Code navigation
 
-For any question about how this code works, use the project's code-graph MCP server: name the symbols involved in one query and answer from its result, instead of grepping or reading files to trace calls and types.
+For code-flow questions, prefer the code-graph MCP before broad grep/read.
+Query flows, not one name: owner + action + nouns, e.g. "repository find manager query builder".
+Do not fan out through files or grep to trace calls the graph shows. Do not re-read returned source unless it has no match, signatures only, or non-TS files.
 `;
 // The guided arm models how a normal user actually works: they keep an AGENTS.md
 // and, in the prompt, tell the agent to follow it. That elevates the project file
@@ -111,11 +147,16 @@ function setGuidance(on) {
 const goRoot = path.join(os.homedir(), "go-sdk", "go", "bin");
 const goEnv = {
   ...process.env,
-  PATH: fs.existsSync(goRoot) ? `${goRoot}${path.delimiter}${process.env.PATH ?? ""}` : process.env.PATH,
+  PATH: fs.existsSync(goRoot)
+    ? `${goRoot}${path.delimiter}${process.env.PATH ?? ""}`
+    : process.env.PATH,
 };
 
 // 1. Build the MCP server binary (skipped for codegraph, which is a global CLI).
-const binary = path.join(os.tmpdir(), `ttscgraph-ab-${process.pid}${process.platform === "win32" ? ".exe" : ""}`);
+const binary = path.join(
+  os.tmpdir(),
+  `ttscgraph-ab-${process.pid}${process.platform === "win32" ? ".exe" : ""}`,
+);
 if (!cg) {
   console.log("Building ttscgraph...");
   runOrThrow("go", ["build", "-o", binary, "./cmd/ttscgraph"], ttscDir, goEnv);
@@ -125,7 +166,12 @@ if (!cg) {
 if (!fs.existsSync(repoDir)) {
   fs.mkdirSync(corpus, { recursive: true });
   console.log(`Cloning ${spec.url} (shallow) -> ${repoDir} ...`);
-  runOrThrow("git", ["clone", "--depth", "1", spec.url, repoDir], corpus, process.env);
+  runOrThrow(
+    "git",
+    ["clone", "--depth", "1", spec.url, repoDir],
+    corpus,
+    process.env,
+  );
 }
 
 // 3. WITH = @ttsc/graph; WITHOUT = empty config. Both --strict-mcp-config.
@@ -134,15 +180,36 @@ if (!fs.existsSync(repoDir)) {
 // server directly.
 // codegraph manages its own indexing/daemon, so the ttscgraph daemon path (which
 // spawns the unbuilt `binary`) must be skipped under --cg.
-const useDaemon = !cg && (args.daemon === "1" || args.daemon === "true" || repoKey === "vscode");
+const useDaemon =
+  !cg &&
+  (args.daemon === "1" || args.daemon === "true" || repoKey === "vscode");
 let daemon = null;
 let withArgs;
 if (useDaemon) {
-  const portFile = path.join(os.tmpdir(), `ttscgraph-daemon-${process.pid}.port`);
+  const portFile = path.join(
+    os.tmpdir(),
+    `ttscgraph-daemon-${process.pid}.port`,
+  );
   console.log("Starting daemon (build once)...");
-  daemon = cp.spawn(binary, ["--daemon", "--cwd", repoDir, "--tsconfig", tsconfig, "--port-file", portFile, "--idle", "0"], { stdio: "ignore", windowsHide: true });
+  daemon = cp.spawn(
+    binary,
+    [
+      "--daemon",
+      "--cwd",
+      repoDir,
+      "--tsconfig",
+      tsconfig,
+      "--port-file",
+      portFile,
+      "--idle",
+      "0",
+    ],
+    { stdio: "ignore", windowsHide: true },
+  );
   const addr = waitForPort(portFile, 30_000);
-  console.log(`  daemon at ${addr}; warming (type-checking ${repoKey}, this can take minutes)...`);
+  console.log(
+    `  daemon at ${addr}; warming (type-checking ${repoKey}, this can take minutes)...`,
+  );
   const warmStart = Date.now();
   warmDaemon(binary, addr);
   console.log(`  warm in ${((Date.now() - warmStart) / 1000).toFixed(0)}s`);
@@ -154,7 +221,13 @@ if (useDaemon) {
 const withCfg = path.join(os.tmpdir(), `mcp-graph-${process.pid}.json`);
 const emptyCfg = path.join(os.tmpdir(), `mcp-empty-${process.pid}.json`);
 const serverCfg = cg
-  ? { codegraph: { command: "codegraph", args: ["serve", "--mcp", "--path", repoDir], env: { CODEGRAPH_NO_DAEMON: "1" } } }
+  ? {
+      codegraph: {
+        command: "codegraph",
+        args: ["serve", "--mcp", "--path", repoDir],
+        env: { CODEGRAPH_NO_DAEMON: "1" },
+      },
+    }
   : { "ttsc-graph": { command: binary, args: withArgs } };
 fs.writeFileSync(withCfg, JSON.stringify({ mcpServers: serverCfg }));
 fs.writeFileSync(emptyCfg, JSON.stringify({ mcpServers: {} }));
@@ -169,22 +242,23 @@ console.log(
   `\ncodegraph A/B on ${repoKey} — model ${model}, ${runs} run(s) x ${arms.length} arms` +
     (guidance ? " (+guided = graph with a project instruction to use it)" : ""),
 );
-console.log(`Q: ${spec.question}\n`);
+console.log(`Q (${difficulty}): ${question}\n`);
 
 const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
 let spent = 0;
 try {
   for (const arm of arms) {
     setGuidance(arm.guide);
-    const question = arm.guide ? GUIDED_PREFIX + spec.question : spec.question;
+    const prompt = arm.guide ? GUIDED_PREFIX + question : question;
     for (let r = 0; r < runs; r++) {
-      const m = runClaude(question, arm.cfg);
+      const m = runClaude(prompt, arm.cfg);
       samples[arm.name].push(m);
       spent += m.cost;
       console.log(
         `  ${arm.name.padEnd(8)} run ${r + 1}: $${m.cost.toFixed(3)}, ${m.tokens} tok, ${m.tools} tools ` +
           `(read ${m.reads}, grep ${m.grep}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
-          (m.ok ? "" : "  [FAILED]") + `  [running $${spent.toFixed(2)}]`,
+          (m.ok ? "" : "  [FAILED]") +
+          `  [running $${spent.toFixed(2)}]`,
       );
     }
   }
@@ -194,16 +268,20 @@ try {
   setGuidance(false);
 }
 
-const med = (arm, k) => median(samples[arm].filter((m) => m.ok).map((m) => m[k]));
+const med = (arm, k) =>
+  median(samples[arm].filter((m) => m.ok).map((m) => m[k]));
 const pct = (g, b) => (b === 0 ? 0 : Math.round((1 - g / b) * 100));
 const line = (label, k, fmt = (x) => x) => {
   const b = med("baseline", k);
   let s = `  ${label.padEnd(12)} baseline ${fmt(b)}  ->  graph ${fmt(med("graph", k))} (${pct(med("graph", k), b)}%)`;
-  if (guidance) s += `  ->  guided ${fmt(med("guided", k))} (${pct(med("guided", k), b)}%)`;
+  if (guidance)
+    s += `  ->  guided ${fmt(med("guided", k))} (${pct(med("guided", k), b)}%)`;
   console.log(s);
 };
 
-console.log(`\nMedian of ${runs} run(s), vs empty-MCP baseline (codegraph metrics):`);
+console.log(
+  `\nMedian of ${runs} run(s), vs empty-MCP baseline (codegraph metrics):`,
+);
 line("tokens", "tokens");
 line("tool calls", "tools");
 line("cost", "cost", (x) => `$${x.toFixed(3)}`);
@@ -211,9 +289,18 @@ line("wall time", "durMs", (x) => `${(x / 1000).toFixed(0)}s`);
 console.log(`\nTotal spend this run: $${spent.toFixed(2)}`);
 
 const reportName = `agent-ab-report${guidance ? "-guided" : ""}.json`;
-fs.writeFileSync(path.join(here, reportName), `${JSON.stringify({ repo: repoKey, model, runs, guidance, question: spec.question, samples }, null, 2)}\n`);
+fs.writeFileSync(
+  path.join(here, reportName),
+  `${JSON.stringify({ repo: repoKey, model, runs, guidance, difficulty, question, samples }, null, 2)}\n`,
+);
 if (daemon) daemon.kill();
-try { fs.rmSync(binary, { force: true }); fs.rmSync(withCfg, { force: true }); fs.rmSync(emptyCfg, { force: true }); } catch { /* best effort */ }
+try {
+  fs.rmSync(binary, { force: true });
+  fs.rmSync(withCfg, { force: true });
+  fs.rmSync(emptyCfg, { force: true });
+} catch {
+  /* best effort */
+}
 
 // waitForPort polls the daemon's port file until it reports a host:port address.
 function waitForPort(portFile, timeoutMs) {
@@ -231,10 +318,29 @@ function waitForPort(portFile, timeoutMs) {
 // warmDaemon drives one graph_explore through the proxy, which blocks until the
 // daemon's background type-check lands, so the timed sessions hit a warm server.
 function warmDaemon(bin, addr) {
-  const init = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
-  const call = JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "graph_explore", arguments: { query: "main" } } });
-  const result = cp.spawnSync(bin, ["--connect", addr], { input: `${init}\n${call}\n`, encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024, timeout: 1_200_000 });
-  if (result.status !== 0) throw new Error(`daemon warm-up failed: ${(result.stderr || "").slice(0, 300)}`);
+  const init = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: {},
+  });
+  const call = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "tools/call",
+    params: { name: "graph_explore", arguments: { query: "main" } },
+  });
+  const result = cp.spawnSync(bin, ["--connect", addr], {
+    input: `${init}\n${call}\n`,
+    encoding: "utf8",
+    windowsHide: true,
+    maxBuffer: 64 * 1024 * 1024,
+    timeout: 1_200_000,
+  });
+  if (result.status !== 0)
+    throw new Error(
+      `daemon warm-up failed: ${(result.stderr || "").slice(0, 300)}`,
+    );
 }
 
 // syncSleep blocks for ms without async, so the synchronous setup can poll.
@@ -245,8 +351,32 @@ function syncSleep(ms) {
 function runClaude(question, cfg) {
   const result = cp.spawnSync(
     "claude",
-    ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions", "--model", model, "--effort", "high", "--max-budget-usd", "4", "--strict-mcp-config", "--mcp-config", cfg],
-    { cwd: repoDir, input: question, encoding: "utf8", windowsHide: true, shell: true, maxBuffer: 256 * 1024 * 1024, timeout: 900_000 },
+    [
+      "-p",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--permission-mode",
+      "bypassPermissions",
+      "--model",
+      model,
+      "--effort",
+      "high",
+      "--max-budget-usd",
+      "4",
+      "--strict-mcp-config",
+      "--mcp-config",
+      cfg,
+    ],
+    {
+      cwd: repoDir,
+      input: question,
+      encoding: "utf8",
+      windowsHide: true,
+      shell: true,
+      maxBuffer: 256 * 1024 * 1024,
+      timeout: 900_000,
+    },
   );
   if (result.error) throw result.error;
   return parseStream(result.stdout ?? "");
@@ -256,14 +386,29 @@ function runClaude(question, cfg) {
 // every assistant turn's usage (not the last-turn result.usage), and tool calls
 // are counted across assistant events (ToolSearch excluded).
 function parseStream(text) {
-  let tokens = 0, tools = 0, reads = 0, grep = 0, graph = 0, other = 0, result = null;
+  let tokens = 0,
+    tools = 0,
+    reads = 0,
+    grep = 0,
+    graph = 0,
+    other = 0,
+    result = null;
   for (const raw of text.split("\n")) {
     if (!raw.trim()) continue;
     let e;
-    try { e = JSON.parse(raw); } catch { continue; }
+    try {
+      e = JSON.parse(raw);
+    } catch {
+      continue;
+    }
     if (e.type === "assistant") {
       const u = e.message?.usage;
-      if (u) tokens += (u.input_tokens || 0) + (u.output_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
+      if (u)
+        tokens +=
+          (u.input_tokens || 0) +
+          (u.output_tokens || 0) +
+          (u.cache_read_input_tokens || 0) +
+          (u.cache_creation_input_tokens || 0);
       for (const b of e.message?.content || []) {
         if (b.type !== "tool_use") continue;
         if (b.name === "ToolSearch") continue;
@@ -277,13 +422,32 @@ function parseStream(text) {
       result = e;
     }
   }
-  return { tokens, tools, reads, grep, graph, other, cost: result?.total_cost_usd || 0, durMs: result?.duration_ms || 0, ok: result?.subtype === "success" };
+  return {
+    tokens,
+    tools,
+    reads,
+    grep,
+    graph,
+    other,
+    cost: result?.total_cost_usd || 0,
+    durMs: result?.duration_ms || 0,
+    ok: result?.subtype === "success",
+  };
 }
 
 function runOrThrow(command, commandArgs, cwd, env) {
-  const result = cp.spawnSync(command, commandArgs, { cwd, env, encoding: "utf8", windowsHide: true, shell: command === "claude" });
+  const result = cp.spawnSync(command, commandArgs, {
+    cwd,
+    env,
+    encoding: "utf8",
+    windowsHide: true,
+    shell: command === "claude",
+  });
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} ${commandArgs.join(" ")} failed (${result.status})\n${result.stderr ?? ""}`);
+  if (result.status !== 0)
+    throw new Error(
+      `${command} ${commandArgs.join(" ")} failed (${result.status})\n${result.stderr ?? ""}`,
+    );
   return result.stdout ?? "";
 }
 

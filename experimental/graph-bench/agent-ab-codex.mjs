@@ -36,37 +36,65 @@ const REPOS = {
   excalidraw: {
     url: "https://github.com/excalidraw/excalidraw",
     tsconfig: "tsconfig.json",
-    question: "How does Excalidraw redraw the scene when an element changes?",
+    questions: {
+      headline: "How does Excalidraw redraw the scene when an element changes?",
+      medium:
+        "Which code path schedules a scene redraw after an element is changed?",
+    },
   },
   vscode: {
     url: "https://github.com/microsoft/vscode",
     tsconfig: "src/tsconfig.json",
-    question: "How does a VS Code extension send a message to the main process?",
+    questions: {
+      headline:
+        "How does a VS Code extension send a message to the main process?",
+      medium:
+        "Where does an extension host message get forwarded toward the main process?",
+    },
   },
   nestjs: {
     url: "https://github.com/nestjs/nest",
     tsconfig: "tsconfig.graph.json",
-    question: "How does NestJS route an incoming request to a controller method?",
+    questions: {
+      headline:
+        "How does NestJS route an incoming request to a controller method?",
+      medium:
+        "Which code invokes the selected controller method for an HTTP route?",
+    },
   },
   vue: {
     url: "https://github.com/vuejs/core",
     tsconfig: "tsconfig.graph.json",
-    question: "How does Vue re-render a component when a ref changes?",
+    questions: {
+      headline: "How does Vue re-render a component when a ref changes?",
+      medium:
+        "Which code schedules a component update after a ref value changes?",
+    },
   },
   zod: {
     url: "https://github.com/colinhacks/zod",
     tsconfig: "tsconfig.graph.json",
-    question: "What happens when you call a Zod schema's parse() method?",
+    questions: {
+      headline: "What happens when you call a Zod schema's parse() method?",
+      medium: "Which internal parse method does a Zod schema's parse() call?",
+    },
   },
   typeorm: {
     url: "https://github.com/typeorm/typeorm",
     tsconfig: "tsconfig.graph.json",
-    question: "What happens when you call a repository's find() method?",
+    questions: {
+      headline: "What happens when you call a repository's find() method?",
+      medium:
+        "How are relation options applied when repository.find() builds its query?",
+    },
   },
   rxjs: {
     url: "https://github.com/ReactiveX/rxjs",
     tsconfig: "tsconfig.graph.json",
-    question: "What happens when you subscribe to an observable?",
+    questions: {
+      headline: "What happens when you subscribe to an observable?",
+      medium: "Which code creates the Subscriber used by Observable.subscribe?",
+    },
   },
 };
 
@@ -81,6 +109,10 @@ const runs = Number(args.runs ?? 2);
 const model = args.model ?? "gpt-5.5";
 const effort = args.effort ?? "high";
 const tsconfig = args.tsconfig ?? spec.tsconfig;
+const difficulty = args.difficulty ?? "medium";
+const question =
+  spec.questions?.[difficulty] ?? spec.questions?.medium ?? spec.question;
+if (!question) throw new Error(`repo ${repoKey} has no ${difficulty} question`);
 
 const corpus = args.corpus ?? path.join(os.tmpdir(), "graph-corpus");
 const repoDir = path.join(corpus, repoKey);
@@ -96,7 +128,9 @@ const guidance = args.guidance === "1" || args.guidance === "true";
 const cg = args.cg === "1" || args.cg === "true";
 const GUIDANCE = `# Code navigation
 
-For any question about how this code works, use the project's code-graph MCP server: name the symbols involved in one query and answer from its result, instead of grepping or reading files to trace calls and types.
+For code-flow questions, prefer the code-graph MCP before broad grep/read.
+Query flows, not one name: owner + action + nouns, e.g. "repository find manager query builder".
+Do not fan out through files or grep to trace calls the graph shows. Do not re-read returned source unless it has no match, signatures only, or non-TS files.
 `;
 // The guided arm models how a normal user actually works: they keep an AGENTS.md
 // and tell the agent, in the prompt, to follow it. That elevates the project file
@@ -146,7 +180,8 @@ if (!fs.existsSync(repoDir)) {
 // codegraph manages its own indexing/daemon, so the ttscgraph daemon path (which
 // spawns the unbuilt `binary`) must be skipped under --cg.
 const useDaemon =
-  !cg && (args.daemon === "1" || args.daemon === "true" || repoKey === "vscode");
+  !cg &&
+  (args.daemon === "1" || args.daemon === "true" || repoKey === "vscode");
 let daemon = null;
 let mcpArgs;
 if (useDaemon) {
@@ -198,15 +233,15 @@ console.log(
   `\ncodegraph A/B on ${repoKey} via codex — model ${model} (effort ${effort}), ${runs} run(s) x ${arms.length} arms` +
     (guidance ? " (+guided = graph with a project instruction to use it)" : ""),
 );
-console.log(`Q: ${spec.question}\n`);
+console.log(`Q (${difficulty}): ${question}\n`);
 
 const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
 try {
   for (const arm of arms) {
     setGuidance(arm.guide);
-    const question = arm.guide ? GUIDED_PREFIX + spec.question : spec.question;
+    const prompt = arm.guide ? GUIDED_PREFIX + question : question;
     for (let r = 0; r < runs; r++) {
-      const m = runCodex(question, arm.home);
+      const m = runCodex(prompt, arm.home);
       samples[arm.name].push(m);
       console.log(
         `  ${arm.name.padEnd(8)} run ${r + 1}: ${m.tokens} tok, ${m.tools} tools ` +
@@ -230,7 +265,8 @@ const pct = (g, b) => (b === 0 ? 0 : Math.round((1 - g / b) * 100));
 const line = (label, k, fmt = (x) => x) => {
   const b = med("baseline", k);
   let s = `  ${label.padEnd(12)} baseline ${fmt(b)}  ->  graph ${fmt(med("graph", k))} (${pct(med("graph", k), b)}%)`;
-  if (guidance) s += `  ->  guided ${fmt(med("guided", k))} (${pct(med("guided", k), b)}%)`;
+  if (guidance)
+    s += `  ->  guided ${fmt(med("guided", k))} (${pct(med("guided", k), b)}%)`;
   console.log(s);
 };
 
@@ -244,7 +280,7 @@ line("wall time", "durMs", (x) => `${(x / 1000).toFixed(0)}s`);
 const reportName = `agent-ab-codex-report${guidance ? "-guided" : ""}.json`;
 fs.writeFileSync(
   path.join(here, reportName),
-  `${JSON.stringify({ repo: repoKey, model, effort, runs, guidance, question: spec.question, samples }, null, 2)}\n`,
+  `${JSON.stringify({ repo: repoKey, model, effort, runs, guidance, difficulty, question, samples }, null, 2)}\n`,
 );
 if (daemon) daemon.kill();
 cleanup([binary, withHome, withoutHome]);
@@ -263,7 +299,9 @@ function makeCodexHome(tag, serverArgs) {
   let toml = `model = '${model}'\nmodel_reasoning_effort = '${effort}'\n`;
   if (serverArgs) {
     if (cg) {
-      const a = ["serve", "--mcp", "--path", repoDir].map((x) => `'${x}'`).join(", ");
+      const a = ["serve", "--mcp", "--path", repoDir]
+        .map((x) => `'${x}'`)
+        .join(", ");
       toml += `\n[mcp_servers.codegraph]\ncommand = 'codegraph'\nargs = [${a}]\nenv = { CODEGRAPH_NO_DAEMON = "1" }\n`;
     } else {
       const argList = serverArgs.map((a) => `'${a}'`).join(", ");

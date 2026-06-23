@@ -1,6 +1,7 @@
-`ttsc-graph` is a graph of this codebase resolved by the TypeScript compiler: every symbol and the calls between them.
+`ttsc-graph` is the TypeScript compiler's relationship graph: symbols, source, calls, callers, types.
 
-- For any question about how the code works, call `graph_explore` first, before grep or reading files
-- Name every symbol the question touches in one query; it returns their source and call graph, usually the whole answer
-- Querying one symbol at a time, or grepping to trace calls, wastes turns the graph already saves
-- `graph_diagnostics` reports a file's type and lint errors
+- For code-flow questions, prefer `graph_explore` before broad grep/read; one query gives map plus source.
+- Query flows, not one name: owner + action + nouns, e.g. `repository find manager query builder`.
+- Do not fan out through files or grep to trace calls the graph shows.
+- Do not re-read returned source; read only for no match, signatures, or non-TS files.
+- Use `graph_diagnostics` for file errors.

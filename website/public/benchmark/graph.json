@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-23T20:38:42.160Z",
+  "generatedAt": "2026-06-23T20:41:04.322Z",
   "structural": {
     "project": "packages/ttsc",
     "tsconfig": "tsconfig.json",
@@ -865,6 +865,68 @@
               "other": 0,
               "cost": 0.6351305,
               "durMs": 40069,
+              "ok": true
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "codegraph",
+        "toolSetupMs": 13322.9696,
+        "repo": "vue",
+        "model": "gpt-5.5",
+        "effort": "high",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Which code schedules a component update after a ref value changes?",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 317269,
+              "cached": 223872,
+              "turns": 1,
+              "tools": 14,
+              "shell": 14,
+              "graph": 0,
+              "types": {
+                "agent_message": 4,
+                "command_execution": 14
+              },
+              "durMs": 65359,
+              "ok": true
+            }
+          ],
+          "graph": [
+            {
+              "tokens": 158247,
+              "cached": 69376,
+              "turns": 1,
+              "tools": 4,
+              "shell": 0,
+              "graph": 4,
+              "types": {
+                "agent_message": 5,
+                "mcp_tool_call": 4
+              },
+              "durMs": 34689,
+              "ok": true
+            }
+          ],
+          "guided": [
+            {
+              "tokens": 157214,
+              "cached": 100608,
+              "turns": 1,
+              "tools": 4,
+              "shell": 0,
+              "graph": 4,
+              "types": {
+                "agent_message": 5,
+                "mcp_tool_call": 4
+              },
+              "durMs": 38160,
               "ok": true
             }
           ]

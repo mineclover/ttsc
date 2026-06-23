@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-23T21:19:38.094Z",
+  "generatedAt": "2026-06-23T21:20:56.279Z",
   "structural": {
     "project": "packages/ttsc",
     "tsconfig": "tsconfig.json",
@@ -1424,6 +1424,57 @@
               "other": 0,
               "cost": 0.0833201,
               "durMs": 10224,
+              "ok": true
+            }
+          ]
+        }
+      },
+      {
+        "harness": "claude-code",
+        "tool": "ttsc-graph",
+        "repo": "zod",
+        "model": "opus",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Which internal parse method does a Zod schema's parse() call?",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 308408,
+              "tools": 4,
+              "reads": 2,
+              "grep": 2,
+              "graph": 0,
+              "other": 0,
+              "cost": 0.2488185,
+              "durMs": 28922,
+              "ok": true
+            }
+          ],
+          "graph": [
+            {
+              "tokens": 140643,
+              "tools": 1,
+              "reads": 0,
+              "grep": 0,
+              "graph": 1,
+              "other": 0,
+              "cost": 0.206033,
+              "durMs": 18500,
+              "ok": true
+            }
+          ],
+          "guided": [
+            {
+              "tokens": 223571,
+              "tools": 2,
+              "reads": 0,
+              "grep": 0,
+              "graph": 2,
+              "other": 0,
+              "cost": 0.336408,
+              "durMs": 22135,
               "ok": true
             }
           ]

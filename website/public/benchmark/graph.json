@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-23T21:35:57.438Z",
+  "generatedAt": "2026-06-23T21:39:08.994Z",
   "structural": {
     "project": "packages/ttsc",
     "tsconfig": "tsconfig.json",
@@ -1866,6 +1866,58 @@
                 "mcp_tool_call": 3
               },
               "durMs": 54363,
+              "ok": true
+            }
+          ]
+        }
+      },
+      {
+        "harness": "claude-code",
+        "tool": "codegraph",
+        "toolSetupMs": 17412.2349,
+        "repo": "nestjs",
+        "model": "sonnet",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Which code invokes the selected controller method for an HTTP route?",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 559697,
+              "tools": 25,
+              "reads": 8,
+              "grep": 3,
+              "graph": 0,
+              "other": 14,
+              "cost": 0.13656434999999997,
+              "durMs": 77103,
+              "ok": true
+            }
+          ],
+          "graph": [
+            {
+              "tokens": 659499,
+              "tools": 18,
+              "reads": 7,
+              "grep": 6,
+              "graph": 2,
+              "other": 3,
+              "cost": 0.18683239999999998,
+              "durMs": 61010,
+              "ok": true
+            }
+          ],
+          "guided": [
+            {
+              "tokens": 301338,
+              "tools": 2,
+              "reads": 0,
+              "grep": 0,
+              "graph": 2,
+              "other": 0,
+              "cost": 0.18295109999999998,
+              "durMs": 31177,
               "ok": true
             }
           ]

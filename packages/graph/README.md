@@ -74,6 +74,8 @@ Your agent now has two new abilities:
 
 You never call these yourself. Your agent uses them when it needs to.
 
+Claude Code does this on its own. Codex is more cautious with third-party MCP tools and often explores with the shell instead, so tell it directly — add a line to your `AGENTS.md` asking it to call `graph_explore` first. See the [setup guide](https://ttsc.dev/docs/setup#codex-and-other-tool-conservative-agents).
+
 ## How it works
 
 `ttsc` already type-checks your project with the real TypeScript compiler and keeps the result in memory.

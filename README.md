@@ -159,6 +159,8 @@ Point your agent's MCP client at it. For Claude Code:
 
 On codegraph's own agent-cost benchmark, Claude agents answer reading zero files, cutting tokens by 77% to 86% and tool calls by 94% to 95%. See [`@ttsc/graph`](https://github.com/samchon/ttsc/tree/master/packages/graph) and the [benchmark](https://ttsc.dev/docs/benchmark#code-graph-mcp).
 
+Claude Code follows the server's instructions and uses the graph on its own. Codex is more conservative with third-party MCP tools and tends to fall back to the shell, so tell it directly: add a line to your `AGENTS.md` asking it to call `graph_explore` first. See [Setup](https://ttsc.dev/docs/setup#codex-and-other-tool-conservative-agents).
+
 ## Plugins
 
 Plugins let libraries add compile-time checks, transforms, and type-driven code generation to normal `ttsc` and `ttsx` runs.

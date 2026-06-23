@@ -14,11 +14,12 @@ import (
 // budgets so one query cannot flood an agent's context: a long body is truncated
 // to maxSourceLines (32) with a "more lines" tail, a node with more than
 // maxEdgesPerDirection (12) incoming edges gets a "more" tail, and once the
-// verbatim source crosses maxExploreChars (7000) the remaining matched nodes
-// collapse to signatures.
+// verbatim source crosses the query's budget — exploreBudgetBase (6000) for a
+// single-term query like "process" — the remaining matched nodes collapse to
+// signatures.
 //
 //  1. Compile a fixture with a 40-statement function, a Hub type referenced by 13
-//     functions, and three large process* functions.
+//     functions, and six large process* functions.
 //  2. Build the server from the resident Program.
 //  3. Assert each budget marker appears in the matching explore response.
 func TestExploreBoundsResponse(t *testing.T) {
@@ -42,11 +43,11 @@ func TestExploreBoundsResponse(t *testing.T) {
     fmt.Fprintf(&src, "export function u%d(h: Hub): void {}\n", i)
   }
 
-  // (c) processAlpha/Beta/Gamma: three functions each with a large body, so the
-  // verbatim source crosses maxExploreChars (7000) and the later matches collapse
-  // to signatures. The statement lines are deliberately long so three rendered
-  // bodies exceed the byte budget.
-  for _, name := range []string{"processAlpha", "processBeta", "processGamma"} {
+  // (c) Six process* functions each with a large body, so the verbatim source
+  // crosses the single-term budget (exploreBudgetBase, 6000) and the later matches
+  // collapse to signatures. The statement lines are deliberately long so the
+  // rendered bodies exceed the byte budget.
+  for _, name := range []string{"processAlpha", "processBeta", "processGamma", "processDelta", "processEpsilon", "processZeta"} {
     fmt.Fprintf(&src, "export function %s(): number {\n", name)
     fmt.Fprintf(&src, "  let total%s: number = 0;\n", name)
     for i := 0; i < 40; i++ {

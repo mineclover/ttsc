@@ -53,7 +53,10 @@ const serverInstructions = "For any question about how this project's code works
   "compiler's own resolution, so every relationship down to a method-to-method or constructor call that you " +
   "would otherwise grep for is already an edge. graph_explore takes a symbol name or the salient nouns of " +
   "the question (e.g. \"render update canvas element\"); it also shows a symbol's own diagnostics and how " +
-  "much of its blast radius is already broken, so you can judge a change's safety before making it. Open a " +
+  "much of its blast radius is already broken, so you can judge a change's safety before making it. Name " +
+  "several related symbols in one query rather than drilling one at a time: the response returns each match " +
+  "with its source and its neighbors' names and locations, so a few broad queries resolve a flow where many " +
+  "narrow follow-up calls just re-pay for the growing context. Open a " +
   "file only for statement-level detail inside a body it summarizes. Use graph_diagnostics for one file's " +
   "errors: TypeScript type errors plus the project's @ttsc/lint and transform-plugin findings."
 

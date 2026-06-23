@@ -75,11 +75,39 @@ func textResult(text string) any {
   }
 }
 
-// maxExploreChars budgets the verbatim source in a response. Past it, further
-// matched nodes render as a signature (header, edges, blast radius) without their
-// body, so one call does not flood the agent's context with source it did not ask
-// for, the adaptive-sizing idea codegraph uses.
-const maxExploreChars = 7000
+// The verbatim-source budget scales with how broadly the agent asked. Past the
+// budget, further matched nodes render as a signature (header, edges, blast
+// radius) without their body, so one call does not flood the context with source
+// it did not ask for.
+//
+// Why it scales with the query, not a flat cap: the agent's cost is dominated by
+// the NUMBER of turns, not any one response, because every prior response is
+// re-charged from the conversation cache on each later turn — K calls of size r
+// cost on the order of r·K²/2. So a broad, multi-symbol query (the agent batching
+// a whole flow) earns a large budget and gets the cluster back with bodies in one
+// turn, which stops a thorough model from a long symbol-by-symbol BFS. A narrow,
+// single-symbol query earns a small budget, so a shell-native agent that drills
+// one name at a time is not charged for a cluster it did not request. Measured: a
+// broad-batching model dropped from 9 calls to 4 once a broad query returned the
+// whole cluster, while narrow drillers stay cheap per call.
+const (
+  exploreBudgetBase    = 6000
+  exploreBudgetPerTerm = 3000
+  exploreBudgetMax     = 16000
+)
+
+// exploreBudget returns the verbatim-source budget for a query with terms salient
+// tokens: a base for the first symbol plus a per-extra-symbol increment, capped.
+func exploreBudget(terms int) int {
+  if terms < 1 {
+    terms = 1
+  }
+  budget := exploreBudgetBase + exploreBudgetPerTerm*(terms-1)
+  if budget > exploreBudgetMax {
+    return exploreBudgetMax
+  }
+  return budget
+}
 
 // maxEdgesPerDirection caps the incoming/outgoing edges listed per node so a
 // central symbol does not dump hundreds of relationships into the response.
@@ -108,11 +136,12 @@ func (s *Server) explore(args json.RawMessage) (any, *rpcError) {
   if len(matches) == 0 {
     return textResult(fmt.Sprintf("No graph nodes match %q.", in.Query)), nil
   }
+  budget := exploreBudget(len(queryTokens(in.Query)))
   var b strings.Builder
   b.WriteString(exploreHeader)
   collapsed := 0
   for _, node := range matches {
-    withSource := b.Len() < maxExploreChars
+    withSource := b.Len() < budget
     if !withSource {
       collapsed++
     }
@@ -247,7 +276,7 @@ func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSo
     external = " (external)"
   }
   source, line := s.nodeSource(node)
-  fmt.Fprintf(b, "%s %s%s  %s:%d\n", node.Kind, node.Name, external, node.File, line)
+  fmt.Fprintf(b, "%s %s%s  %s:%d\n", node.Kind, node.Name, external, s.relFile(node.File), line)
   if !withSource {
     return // past the budget: a one-line signature, no edges or body
   }
@@ -258,7 +287,7 @@ func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSo
     if edge.From == node.ID {
       if to := s.graph.Nodes[edge.To]; to != nil {
         if len(outgoing) < maxEdgesPerDirection {
-          outgoing = append(outgoing, fmt.Sprintf("  -> %s %s (%s)", to.Kind, to.Name, edge.Kind))
+          outgoing = append(outgoing, fmt.Sprintf("  -> (%s) %s %s  %s:%d", edge.Kind, to.Kind, to.Name, s.relFile(to.File), s.declLine(to)))
         } else {
           outMore++
         }
@@ -267,7 +296,7 @@ func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSo
     if edge.To == node.ID {
       if from := s.graph.Nodes[edge.From]; from != nil {
         if len(incoming) < maxEdgesPerDirection {
-          incoming = append(incoming, fmt.Sprintf("  <- %s %s (%s)", from.Kind, from.Name, edge.Kind))
+          incoming = append(incoming, fmt.Sprintf("  <- (%s) %s %s  %s:%d", edge.Kind, from.Kind, from.Name, s.relFile(from.File), s.declLine(from)))
         } else {
           inMore++
         }
@@ -344,6 +373,66 @@ func (s *Server) nodeSource(node *graph.Node) (string, int) {
 
 func isSpace(c byte) bool {
   return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+// relFile shortens an absolute workspace path to one relative to the project
+// root (the server cwd), so a response does not repeat the long absolute prefix
+// on every edge — pure token waste, since the agent runs from that root. A path
+// outside the root (a bundled lib) or an empty cwd (the prebuilt/test path) is
+// returned unchanged.
+func (s *Server) relFile(file string) string {
+  if s.cwd == "" {
+    return file
+  }
+  root := strings.ReplaceAll(s.cwd, "\\", "/")
+  f := strings.ReplaceAll(file, "\\", "/")
+  if strings.HasPrefix(f, root+"/") {
+    return f[len(root)+1:]
+  }
+  return file
+}
+
+// firstCodeOffset returns the index in src of the first non-trivia byte — past
+// leading whitespace and // line or /* */ block comments — so a signature begins
+// at the declaration keyword rather than a leading doc comment or, worse, a
+// .d.ts license banner that node.Pos includes as leading trivia.
+func firstCodeOffset(src string) int {
+  i := 0
+  for i < len(src) {
+    switch {
+    case isSpace(src[i]):
+      i++
+    case src[i] == '/' && i+1 < len(src) && src[i+1] == '/':
+      if j := strings.IndexByte(src[i:], '\n'); j >= 0 {
+        i += j + 1
+      } else {
+        return len(src)
+      }
+    case src[i] == '/' && i+1 < len(src) && src[i+1] == '*':
+      if j := strings.Index(src[i+2:], "*/"); j >= 0 {
+        i += 2 + j + 2
+      } else {
+        return len(src)
+      }
+    default:
+      return i
+    }
+  }
+  return i
+}
+
+// declLine returns node's 1-based declaration line, skipping the leading doc
+// comment that node.Pos carries as trivia so the line points at the declaration
+// itself. Carrying this on every edge is what lets a shell-native agent cite a
+// call target without re-reading the file to count lines — the dominant residual
+// cost the bare-name edge left on the table (a full signature, by contrast, only
+// bloated the response without cutting the body fetches a thorough model makes).
+func (s *Server) declLine(node *graph.Node) int {
+  src, line := s.nodeSource(node)
+  if src == "" {
+    return line
+  }
+  return line + strings.Count(src[:firstCodeOffset(src)], "\n")
 }
 
 // maxSourceLines caps the verbatim body shown per node, so one large declaration

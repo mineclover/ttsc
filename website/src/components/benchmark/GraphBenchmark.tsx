@@ -233,15 +233,13 @@ function AgentCostSection({ cells }: { cells: AgentCell[] }) {
                   </p>
                 ) : null}
                 <div className="mt-3">
-                  <div
-                    className={`font-mono text-3xl font-bold leading-none md:text-4xl ${
-                      tokensPct > 0 ? "text-cyan-300" : "text-neutral-500"
-                    }`}
-                  >
-                    {tokensPct > 0 ? `${tokensPct}%` : "0%"}
+                  <div className="font-mono text-3xl font-bold leading-none md:text-4xl">
+                    <span className="text-cyan-300">{100 - tokensPct}%</span>
+                    <span className="text-neutral-600"> / </span>
+                    <span className="text-neutral-300">{tokensPct}%</span>
                   </div>
                   <div className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-neutral-500">
-                    tokens saved
+                    used / saved &middot; tokens
                   </div>
                 </div>
               </div>

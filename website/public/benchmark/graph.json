@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-23T20:37:01.391Z",
+  "generatedAt": "2026-06-23T20:38:42.160Z",
   "structural": {
     "project": "packages/ttsc",
     "tsconfig": "tsconfig.json",
@@ -813,6 +813,58 @@
               "other": 0,
               "cost": 0.15901700000000002,
               "durMs": 27647,
+              "ok": true
+            }
+          ]
+        }
+      },
+      {
+        "harness": "claude-code",
+        "tool": "codegraph",
+        "toolSetupMs": 13322.9696,
+        "repo": "vue",
+        "model": "opus",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Which code schedules a component update after a ref value changes?",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 240916,
+              "tools": 4,
+              "reads": 1,
+              "grep": 3,
+              "graph": 0,
+              "other": 0,
+              "cost": 0.146295,
+              "durMs": 20965,
+              "ok": true
+            }
+          ],
+          "graph": [
+            {
+              "tokens": 478696,
+              "tools": 5,
+              "reads": 1,
+              "grep": 2,
+              "graph": 2,
+              "other": 0,
+              "cost": 0.356701,
+              "durMs": 35377,
+              "ok": true
+            }
+          ],
+          "guided": [
+            {
+              "tokens": 713777,
+              "tools": 5,
+              "reads": 1,
+              "grep": 1,
+              "graph": 3,
+              "other": 0,
+              "cost": 0.6351305,
+              "durMs": 40069,
               "ok": true
             }
           ]

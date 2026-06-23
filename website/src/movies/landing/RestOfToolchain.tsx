@@ -32,15 +32,6 @@ const CARDS = [
     accent: false,
   },
   {
-    name: "ttscserver",
-    tagline: "Editor",
-    description:
-      "Surface plugin diagnostics, quick fixes, and commands inside the TypeScript language stream.",
-    meta: "VS Code extension",
-    href: "/docs/setup#editor-vs-code",
-    accent: false,
-  },
-  {
     name: "@ttsc/graph",
     tagline: "Coding agents",
     description:
@@ -97,7 +88,7 @@ export default function RestOfToolchain() {
         </FadeIn>
 
         <FadeIn delay={120}>
-          <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {CARDS.map((card) => (
               <a
                 key={card.name}

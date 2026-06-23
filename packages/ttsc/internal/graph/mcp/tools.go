@@ -125,12 +125,14 @@ func (s *Server) explore(args json.RawMessage) (any, *rpcError) {
 }
 
 // exploreHeader prefixes every graph_explore response. It restates the graph's
-// authority on each result, not just in the one-time initialize instructions:
-// every relationship is the compiler's own resolution, so a thorough model has
-// no reason to re-open the files to re-derive what is already shown.
-const exploreHeader = "Checker-resolved — every relationship below is the TypeScript compiler's own resolution of this code, " +
-  "exact and complete for what it covers, not a syntactic guess. It is ground truth: answer from it, and do not " +
-  "re-open these files to re-derive what is already shown here.\n\n"
+// standing on each result, not only in the one-time initialize instructions, in
+// the precise terms that distinguish it from a model's own probabilistic recall:
+// this is a deterministic computation by the type checker, authoritative for the
+// relationships it reports, so re-reading the source to confirm is redundant
+// recomputation, not verification.
+const exploreHeader = "This is the type checker's own deterministic resolution of your code, authoritative for the " +
+  "relationships it reports. Re-reading the source only re-derives what the compiler already resolved; answer from " +
+  "the graph.\n\n"
 
 // maxExploreNodes caps how many ranked nodes a query returns, so a broad
 // keyword query surfaces the most relevant declarations without flooding context.

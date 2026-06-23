@@ -1299,7 +1299,7 @@ function materializeLocalTarballs(targets, dir) {
     fs.rmSync(packageDir, { recursive: true, force: true });
     fs.mkdirSync(path.dirname(packageDir), { recursive: true });
     sh(
-      `tar --force-local -xzf ${quote(path.join(TGZ, target.file))} -C ${quote(tmp)}`,
+      `tar --force-local -xzf ${quote(tarPath(path.join(TGZ, target.file)))} -C ${quote(tarPath(tmp))}`,
       dir,
       { quiet: true },
     );
@@ -1311,6 +1311,10 @@ function materializeLocalTarballs(targets, dir) {
     `Materialized local tarballs into ${path.basename(dir)}: ` +
       `${targets.map((target) => target.name).join(", ")}\n`,
   );
+}
+
+function tarPath(file) {
+  return process.platform === "win32" ? file.replace(/\\/g, "/") : file;
 }
 
 function linkPackageBins(packageDir, nodeModules) {

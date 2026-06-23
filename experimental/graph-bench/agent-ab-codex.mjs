@@ -36,12 +36,37 @@ const REPOS = {
   excalidraw: {
     url: "https://github.com/excalidraw/excalidraw",
     tsconfig: "tsconfig.json",
-    question: "How does Excalidraw render and update canvas elements?",
+    question: "How does Excalidraw redraw the scene when an element changes?",
   },
   vscode: {
     url: "https://github.com/microsoft/vscode",
     tsconfig: "src/tsconfig.json",
-    question: "How does the extension host communicate with the main process?",
+    question: "How does a VS Code extension send a message to the main process?",
+  },
+  nestjs: {
+    url: "https://github.com/nestjs/nest",
+    tsconfig: "tsconfig.graph.json",
+    question: "How does NestJS route an incoming request to a controller method?",
+  },
+  vue: {
+    url: "https://github.com/vuejs/core",
+    tsconfig: "tsconfig.graph.json",
+    question: "How does Vue re-render a component when a ref changes?",
+  },
+  zod: {
+    url: "https://github.com/colinhacks/zod",
+    tsconfig: "tsconfig.graph.json",
+    question: "What happens when you call a Zod schema's parse() method?",
+  },
+  typeorm: {
+    url: "https://github.com/typeorm/typeorm",
+    tsconfig: "tsconfig.graph.json",
+    question: "What happens when you call a repository's find() method?",
+  },
+  rxjs: {
+    url: "https://github.com/ReactiveX/rxjs",
+    tsconfig: "tsconfig.graph.json",
+    question: "What happens when you subscribe to an observable?",
   },
 };
 
@@ -71,10 +96,14 @@ const guidance = args.guidance === "1" || args.guidance === "true";
 const cg = args.cg === "1" || args.cg === "true";
 const GUIDANCE = `# Code navigation
 
-This project is served by a code-graph MCP server that maps the codebase with a real parser.
-
-For any question about how the code works, use that server's tools instead of grepping or reading files to trace calls, types, or references. Put every symbol the question involves into one query and answer in as few calls as you can; a flow usually needs only two or three. Do not call the tool once per symbol.
+For any question about how this code works, use the project's code-graph MCP server: name the symbols involved in one query and answer from its result, instead of grepping or reading files to trace calls and types.
 `;
+// The guided arm models how a normal user actually works: they keep an AGENTS.md
+// and tell the agent, in the prompt, to follow it. That elevates the project file
+// to the authority of the user's own words — the channel codex honors most — so it
+// is prepended to the question ONLY in the guided arm.
+const GUIDED_PREFIX =
+  "Follow this project's AGENTS.md instructions when answering.\n\n";
 function setGuidance(on) {
   for (const name of ["CLAUDE.md", "AGENTS.md"]) {
     const p = path.join(repoDir, name);
@@ -175,8 +204,9 @@ const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
 try {
   for (const arm of arms) {
     setGuidance(arm.guide);
+    const question = arm.guide ? GUIDED_PREFIX + spec.question : spec.question;
     for (let r = 0; r < runs; r++) {
-      const m = runCodex(spec.question, arm.home);
+      const m = runCodex(question, arm.home);
       samples[arm.name].push(m);
       console.log(
         `  ${arm.name.padEnd(8)} run ${r + 1}: ${m.tokens} tok, ${m.tools} tools ` +

@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 interface AgentSample {
   tokens: number;
   tools: number;
+  durMs?: number;
   [key: string]: unknown;
 }
 
@@ -18,6 +19,7 @@ interface AgentCell {
   model: string;
   runs?: number;
   tool?: string;
+  question?: string;
   samples: {
     baseline: AgentSample[];
     graph: AgentSample[];
@@ -69,6 +71,10 @@ function pctSaved(base: number, graph: number): number {
 
 function fmt(n: number): string {
   return n.toLocaleString();
+}
+
+function fmtSecs(ms: number): string {
+  return `${Math.round(ms / 1000)}s`;
 }
 
 function modelLabel(cell: AgentCell): string {
@@ -306,6 +312,10 @@ function AgentCostSection({ cells }: { cells: AgentCell[] }) {
           const graphTokens = median(cell.samples.graph.map((s) => s.tokens));
           const baseTools = median(cell.samples.baseline.map((s) => s.tools));
           const graphTools = median(cell.samples.graph.map((s) => s.tools));
+          const baseDur = median(
+            cell.samples.baseline.map((s) => s.durMs ?? 0),
+          );
+          const graphDur = median(cell.samples.graph.map((s) => s.durMs ?? 0));
           const tokensPct = pctSaved(baseTokens, graphTokens);
 
           const guided = Array.isArray(cell.samples.guided)
@@ -316,6 +326,9 @@ function AgentCostSection({ cells }: { cells: AgentCell[] }) {
             : undefined;
           const guidedTools = guided
             ? median(guided.map((s) => s.tools))
+            : undefined;
+          const guidedDur = guided
+            ? median(guided.map((s) => s.durMs ?? 0))
             : undefined;
 
           return (
@@ -331,6 +344,11 @@ function AgentCostSection({ cells }: { cells: AgentCell[] }) {
                   {cell.repo} · {cell.harness}
                   {cell.runs !== undefined ? ` · ${cell.runs} runs` : ""}
                 </p>
+                {cell.question ? (
+                  <p className="mt-2 max-w-[18rem] text-[12px] italic leading-snug text-neutral-400">
+                    “{cell.question}”
+                  </p>
+                ) : null}
                 <SavingHeadline tokensPct={tokensPct} />
               </div>
 
@@ -368,6 +386,21 @@ function AgentCostSection({ cells }: { cells: AgentCell[] }) {
                             guidedTools % 1 === 0
                               ? fmt(Math.round(guidedTools))
                               : guidedTools.toFixed(1),
+                        }
+                      : undefined
+                  }
+                />
+                <MetricBlock
+                  metric="wall time"
+                  baseMedian={baseDur}
+                  graphMedian={graphDur}
+                  baselineRaw={fmtSecs(baseDur)}
+                  graphRaw={fmtSecs(graphDur)}
+                  guided={
+                    guidedDur !== undefined
+                      ? {
+                          median: guidedDur,
+                          raw: fmtSecs(guidedDur),
                         }
                       : undefined
                   }

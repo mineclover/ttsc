@@ -164,15 +164,15 @@ func (s *Server) explore(args json.RawMessage) (any, *rpcError) {
 }
 
 // exploreHeader prefixes every graph_explore response. It carries only the steer
-// that is relevant on each result, not a copy of the one-time instructions: the
-// relationships are the compiler's own resolution (a trust signal that they are
-// exact, not a guess), and to go further the agent should widen this query rather
-// than fan out into many narrow calls. It deliberately does NOT say "do not read
-// the source", because a budget-collapsed or external node is rendered as a
-// signature with no body, and telling the agent not to open that file would be
-// wrong.
-const exploreHeader = "These relationships are the compiler's own resolution, exact for what it reports. To follow the " +
-  "flow further, add more symbols to this query rather than calling again one symbol at a time.\n\n"
+// that is relevant at the moment the agent reads a result and decides its next
+// move: the relationships are the compiler's own resolution (a trust signal that
+// they are exact), and the right way to go deeper is to name more symbols in
+// another query, not to shell out and re-read a path already resolved here. It
+// deliberately stops short of "do not read the source", because a budget-collapsed
+// or external node is shown as a signature with no body, and opening that file is
+// legitimate; what adds no precision is re-reading a path printed in full above.
+const exploreHeader = "These relationships are the compiler's exact resolution. To trace the flow deeper, name more " +
+  "symbols in another graph_explore — re-reading a path already resolved above adds cost, not precision.\n\n"
 
 // maxExploreNodes caps how many ranked nodes a query returns, so a broad
 // keyword query surfaces the most relevant declarations without flooding context.

@@ -12,6 +12,7 @@ package mcp
 import (
   "encoding/json"
   "fmt"
+  "strings"
   "sync"
 
   "github.com/samchon/ttsc/packages/ttsc/driver"
@@ -68,6 +69,10 @@ type Server struct {
   tscDiags    []driver.Diagnostic
   diags       []driver.Diagnostic
   diagsByNode map[string][]driver.Diagnostic
+  // nodeLineRanges is each node's 1-based [startLine, endLine], so a diagnostic
+  // that carries only a line — a plugin/lint finding parsed from ttsc's text
+  // banner, which has no byte offset — can still be attributed to its declaration.
+  nodeLineRanges map[string][2]int
   // diagProviders contribute non-tsc diagnostics (lint, transform plugins) over
   // the same Program; empty for the prebuilt binary, populated by a plugin-aware
   // host. Set once at construction, read only inside setProgram.
@@ -133,48 +138,66 @@ func (s *Server) setProgram(prog *driver.Program) {
     s.degree[edge.To]++
   }
   s.tscDiags = prog.Diagnostics()
+  s.nodeLineRanges = computeNodeLineRanges(prog, s.graph)
   s.refreshDiagnostics()
 }
 
-// refreshDiagnostics recomputes the fused diagnostic set — the compiler's own
-// tscDiags plus every provider's current output — and re-attributes it onto the
-// graph. Providers are re-run so a file-backed provider whose contents arrive
-// after startup (the launcher's plugin diagnostics, computed in the background)
-// is picked up on the next query without restarting the server. Callers hold the
-// tool-call lock, so this runs serially with the queries that read the result.
+// refreshDiagnostics recomputes the fused diagnostic set and re-attributes it
+// onto the graph. When a provider supplies diagnostics they are authoritative:
+// the launcher's worker runs ttsc's own check, so its output is the complete
+// plugin-aware set (the compiler's type errors plus @ttsc/lint and transform-
+// plugin findings) and replaces the server's tsc-only pass — no de-duplication
+// needed. With no provider output, the resident Program's diagnostics are used.
+// Providers are re-run per query so a file-backed provider whose contents arrive
+// after startup is picked up without restarting. Callers hold the tool-call
+// lock, so this runs serially with the queries that read the result.
 func (s *Server) refreshDiagnostics() {
-  diags := make([]driver.Diagnostic, len(s.tscDiags))
-  copy(diags, s.tscDiags)
+  var injected []driver.Diagnostic
   for _, provide := range s.diagProviders {
-    if provide == nil {
-      continue
+    if provide != nil {
+      injected = append(injected, provide(s.prog)...)
     }
-    diags = append(diags, provide(s.prog)...)
   }
-  s.diags = diags
-  s.diagsByNode = attributeDiagnostics(s.graph, diags)
+  if len(injected) > 0 {
+    s.diags = injected
+  } else {
+    s.diags = s.tscDiags
+  }
+  s.diagsByNode = attributeDiagnostics(s.graph, s.nodeLineRanges, s.diags)
 }
 
-// attributeDiagnostics maps each diagnostic to the smallest graph node whose
-// source span contains it, so a type error lands on the declaration it occurs
-// in and graph_explore can show "this symbol is broken here" alongside its
-// edges. A diagnostic with no position, or one that falls between declarations
-// (a top-of-file import error), stays unattributed rather than smeared onto a
-// neighbor.
-func attributeDiagnostics(g *graph.Graph, diags []driver.Diagnostic) map[string][]driver.Diagnostic {
+// attributeDiagnostics maps each diagnostic to the smallest graph node that
+// contains it, so a finding lands on the declaration it occurs in and
+// graph_explore can show "this symbol is broken here" alongside its edges. A
+// diagnostic with a byte offset (the compiler's own pass) is placed by span; one
+// with only a line (a plugin finding parsed from ttsc's text banner) is placed
+// by line range. A finding that falls between declarations (a top-of-file import
+// error) stays unattributed rather than smeared onto a neighbor.
+func attributeDiagnostics(g *graph.Graph, lineRanges map[string][2]int, diags []driver.Diagnostic) map[string][]driver.Diagnostic {
   byNode := make(map[string][]driver.Diagnostic)
   for _, d := range diags {
-    if d.Start == nil || d.File == "" {
+    if d.File == "" {
       continue
     }
-    pos := *d.Start
     var best *graph.Node
+    bestSize := 0
     for _, node := range g.Nodes {
-      if node.File != d.File || pos < node.Pos || pos >= node.End {
+      if node.File != d.File {
         continue
       }
-      if best == nil || (node.End-node.Pos) < (best.End-best.Pos) {
-        best = node
+      contains, size := false, 0
+      if d.Start != nil {
+        pos := *d.Start
+        contains = pos >= node.Pos && pos < node.End
+        size = node.End - node.Pos
+      } else if d.Line > 0 {
+        if lr, ok := lineRanges[node.ID]; ok {
+          contains = d.Line >= lr[0] && d.Line <= lr[1]
+          size = lr[1] - lr[0]
+        }
+      }
+      if contains && (best == nil || size < bestSize) {
+        best, bestSize = node, size
       }
     }
     if best != nil {
@@ -182,6 +205,29 @@ func attributeDiagnostics(g *graph.Graph, diags []driver.Diagnostic) map[string]
     }
   }
   return byNode
+}
+
+// computeNodeLineRanges records each node's 1-based [startLine, endLine] from its
+// source file's text, the index a line-only diagnostic is attributed against.
+func computeNodeLineRanges(prog *driver.Program, g *graph.Graph) map[string][2]int {
+  out := make(map[string][2]int, len(g.Nodes))
+  texts := map[string]string{}
+  for _, node := range g.Nodes {
+    text, ok := texts[node.File]
+    if !ok {
+      if file := prog.SourceFile(node.File); file != nil {
+        text = file.Text()
+      }
+      texts[node.File] = text
+    }
+    if text == "" || node.Pos < 0 || node.End > len(text) || node.Pos > node.End {
+      continue
+    }
+    start := 1 + strings.Count(text[:node.Pos], "\n")
+    end := 1 + strings.Count(text[:node.End], "\n")
+    out[node.ID] = [2]int{start, end}
+  }
+  return out
 }
 
 type request struct {

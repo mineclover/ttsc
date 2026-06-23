@@ -69,7 +69,12 @@ export function caller(): number {
   server := mcp.NewServer(prog, provider)
   text := toolText(t, server, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"graph_explore","arguments":{"query":"target"}}}`)
 
-  if !strings.Contains(text, "TS9999") || !strings.Contains(text, "synthetic lint finding") {
+  if !strings.Contains(text, "synthetic lint finding") {
     t.Fatalf("graph_explore did not surface the injected provider diagnostic on target:\n%s", text)
+  }
+  // A plugin/lint code (>= 9000) renders without the "TS" prefix reserved for
+  // TypeScript compiler diagnostics.
+  if strings.Contains(text, "TS9999") {
+    t.Fatalf("plugin-coded finding rendered with a TS prefix:\n%s", text)
   }
 }

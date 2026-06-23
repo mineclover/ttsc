@@ -57,20 +57,32 @@ export function runDiagnosticsWorker(
     const out = raw
       .filter(
         (d) =>
-          typeof d.code === "string" &&
           typeof d.file === "string" &&
-          typeof d.start === "number",
+          (typeof d.line === "number" || typeof d.start === "number"),
       )
       .map((d) => ({
         file: d.file as string,
-        start: d.start as number,
-        line: typeof d.line === "number" ? d.line : 1,
-        column: typeof d.character === "number" ? d.character : 1,
-        code: 0,
-        message: `${String(d.code)}: ${String(d.messageText ?? "")}`,
+        // A byte offset when the structured lane gives one; otherwise null and
+        // the server attributes by line. @ttsc/lint and transform plugins reach
+        // the result through ttsc's text banner, which carries a line but no
+        // offset.
+        start: typeof d.start === "number" ? (d.start as number) : null,
+        line: typeof d.line === "number" ? (d.line as number) : 1,
+        column: typeof d.character === "number" ? (d.character as number) : 1,
+        // tsc diagnostics use numeric codes; @ttsc/lint and native plugins hash
+        // their rule to a code >= 9000. A rare string id is marked non-tsc (the
+        // server then drops the "TS" prefix); the rule name travels in the
+        // message regardless.
+        code: typeof d.code === "number" ? (d.code as number) : 9000,
+        message: String(d.messageText ?? ""),
       }));
 
-    fs.writeFileSync(outPath, JSON.stringify(out));
+    // Atomic publish: write to a sibling temp file and rename, so the server
+    // never reads a half-written file (a partial read would drop every finding
+    // for that query).
+    const tmp = `${outPath}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(out));
+    fs.renameSync(tmp, outPath);
   } catch {
     // Resilient by contract: no file means the graph shows tsc-only diagnostics.
   }

@@ -282,7 +282,8 @@ func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSo
   // this declaration, and — the fix-safety angle — how much of its blast radius
   // is already broken, so the reach of an edit over current errors is visible
   // before the edit is made.
-  if own := s.diagsByNode[node.ID]; len(own) > 0 {
+  if own := s.nodeDiagnostics(node); len(own) > 0 {
+    sortDiagnostics(own)
     fmt.Fprintf(b, "  diagnostics here (%d):\n", len(own))
     for i, d := range own {
       if i >= maxNodeDiagnostics {
@@ -305,7 +306,7 @@ func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSo
       fmt.Fprintf(b, "  blast radius: %d transitive dependent(s)\n", len(deps))
     }
   }
-  if withSource && source != "" {
+  if source != "" {
     b.WriteString(numberLines(source, line))
   }
   b.WriteString("\n")
@@ -375,12 +376,40 @@ func (s *Server) dependents(node *graph.Node) map[string]bool {
   return seen
 }
 
+// nodeDiagnostics returns the diagnostics attributed to a node plus those on any
+// node nested within its source span. A class collects its methods' findings, so
+// exploring the class shows that its members are broken — the fix-safety signal
+// would otherwise sit only on the member nodes, which the agent has not named.
+func (s *Server) nodeDiagnostics(node *graph.Node) []driver.Diagnostic {
+  out := append([]driver.Diagnostic(nil), s.diagsByNode[node.ID]...)
+  for _, other := range s.graph.Nodes {
+    if other.ID == node.ID || other.File != node.File {
+      continue
+    }
+    if other.Pos >= node.Pos && other.End <= node.End {
+      out = append(out, s.diagsByNode[other.ID]...)
+    }
+  }
+  return out
+}
+
+// tscCodeFloor is the lowest code @ttsc/lint and native plugins hash their rule
+// names to (RuleCode = 9000 + hash). TypeScript's own diagnostic codes stay
+// below it, so the code alone tells a compiler error from a plugin finding.
+const tscCodeFloor = 9000
+
+// isTscCode reports whether code is a TypeScript compiler diagnostic (shown as
+// "TSxxxx") rather than a plugin/lint finding (whose hashed code is meaningless,
+// so its rule travels in the message instead).
+func isTscCode(code int32) bool {
+  return code > 0 && code < tscCodeFloor
+}
+
 // formatDiagnostic renders one diagnostic for a node listing. A tsc diagnostic
-// has a numeric code shown as "TSxxxx line N"; an injected lint/plugin finding
-// carries code 0 and a self-describing message (its rule is in the text), so the
-// "TS" prefix is dropped.
+// shows its "TSxxxx" code; a plugin/lint finding drops the code (its rule is in
+// the message) and shows just the location and text.
 func formatDiagnostic(d driver.Diagnostic) string {
-  if d.Code > 0 {
+  if isTscCode(d.Code) {
     return fmt.Sprintf("TS%d line %d: %s", d.Code, d.Line, d.Message)
   }
   return fmt.Sprintf("line %d: %s", d.Line, d.Message)
@@ -425,15 +454,31 @@ func (s *Server) diagnostics(args json.RawMessage) (any, *rpcError) {
   if len(found) == 0 {
     return textResult(fmt.Sprintf("No diagnostics for %s.", path)), nil
   }
+  sortDiagnostics(found)
   var b strings.Builder
   for _, d := range found {
-    if d.Code > 0 {
+    if isTscCode(d.Code) {
       fmt.Fprintf(&b, "%s:%d:%d TS%d %s\n", d.File, d.Line, d.Column, d.Code, d.Message)
     } else {
       fmt.Fprintf(&b, "%s:%d:%d %s\n", d.File, d.Line, d.Column, d.Message)
     }
   }
   return textResult(strings.TrimRight(b.String(), "\n")), nil
+}
+
+// sortDiagnostics orders diagnostics by source location so a file's findings
+// read top-to-bottom (the fused set otherwise lists the compiler's pass before
+// the injected plugin findings, regardless of line).
+func sortDiagnostics(diags []driver.Diagnostic) {
+  sort.Slice(diags, func(i, j int) bool {
+    if diags[i].Line != diags[j].Line {
+      return diags[i].Line < diags[j].Line
+    }
+    if diags[i].Column != diags[j].Column {
+      return diags[i].Column < diags[j].Column
+    }
+    return diags[i].Code < diags[j].Code
+  })
 }
 
 // resolveFile maps a tool's file argument to program source-file paths. An exact

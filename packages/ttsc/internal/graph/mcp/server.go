@@ -42,7 +42,10 @@ const serverInstructions = "ttsc-graph is this project's checker-resolved code g
   "you would otherwise grep for is already an edge. For any question about how the code works, call " +
   "graph_explore first (a symbol name, or the salient nouns of the question, e.g. \"render update canvas " +
   "element\") and answer from it; trust the resolved edges rather than re-reading. Open a file only for " +
-  "statement-level detail inside a body it summarizes. Use graph_diagnostics for type errors."
+  "statement-level detail inside a body it summarizes. graph_explore also shows a symbol's own diagnostics " +
+  "and how much of its blast radius is already broken, so you can judge a change's safety before making it. " +
+  "Use graph_diagnostics for one file's errors: TypeScript type errors plus the project's @ttsc/lint and " +
+  "transform-plugin findings."
 
 // Server answers MCP requests from a resident Program and the graph built from
 // it. The Program/graph may be supplied eagerly or built in the background; ready

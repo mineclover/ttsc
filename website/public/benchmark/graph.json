@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-23T20:50:22.495Z",
+  "generatedAt": "2026-06-23T20:52:07.128Z",
   "structural": {
     "project": "packages/ttsc",
     "tsconfig": "tsconfig.json",
@@ -1194,6 +1194,68 @@
               "other": 0,
               "cost": 0.263444,
               "durMs": 16284,
+              "ok": true
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "codegraph",
+        "toolSetupMs": 13462.5135,
+        "repo": "rxjs",
+        "model": "gpt-5.5",
+        "effort": "high",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Which code creates the Subscriber used by Observable.subscribe?",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 194082,
+              "cached": 86528,
+              "turns": 1,
+              "tools": 11,
+              "shell": 11,
+              "graph": 0,
+              "types": {
+                "agent_message": 4,
+                "command_execution": 11
+              },
+              "durMs": 44319,
+              "ok": true
+            }
+          ],
+          "graph": [
+            {
+              "tokens": 141104,
+              "cached": 51968,
+              "turns": 1,
+              "tools": 4,
+              "shell": 0,
+              "graph": 4,
+              "types": {
+                "agent_message": 4,
+                "mcp_tool_call": 4
+              },
+              "durMs": 30926,
+              "ok": true
+            }
+          ],
+          "guided": [
+            {
+              "tokens": 90666,
+              "cached": 35840,
+              "turns": 1,
+              "tools": 2,
+              "shell": 0,
+              "graph": 2,
+              "types": {
+                "agent_message": 3,
+                "mcp_tool_call": 2
+              },
+              "durMs": 25882,
               "ok": true
             }
           ]

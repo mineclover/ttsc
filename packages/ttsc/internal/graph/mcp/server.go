@@ -28,13 +28,12 @@ const defaultProtocolVersion = "2025-06-18"
 // serverInstructions is shipped in the initialize response. It is the only
 // channel through which the server advises an agent; nothing is written to disk.
 const serverInstructions = "ttsc-graph is this project's checker-resolved code graph: its nodes are the " +
-  "top-level declarations and its edges (calls, type references, heritage) are the TypeScript compiler's " +
-  "own resolution, not a textual guess. For an architecture or flow question — how the pieces fit, what " +
-  "relates to a symbol, a blast radius — call graph_explore first (a symbol name, or the salient nouns of " +
-  "the question, e.g. \"render update canvas element\") and answer from it: the top-level structure it " +
-  "returns is usually the whole answer, so you need not grep. Open a file only when the question turns on " +
-  "logic inside a method or a variable-bound callable, which the graph does not model. Use " +
-  "graph_diagnostics for type errors."
+  "declarations and their methods, and its edges (calls, type references, heritage) are the TypeScript " +
+  "compiler's own resolution — every relationship, down to a method-to-method or constructor call, that " +
+  "you would otherwise grep for is already an edge. For any question about how the code works, call " +
+  "graph_explore first (a symbol name, or the salient nouns of the question, e.g. \"render update canvas " +
+  "element\") and answer from it; trust the resolved edges rather than re-reading. Open a file only for " +
+  "statement-level detail inside a body it summarizes. Use graph_diagnostics for type errors."
 
 // Server answers MCP requests from a resident Program and the graph built from
 // it. The Program/graph may be supplied eagerly or built in the background; ready

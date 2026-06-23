@@ -123,16 +123,16 @@ function UsageBar({
     >
       <div className="flex h-5 w-full overflow-hidden rounded bg-[#171d28]">
         <div
-          className="h-full bg-neutral-500/80"
+          className="h-full bg-cyan-500"
           style={{ width: `${usedWidth}%` }}
         />
-        <div className="h-full flex-1 bg-emerald-500" />
+        <div className="h-full flex-1 bg-neutral-700" />
       </div>
       <div className="flex justify-between font-mono text-[10px]">
-        <span className="text-neutral-400">
+        <span className="text-cyan-300">
           {used}% used{rowLabel ? ` (${rowLabel})` : ""}
         </span>
-        <span className="text-emerald-300">{saved}% saved</span>
+        <span className="text-neutral-500">{saved}% saved</span>
       </div>
     </div>
   );
@@ -186,8 +186,8 @@ function AgentCostSection({ cells }: { cells: AgentCell[] }) {
             Agent cost
           </h2>
           <p className="mt-1 text-[13px] text-neutral-400">
-            Each bar is the empty-MCP baseline. The grey part is what the graph
-            still uses, the green part is what it saves. Hover for the raw counts.
+            Each bar is the empty-MCP baseline. The blue part is what the graph
+            still uses, the grey part is what it saves. Hover for the raw counts.
           </p>
         </div>
         <p className="font-mono text-[11px] uppercase text-neutral-500">
@@ -235,7 +235,7 @@ function AgentCostSection({ cells }: { cells: AgentCell[] }) {
                 <div className="mt-3">
                   <div
                     className={`font-mono text-3xl font-bold leading-none md:text-4xl ${
-                      tokensPct > 0 ? "text-emerald-300" : "text-neutral-500"
+                      tokensPct > 0 ? "text-cyan-300" : "text-neutral-500"
                     }`}
                   >
                     {tokensPct > 0 ? `${tokensPct}%` : "0%"}

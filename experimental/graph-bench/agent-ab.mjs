@@ -100,7 +100,9 @@ if (!fs.existsSync(repoDir)) {
 // A large repo (VS Code) is type-checked once by a daemon the per-session proxy
 // connects to, instead of rebuilt per session; small repos use the single-process
 // server directly.
-const useDaemon = args.daemon === "1" || args.daemon === "true" || repoKey === "vscode";
+// codegraph manages its own indexing/daemon, so the ttscgraph daemon path (which
+// spawns the unbuilt `binary`) must be skipped under --cg.
+const useDaemon = !cg && (args.daemon === "1" || args.daemon === "true" || repoKey === "vscode");
 let daemon = null;
 let withArgs;
 if (useDaemon) {
@@ -139,20 +141,25 @@ console.log(`Q: ${spec.question}\n`);
 
 const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
 let spent = 0;
-for (const arm of arms) {
-  setGuidance(arm.guide);
-  for (let r = 0; r < runs; r++) {
-    const m = runClaude(spec.question, arm.cfg);
-    samples[arm.name].push(m);
-    spent += m.cost;
-    console.log(
-      `  ${arm.name.padEnd(8)} run ${r + 1}: $${m.cost.toFixed(3)}, ${m.tokens} tok, ${m.tools} tools ` +
-        `(read ${m.reads}, grep ${m.grep}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
-        (m.ok ? "" : "  [FAILED]") + `  [running $${spent.toFixed(2)}]`,
-    );
+try {
+  for (const arm of arms) {
+    setGuidance(arm.guide);
+    for (let r = 0; r < runs; r++) {
+      const m = runClaude(spec.question, arm.cfg);
+      samples[arm.name].push(m);
+      spent += m.cost;
+      console.log(
+        `  ${arm.name.padEnd(8)} run ${r + 1}: $${m.cost.toFixed(3)}, ${m.tokens} tok, ${m.tools} tools ` +
+          `(read ${m.reads}, grep ${m.grep}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
+          (m.ok ? "" : "  [FAILED]") + `  [running $${spent.toFixed(2)}]`,
+      );
+    }
   }
+} finally {
+  // Always strip the guidance files, even on a mid-run throw, so a later
+  // no-guidance run cannot inherit them and taint its baseline/graph arms.
+  setGuidance(false);
 }
-setGuidance(false);
 
 const med = (arm, k) => median(samples[arm].filter((m) => m.ok).map((m) => m[k]));
 const pct = (g, b) => (b === 0 ? 0 : Math.round((1 - g / b) * 100));

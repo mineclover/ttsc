@@ -55,9 +55,14 @@ type Server struct {
   prog     *driver.Program
   graph    *graph.Graph
   degree   map[string]int
-  // diags is the project's diagnostics, computed once with the graph; diagsByNode
-  // attributes each to the declaration it occurs in, so graph_explore can fuse the
-  // live "what is broken" view onto the static structure it already serves.
+  // tscDiags is the compiler's own diagnostics, computed once with the graph
+  // (the Program is read-only after build). diags is the fused set — tscDiags
+  // plus every provider's current output — and diagsByNode attributes each to the
+  // declaration it occurs in, so graph_explore can fuse the live "what is broken"
+  // view onto the static structure it already serves. The fused set is refreshed
+  // per query so a file-backed provider (the launcher's plugin diagnostics,
+  // computed in the background) is picked up once it lands.
+  tscDiags    []driver.Diagnostic
   diags       []driver.Diagnostic
   diagsByNode map[string][]driver.Diagnostic
   // diagProviders contribute non-tsc diagnostics (lint, transform plugins) over
@@ -124,14 +129,27 @@ func (s *Server) setProgram(prog *driver.Program) {
     s.degree[edge.From]++
     s.degree[edge.To]++
   }
-  s.diags = prog.Diagnostics()
+  s.tscDiags = prog.Diagnostics()
+  s.refreshDiagnostics()
+}
+
+// refreshDiagnostics recomputes the fused diagnostic set — the compiler's own
+// tscDiags plus every provider's current output — and re-attributes it onto the
+// graph. Providers are re-run so a file-backed provider whose contents arrive
+// after startup (the launcher's plugin diagnostics, computed in the background)
+// is picked up on the next query without restarting the server. Callers hold the
+// tool-call lock, so this runs serially with the queries that read the result.
+func (s *Server) refreshDiagnostics() {
+  diags := make([]driver.Diagnostic, len(s.tscDiags))
+  copy(diags, s.tscDiags)
   for _, provide := range s.diagProviders {
     if provide == nil {
       continue
     }
-    s.diags = append(s.diags, provide(prog)...)
+    diags = append(diags, provide(s.prog)...)
   }
-  s.diagsByNode = attributeDiagnostics(s.graph, s.diags)
+  s.diags = diags
+  s.diagsByNode = attributeDiagnostics(s.graph, diags)
 }
 
 // attributeDiagnostics maps each diagnostic to the smallest graph node whose

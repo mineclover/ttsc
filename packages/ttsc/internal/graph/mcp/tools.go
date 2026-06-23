@@ -104,6 +104,7 @@ func (s *Server) explore(args json.RawMessage) (any, *rpcError) {
   if err := s.ensureLoaded(); err != nil {
     return nil, &rpcError{Code: codeInternal, Message: "graph not available: " + err.Error()}
   }
+  s.refreshDiagnostics()
   matches := s.matchNodes(in.Query)
   if len(matches) == 0 {
     return textResult(fmt.Sprintf("No graph nodes match %q.", in.Query)), nil
@@ -399,6 +400,7 @@ func (s *Server) diagnostics(args json.RawMessage) (any, *rpcError) {
   if err := s.ensureLoaded(); err != nil {
     return nil, &rpcError{Code: codeInternal, Message: "graph not available: " + err.Error()}
   }
+  s.refreshDiagnostics()
   matches := s.resolveFile(in.File)
   switch len(matches) {
   case 0:

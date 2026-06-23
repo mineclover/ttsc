@@ -134,7 +134,11 @@ See [`@ttsc/vscode`](https://github.com/samchon/ttsc/tree/master/packages/vscode
 
 ### Coding Agents (MCP)
 
-`@ttsc/graph` is an MCP server that gives a coding agent a checker-resolved code graph and diagnostics for your project, so it answers "what relates to this symbol" or "what is the blast radius of this change" from the type checker instead of grepping and re-reading files.
+`@ttsc/graph` gives a coding agent a checker-resolved map of your project, over MCP.
+
+It answers what relates to a symbol and what a change affects, straight from the type checker, so the agent stops grepping and re-reading files.
+
+It also carries the project's full diagnostics: type errors, `@ttsc/lint` violations, and plugin findings. They are fused onto the graph, so an agent sees a change's reach over what is already broken before editing.
 
 ```bash
 npm install -D ttsc @ttsc/graph typescript@rc

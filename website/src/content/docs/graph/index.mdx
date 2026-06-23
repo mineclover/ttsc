@@ -2,11 +2,45 @@ import { Tabs } from "nextra/components";
 
 # Code Graph (MCP)
 
-`@ttsc/graph` is a Model Context Protocol server that gives a coding agent a checker-resolved code graph and diagnostics for your TypeScript project. It runs `ttscgraph`, a native binary that builds one resident `Program` from your `tsconfig.json` and answers every query from that warm type checker.
+`@ttsc/graph` gives a coding agent a map of your TypeScript project, over MCP.
 
-The point of difference is precision. Every edge the graph reports is resolved by the real TypeScript-Go checker, not a syntactic heuristic: a call through a barrel re-export lands on the sibling source that declares the symbol, a `workspace:*` dependency is followed as your own code, and a `node_modules` or `.d.ts` declaration is reported as an external boundary leaf the walk does not descend into. Because the server holds the `Program` open, a query is a method call on an already-built checker, not a fresh compile and not an external language-server round-trip.
+It runs `ttscgraph`, a native binary that type-checks your project once and keeps it in memory. Every query is answered from that warm checker, not a fresh parse.
 
-On codegraph's own agent-cost benchmark this lets an agent answer an architecture question from the graph alone, reading zero files, for 70% fewer tokens and 83% fewer tool calls than the same agent without it, averaged across two repositories. See the [Benchmark](/docs/benchmark#code-graph-mcp) for the full numbers and method.
+So every relationship it reports is the compiler's own answer, not a guess from reading text.
+
+## One graph, two questions
+
+Most tools answer only one of these. This one answers both, from the same graph:
+
+- **What calls what.** The static structure: what a symbol calls, what depends on it, the types it touches, its heritage.
+- **What is broken, and how far it spreads.** The live diagnostics, fused onto that structure.
+
+That fusion is the point. `graph_explore` shows a symbol's own errors, and how many of the things that depend on it are already broken.
+
+So before you change a symbol, you can see the reach of the change over what is currently failing. That is fix-safety, not just a cheaper way to read code.
+
+No other tool fuses all three. A tree-sitter graph has no types and no errors. An editor's language server has errors but no structure graph. A linter is separate again. Only a graph built on the real checker holds the structure, the diagnostics, and the affected set in one place.
+
+On a public agent-cost benchmark the same graph also cut an agent's tokens by 70% and its tool calls by 83%, reading zero files. See the [Benchmark](/docs/benchmark#code-graph-mcp) for the numbers and method.
+
+## What only the compiler can resolve
+
+A text search or a tree-sitter parse stops where the syntax stops. A real type checker does not. So these edges are correct where a text tool can only guess:
+
+- **pnpm / workspace monorepos.** A `workspace:*` dependency is followed into the sibling package's real source. A call across packages lands on the true declaration, not the barrel it passed through.
+- **Path aliases.** A `@app/*` import from `tsconfig` is resolved to the real file, so the edge is right where a text tool sees only the alias string.
+- **Barrel re-exports.** An `index.ts` that only re-exports is unwrapped to the file that actually declares the symbol.
+- **Your code vs the world.** Anything in `node_modules` or a `.d.ts` is reported as an outside boundary, not walked into. The graph stays your code.
+
+## Diagnostics
+
+`graph_diagnostics`, and the errors fused into `graph_explore`, are the project's full diagnostic set:
+
+- TypeScript type and compile errors.
+- `@ttsc/lint` rule violations.
+- Transform-plugin errors, from plugins like typia and nestia.
+
+It can show all of them because it rides the real `ttsc` compile, plugins and all. It reports exactly what `ttsc` reports, at the same code and location.
 
 ## Install
 
@@ -44,7 +78,11 @@ Usage guidance is delivered in the MCP `initialize` response. The server never w
 <Tabs items={["graph_explore", "graph_diagnostics"]}>
 <Tabs.Tab>
 
-The primary tool. Given a symbol name or a file-path fragment, it returns the matching nodes and, for each, the verbatim line-numbered declaration source, its checker-resolved incoming and outgoing edges (`heritage`, `value-call`, `type-ref`), and a blast-radius count of transitive dependents. One call is usually enough context to stop, instead of fanning out to read files.
+The primary tool. Give it a symbol name or a file-path fragment.
+
+For each matching node it returns the verbatim line-numbered source, its checker-resolved edges in both directions (`heritage`, `value-call`, `type-ref`), its blast radius of transitive dependents, its own diagnostics, and how many of those dependents are already broken.
+
+One call is usually enough context to stop, instead of fanning out to read files.
 
 ```json
 { "name": "graph_explore", "arguments": { "query": "PaymentService" } }
@@ -53,7 +91,7 @@ The primary tool. Given a symbol name or a file-path fragment, it returns the ma
 </Tabs.Tab>
 <Tabs.Tab>
 
-The tsc semantic diagnostics for one file, in the same code and location `tsgo` reports, read straight from the shared `Program`.
+Every diagnostic for one file: type errors, `@ttsc/lint` violations, and transform-plugin findings, at the same code and location `ttsc` reports, read straight from the shared `Program`.
 
 ```json
 { "name": "graph_diagnostics", "arguments": { "file": "src/payment/service.ts" } }
@@ -74,7 +112,11 @@ Splitting `value-call` from `type-ref` lets an impact query separate "used at ru
 
 ## Scope
 
-This is a v1. The nodes are the declarations and their methods; the edges are the kinds above, resolved by the checker — a method-to-method call, a `new T()` constructor call, and a call from inside a top-level `const fn = () => …` are all edges. Diagnostics come from the tsc semantic pass. A file watcher, on-disk persistence, and lint-merged diagnostics are not included yet. The node identity is position-invariant, so an incremental layer can be added later without re-keying the graph.
+This is a v1. The nodes are the declarations and their methods, including the members of a `namespace`. The edges are the kinds above, resolved by the checker: a method-to-method call, a `new T()` constructor call, and a call from inside a top-level `const fn = () => …` are all edges.
+
+The diagnostics carry the full compile: type errors, lint, and transform plugins.
+
+A file watcher and on-disk persistence are not included yet. The node identity is position-invariant, so an incremental layer can be added later without re-keying the graph.
 
 ## Environment
 

@@ -19,7 +19,7 @@ func toolsListResult() any {
     "tools": []any{
       map[string]any{
         "name":        "graph_explore",
-        "description": "The compiler's own code graph for a symbol or file: returns its source plus every checker-resolved relationship — what it calls (method-to-method and constructor calls included), the types it references, and its heritage, in both directions — with its blast radius and any live diagnostics on it. The blast radius also reports how many transitive dependents currently have errors, so before editing a symbol you can see the reach of the change over what is already broken. Answer architecture, flow, and change-impact questions from it; the edges are what you would otherwise grep for.",
+        "description": "Call this first for any question about how the code works — architecture, flow, call paths, change impact — instead of grepping or reading files. It returns the compiler's own code graph for a symbol or file: the source plus every checker-resolved relationship — what it calls (method-to-method and constructor calls included), the types it references, and its heritage, in both directions — with its blast radius and any live diagnostics on it. The blast radius reports how many transitive dependents currently have errors, so before editing a symbol you can see the reach of the change over what is already broken; the edges are what you would otherwise grep for.",
         "inputSchema": map[string]any{
           "type": "object",
           "properties": map[string]any{

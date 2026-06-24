@@ -34,7 +34,11 @@ const ttscDir = path.join(repoRoot, "packages", "ttsc");
 // tool-neutral, naming no output shape, so neither grep nor the graph is handed
 // the format and the token comparison stays honest.
 const ARCHITECTURE_QUESTION = fs
-  .readFileSync(path.join(here, "questions", "architecture-callpath.md"), "utf8")
+  .readFileSync(
+    process.env.TTSC_BENCH_QUESTION_FILE ||
+      path.join(here, "questions", "architecture-callpath.md"),
+    "utf8",
+  )
   .trim();
 
 // TypeScript benchmark repos and their medium-difficulty questions.

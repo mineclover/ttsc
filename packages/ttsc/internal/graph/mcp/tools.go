@@ -3,6 +3,7 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -10,65 +11,74 @@ import (
 	"github.com/samchon/ttsc/packages/ttsc/internal/graph"
 )
 
+// queryFilesEnabled reports whether the query_files tool is advertised and
+// callable. On by default; set TTSC_GRAPH_NO_FILES to drop it, so a benchmark can
+// measure the query_nodes-only surface (query_files goes unused for relationship
+// and call-flow questions, where the fuzzy query_nodes is the workhorse).
+func queryFilesEnabled() bool {
+	return os.Getenv("TTSC_GRAPH_NO_FILES") == ""
+}
+
 // toolsListResult advertises the tool surface: query_nodes is the fat,
 // agent-facing default that answers a relationship question in one round-trip;
 // query_files outlines a file's declarations; query_diagnostics is the focused
 // "what is broken" tool.
 func toolsListResult() any {
-	return map[string]any{
-		"tools": []any{
-			map[string]any{
-				"name":        "query_nodes",
-				"description": queryNodesDescription,
-				"inputSchema": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"query": map[string]any{
-							"type":        "string",
-							"description": queryNodesQueryDescription,
-						},
+	tools := []any{
+		map[string]any{
+			"name":        "query_nodes",
+			"description": queryNodesDescription,
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"query": map[string]any{
+						"type":        "string",
+						"description": queryNodesQueryDescription,
 					},
-					"required": []any{"query"},
 				},
-			},
-			map[string]any{
-				"name":        "query_files",
-				"description": queryFilesDescription,
-				"inputSchema": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"locations": map[string]any{
-							"type":        "array",
-							"items":       map[string]any{"type": "string"},
-							"description": queryFilesLocationsDescription,
-						},
-					},
-					"required": []any{"locations"},
-				},
-			},
-			map[string]any{
-				"name":        "query_diagnostics",
-				"description": queryDiagnosticsDescription,
-				"inputSchema": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"files": map[string]any{
-							"type":        "array",
-							"items":       map[string]any{"type": "string"},
-							"description": queryDiagnosticsFilesDescription,
-						},
-						"severity": map[string]any{
-							"type":        "string",
-							"enum":        []any{"error", "warning", "all"},
-							"default":     "error",
-							"description": queryDiagnosticsSeverityDescription,
-						},
-					},
-					"required": []any{},
-				},
+				"required": []any{"query"},
 			},
 		},
 	}
+	if queryFilesEnabled() {
+		tools = append(tools, map[string]any{
+			"name":        "query_files",
+			"description": queryFilesDescription,
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"locations": map[string]any{
+						"type":        "array",
+						"items":       map[string]any{"type": "string"},
+						"description": queryFilesLocationsDescription,
+					},
+				},
+				"required": []any{"locations"},
+			},
+		})
+	}
+	tools = append(tools, map[string]any{
+		"name":        "query_diagnostics",
+		"description": queryDiagnosticsDescription,
+		"inputSchema": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"files": map[string]any{
+					"type":        "array",
+					"items":       map[string]any{"type": "string"},
+					"description": queryDiagnosticsFilesDescription,
+				},
+				"severity": map[string]any{
+					"type":        "string",
+					"enum":        []any{"error", "warning", "all"},
+					"default":     "error",
+					"description": queryDiagnosticsSeverityDescription,
+				},
+			},
+			"required": []any{},
+		},
+	})
+	return map[string]any{"tools": tools}
 }
 
 // clip bounds a client-supplied string before it is echoed into an error or
@@ -94,6 +104,9 @@ func (s *Server) callTool(params json.RawMessage) (any, *rpcError) {
 	case "query_nodes":
 		return s.queryNodes(call.Arguments)
 	case "query_files":
+		if !queryFilesEnabled() {
+			return nil, &rpcError{Code: codeInvalidParams, Message: "unknown tool: query_files"}
+		}
 		return s.queryFiles(call.Arguments)
 	case "query_diagnostics":
 		return s.queryDiagnostics(call.Arguments)

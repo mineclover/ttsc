@@ -17,6 +17,7 @@ interface AgentCell {
   harness: string;
   repo: string;
   model: string;
+  modelVersion?: string;
   effort?: string;
   fixtureBranch?: string;
   daemon?: boolean;
@@ -80,12 +81,51 @@ function fmtSecs(ms: number): string {
   return `${Math.round(ms / 1000)}s`;
 }
 
+/**
+ * Map a harness-qualified, version-agnostic `model` to a "Harness / Model"
+ * display string. The harness is the AI coding agent (Claude Code vs Codex);
+ * the model tier comes from `model` and its version from `modelVersion`. The
+ * version falls back to a sensible default when `modelVersion` is missing on
+ * old data, and an unrecognized model degrades to `model (harness)`.
+ */
 function modelLabel(cell: AgentCell): string {
-  if (cell.model === "sonnet") return "Claude Sonnet 4.6";
-  if (cell.model === "opus") return "Claude Opus 4.8";
-  if (cell.model === "gpt-5.5")
-    return `GPT-5.5 (codex${cell.effort ? `/${cell.effort}` : ""})`;
-  return `${cell.model} (${cell.harness})`;
+  const version = cell.modelVersion;
+  switch (cell.model) {
+    case "claude-code-sonnet":
+      return `Claude Code / Sonnet ${version ?? "4.6"}`;
+    case "claude-code-opus":
+      return `Claude Code / Opus ${version ?? "4.8"}`;
+    case "codex-gpt":
+      return `Codex / ${gptVersionLabel(version) ?? "GPT-5.5"}`;
+    case "codex-gpt-mini":
+      return `Codex / ${gptVersionLabel(version) ?? "GPT-5.4 mini"}`;
+    default:
+      return `${cell.model} (${cell.harness})`;
+  }
+}
+
+/**
+ * Turn a Codex model id (e.g. "gpt-5.5", "gpt-5.4-mini") into a display label
+ * ("GPT-5.5", "GPT-5.4 mini"). Returns undefined when there is no version.
+ */
+function gptVersionLabel(version: string | undefined): string | undefined {
+  if (!version) return undefined;
+  return version.replace(/^gpt-/i, "GPT-").replace(/-mini$/i, " mini");
+}
+
+/**
+ * Display name for an AI coding agent (the benchmark harness): Claude Code is
+ * Anthropic's CLI, Codex is OpenAI's CLI. Unknown harnesses pass through.
+ */
+function harnessLabel(harness: string): string {
+  switch (harness) {
+    case "claude-code":
+      return "Claude Code";
+    case "codex":
+      return "Codex";
+    default:
+      return harness;
+  }
 }
 
 function repoLabel(repo: string): string {
@@ -116,9 +156,18 @@ function cellTool(cell: AgentCell): string {
   return cell.tool ?? TOOL_TTSC;
 }
 
-/** Display order for the model rows inside a project tab. */
+/**
+ * Display order for the model rows inside a project tab: Claude Code first,
+ * then Codex; within each harness the larger model first. Unknown models sort
+ * last.
+ */
 function modelOrder(model: string): number {
-  const order = ["sonnet", "opus", "gpt-5.5"];
+  const order = [
+    "claude-code-opus",
+    "claude-code-sonnet",
+    "codex-gpt",
+    "codex-gpt-mini",
+  ];
   const index = order.indexOf(model);
   return index === -1 ? order.length : index;
 }
@@ -422,7 +471,7 @@ function ModelBlock({ model }: { model: ModelGroup }) {
           {model.label}
         </p>
         <p className="mt-1.5 font-mono text-[11px] text-neutral-500">
-          {model.harness}
+          {harnessLabel(model.harness)}
           {model.runs !== undefined
             ? ` · ${model.runs} run${model.runs !== 1 ? "s" : ""}`
             : ""}

@@ -6,6 +6,8 @@ import GraphBenchmark from "../../../components/benchmark/GraphBenchmark";
 
 It asks the two questions codegraph publishes: how completely does the graph resolve a real codebase, and does an agent spend less when it has the graph. The agent-cost runner also benchmarks `codegraph` itself as a comparator. Both run on real repositories through `experimental/benchmark/graph.mjs` and the lower-level harnesses in `experimental/graph-bench`, and the raw per-run samples are published to `website/public/benchmark/graph.json`.
 
+The agent-cost question is measured across two AI coding agents, each acting as a harness. An AI agent here is an autonomous CLI that reads the repository and answers a question by calling tools (shell, grep, read, or the `@ttsc/graph` MCP), measured once with the MCP server configured and once without it. The two harnesses are **Claude Code** (Anthropic's CLI) running Sonnet and Opus, and **Codex** (OpenAI's CLI) running GPT-5.5 and GPT-5.4 mini.
+
 The savings below are one axis. They are not the whole value.
 
 The graph fuses static structure and live diagnostics into one checker-resolved ontology. So an agent can also see a change's reach over what is currently broken — fix-safety, covered in [Code Graph](/docs/graph).

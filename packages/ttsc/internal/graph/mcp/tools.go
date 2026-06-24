@@ -660,6 +660,7 @@ func wantsConsumerHop(words map[string]bool) bool {
 
 func (s *Server) rankedReverseConsumers(cur string, tokens []string, words map[string]bool) []string {
   candidates := append([]string(nil), s.reverseValueAdj[cur]...)
+  preferredOwners := s.queryOwnerHints(candidates, words)
   sort.Slice(candidates, func(i, j int) bool {
     left := s.pathTargetScoreFrom(cur, candidates[i], tokens, words)
     right := s.pathTargetScoreFrom(cur, candidates[j], tokens, words)
@@ -678,6 +679,9 @@ func (s *Server) rankedReverseConsumers(cur string, tokens []string, words map[s
     if node == nil || node.External || s.ignored[node.File] || isCentralNoise(node) || flowTypeNoise(node) || flowVariableNoise(node, words) {
       continue
     }
+    if len(preferredOwners) > 0 && !preferredOwners[ownerOf(node.Name)] {
+      continue
+    }
     seen[id] = true
     out = append(out, id)
     if len(out) >= maxReverseConsumerBranch {
@@ -685,6 +689,21 @@ func (s *Server) rankedReverseConsumers(cur string, tokens []string, words map[s
     }
   }
   return out
+}
+
+func (s *Server) queryOwnerHints(ids []string, words map[string]bool) map[string]bool {
+  owners := map[string]bool{}
+  for _, id := range ids {
+    node := s.graph.Nodes[id]
+    if node == nil {
+      continue
+    }
+    owner := ownerOf(node.Name)
+    if owner != "" && words[owner] {
+      owners[owner] = true
+    }
+  }
+  return owners
 }
 
 func (s *Server) pathTargetScoreFrom(fromID, toID string, tokens []string, words map[string]bool) int {

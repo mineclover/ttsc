@@ -209,7 +209,7 @@ export class Builder {
   defer func() { _ = prog.Close() }()
 
   server := mcp.NewServer(prog)
-  text := toolText(t, server, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"query_nodes","arguments":{"query":"QueryExpressionMap.joinAttributes join attributes","mode":"flow"}}}`)
+  text := toolText(t, server, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"query_nodes","arguments":{"query":"Builder QueryExpressionMap.joinAttributes join attributes","mode":"flow"}}}`)
   for _, want := range []string{
     "variable QueryExpressionMap.joinAttributes",
     "method Builder.createJoinExpression",

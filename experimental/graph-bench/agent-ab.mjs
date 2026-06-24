@@ -284,7 +284,7 @@ try {
     setGuidance(arm.guide);
     const prompt = arm.guide ? GUIDED_PREFIX + question : question;
     for (let r = 0; r < runs; r++) {
-      const m = runClaude(prompt, arm.cfg, arm.name, r + 1);
+      const m = runClaude(prompt, arm.cfg, arm.name, r + 1, arm.guide);
       samples[arm.name].push(m);
       spent += m.cost;
       console.log(
@@ -381,26 +381,32 @@ function syncSleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-function runClaude(question, cfg, armName, runNumber) {
+function runClaude(question, cfg, armName, runNumber, guide) {
+  // Keep no-guidance arms isolated from parent AGENTS.md/CLAUDE.md, and prevent
+  // Claude's built-in Agent tool from turning an MCP benchmark into subagent IO.
+  const claudeArgs = [
+    "-p",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "bypassPermissions",
+    "--disallowedTools",
+    "Agent",
+    "--model",
+    model,
+    "--effort",
+    "high",
+    "--max-budget-usd",
+    "4",
+    "--strict-mcp-config",
+    "--mcp-config",
+    cfg,
+  ];
+  if (!guide) claudeArgs.splice(1, 0, "--bare");
   const result = cp.spawnSync(
     "claude",
-    [
-      "-p",
-      "--output-format",
-      "stream-json",
-      "--verbose",
-      "--permission-mode",
-      "bypassPermissions",
-      "--model",
-      model,
-      "--effort",
-      "high",
-      "--max-budget-usd",
-      "4",
-      "--strict-mcp-config",
-      "--mcp-config",
-      cfg,
-    ],
+    claudeArgs,
     {
       cwd: repoDir,
       input: question,

@@ -340,7 +340,7 @@ function waitForPort(portFile, timeoutMs) {
   throw new Error("daemon did not report a port in time");
 }
 
-// warmDaemon drives one graph_explore through the proxy, which blocks until the
+// warmDaemon drives one query_nodes call through the proxy, which blocks until the
 // daemon's background type-check lands, so the timed sessions hit a warm server.
 function warmDaemon(bin, addr) {
   const init = JSON.stringify({
@@ -353,7 +353,7 @@ function warmDaemon(bin, addr) {
     jsonrpc: "2.0",
     id: 2,
     method: "tools/call",
-    params: { name: "graph_explore", arguments: { query: "main" } },
+    params: { name: "query_nodes", arguments: { query: "main" } },
   });
   const result = cp.spawnSync(bin, ["--connect", addr], {
     input: `${init}\n${call}\n`,

@@ -184,13 +184,16 @@ func (s *Server) queryNodes(args json.RawMessage) (any, *rpcError) {
 	if len(matches) == 0 {
 		return textResult(fmt.Sprintf("No graph nodes match %q.", clip(in.Query, 200))), nil
 	}
-	// The downstream call-path walk is opt-in (TTSC_GRAPH_CALLPATH): for a specific
-	// mechanism question the agent already queries narrowly, so expanding the chain
-	// just floods the budget with bodiless signature stubs and inflates the response
-	// without dropping the call count. Default to the lean matched cluster.
+	// Expand the downstream call path only when the user actually asked for a flow.
+	// Exact public-surface questions such as `Repository.find()` need the next few
+	// compiler-resolved calls inline; otherwise thorough agents re-query or read the
+	// target files just to confirm the path. Plain symbol lookups stay lean.
 	nodes := matches
-	if os.Getenv("TTSC_GRAPH_CALLPATH") != "" {
-		nodes = s.withCallPath(matches, maxPathNodes)
+	callPath := os.Getenv("TTSC_GRAPH_CALLPATH") != "" || wantsCallPath(in.Query)
+	if callPath {
+		nodes = s.withCallPath(matches, maxPathNodes, in.Query)
+		nodes = s.filterFlowNodes(nodes, in.Query)
+		return textResult(s.renderFlowNodes(nodes, in.Query, "")), nil
 	}
 	return textResult(s.renderNodes(nodes, queryBudget(len(queryTokens(in.Query))), "")), nil
 }
@@ -248,10 +251,91 @@ func (s *Server) renderNodes(nodes []*graph.Node, budget int, note string) strin
 	return strings.TrimRight(b.String(), "\n")
 }
 
+// renderFlowNodes writes a compact implementation trace for call-path questions.
+// It keeps exact source windows but drops type edges, incoming edges, diagnostics,
+// and blast-radius metadata that are useful for impact analysis but costly noise
+// when the user asked "how does this flow reach the work?".
+func (s *Server) renderFlowNodes(nodes []*graph.Node, query string, note string) string {
+	var b strings.Builder
+	b.WriteString(flowHeader)
+	if note != "" {
+		b.WriteString(note)
+		b.WriteByte('\n')
+	}
+	included := make(map[string]bool, len(nodes))
+	for _, node := range nodes {
+		included[node.ID] = true
+	}
+	b.WriteString("Flow nodes:\n")
+	for i, node := range nodes {
+		fmt.Fprintf(&b, "  %d. %s %s  %s:%d\n", i+1, node.Kind, node.Name, s.relFile(node.File), s.declLine(node))
+	}
+	b.WriteByte('\n')
+	for _, node := range nodes {
+		s.writeFlowNode(&b, node, included, query)
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func (s *Server) filterFlowNodes(nodes []*graph.Node, query string) []*graph.Node {
+	tokens := queryTokens(query)
+	words := queryWords(query)
+	out := make([]*graph.Node, 0, len(nodes))
+	for i, node := range nodes {
+		if node == nil || flowTypeNoise(node) || flowHelperNoise(node, query, words) {
+			continue
+		}
+		if i == 0 || s.pathTargetScore(node.ID, tokens, words) > 0 {
+			out = append(out, node)
+			if len(out) >= maxFlowNodes {
+				break
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nodes
+	}
+	return out
+}
+
+const maxFlowNodes = 8
+
+func flowTypeNoise(node *graph.Node) bool {
+	switch strings.ToLower(string(node.Kind)) {
+	case "class", "interface", "type":
+		return true
+	default:
+		return false
+	}
+}
+
+func flowHelperNoise(node *graph.Node, query string, words map[string]bool) bool {
+	member := strings.ToLower(memberName(node.Name))
+	if strings.Contains(strings.ToLower(query), member) {
+		return false
+	}
+	switch {
+	case strings.HasPrefix(member, "create"):
+		return !words["create"] && !words["creates"] && !words["created"] && !words["creation"]
+	case strings.HasPrefix(member, "is"), strings.HasPrefix(member, "has"), strings.HasPrefix(member, "can"):
+		return true
+	case strings.HasPrefix(member, "reject"):
+		return !words["reject"] && !words["rejects"] && !words["rejected"]
+	case strings.HasPrefix(member, "get"):
+		return !words["get"] && !words["gets"] && !(strings.Contains(member, "join") && (words["join"] || words["joins"]))
+	case strings.Contains(member, "eager"):
+		return !words["eager"]
+	default:
+		return false
+	}
+}
+
 // maxPathNodes caps how many downstream call-path nodes a flow query pulls in
 // beyond its direct matches, so one query returns the chain without a hub
 // exploding the response. The render budget collapses the tail past it.
-const maxPathNodes = 12
+const maxPathNodes = 8
+
+const maxPathBranch = 2
 
 // withCallPath appends to the matched seeds the declarations downstream of them
 // along value-call edges (the runtime call flow), breadth-first and bounded, so a
@@ -260,10 +344,13 @@ const maxPathNodes = 12
 // Seeds, external nodes, and anything past the depth or node caps are skipped, and
 // the breadth-first order keeps the immediate next hops first so they render with
 // their bodies before the budget collapses the rest.
-func (s *Server) withCallPath(seeds []*graph.Node, max int) []*graph.Node {
+func (s *Server) withCallPath(seeds []*graph.Node, max int, query string) []*graph.Node {
 	const maxDepth = 5
+	tokens := queryTokens(query)
+	words := queryWords(query)
 	inSet := make(map[string]bool, len(seeds))
 	depth := make(map[string]int, len(seeds))
+	priority := make(map[string]int, len(seeds))
 	queue := make([]string, 0, len(seeds))
 	for _, n := range seeds {
 		inSet[n.ID] = true
@@ -275,15 +362,26 @@ func (s *Server) withCallPath(seeds []*graph.Node, max int) []*graph.Node {
 	for len(queue) > 0 && added < max {
 		cur := queue[0]
 		queue = queue[1:]
+		if depth[cur] > 0 {
+			if node := s.graph.Nodes[cur]; node != nil {
+				out = append(out, node)
+				added++
+				if added >= max {
+					break
+				}
+			}
+		}
 		if depth[cur] >= maxDepth {
 			continue
 		}
 		// Follow the call flow forward, and at each step cross the dynamic-dispatch
 		// seam to any concrete implementors, so an interface method on the path
-		// brings its real body along instead of forcing a separate query.
-		next := s.forwardCallAdj[cur]
-		if impls := s.implementorsAdj[cur]; len(impls) > 0 {
-			next = append(append([]string(nil), next...), impls...)
+		// brings its real body along instead of forcing a separate query. Targets
+		// whose names match the question's domain nouns come first, so a relation
+		// question reaches buildRelations before generic helpers like comment().
+		next := s.rankedPathTargets(cur, tokens, words)
+		if len(next) > maxPathBranch {
+			next = next[:maxPathBranch]
 		}
 		for _, to := range next {
 			if inSet[to] {
@@ -293,16 +391,201 @@ func (s *Server) withCallPath(seeds []*graph.Node, max int) []*graph.Node {
 			// Skip external and git-ignored (generated) targets: the call path stays
 			// in authored code, the same de-surfacing the matcher applies, so one
 			// query does not dump a Prisma client body the agent did not ask for.
-			if node == nil || node.External || s.ignored[node.File] {
+			if node == nil || node.External || s.ignored[node.File] || isCentralNoise(node) {
 				continue
 			}
 			inSet[to] = true
 			depth[to] = depth[cur] + 1
-			out = append(out, node)
+			priority[to] = s.pathTargetScoreFrom(cur, to, tokens, words)
 			queue = append(queue, to)
-			if added++; added >= max {
+			sortPathQueue(queue, priority)
+		}
+	}
+	return out
+}
+
+func sortPathQueue(queue []string, priority map[string]int) {
+	sort.SliceStable(queue, func(i, j int) bool {
+		left := priority[queue[i]]
+		right := priority[queue[j]]
+		if left != right {
+			return left > right
+		}
+		return queue[i] < queue[j]
+	})
+}
+
+func wantsCallPath(query string) bool {
+	lower := strings.ToLower(query)
+	for _, marker := range []string{
+		"call path",
+		"call flow",
+		"trace",
+		"downstream",
+		"through",
+		"invokes",
+		"invoked",
+		"builds",
+		"built",
+		"applied",
+		"resolved",
+		"joined",
+	} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	words := queryWords(query)
+	action := words["apply"] || words["applies"] || words["build"] || words["builds"] ||
+		words["join"] || words["joins"] || words["resolve"] || words["resolves"] ||
+		words["relation"] || words["relations"]
+	entry := words["find"] || words["query"] || strings.Contains(lower, ".")
+	return action && entry
+}
+
+func (s *Server) rankedPathTargets(cur string, tokens []string, words map[string]bool) []string {
+	seen := map[string]bool{}
+	next := make([]string, 0, len(s.forwardCallAdj[cur])+len(s.implementorsAdj[cur]))
+	for _, id := range s.forwardCallAdj[cur] {
+		if !seen[id] {
+			seen[id] = true
+			next = append(next, id)
+		}
+	}
+	for _, id := range s.implementorsAdj[cur] {
+		if !seen[id] {
+			seen[id] = true
+			next = append(next, id)
+		}
+	}
+	sort.Slice(next, func(i, j int) bool {
+		left := s.pathTargetScoreFrom(cur, next[i], tokens, words)
+		right := s.pathTargetScoreFrom(cur, next[j], tokens, words)
+		if left != right {
+			return left > right
+		}
+		return next[i] < next[j]
+	})
+	positive := 0
+	for _, id := range next {
+		if s.pathTargetScoreFrom(cur, id, tokens, words) <= 0 {
+			break
+		}
+		positive++
+	}
+	if positive > 0 {
+		next = next[:positive]
+	}
+	return next
+}
+
+func (s *Server) pathTargetScoreFrom(fromID, toID string, tokens []string, words map[string]bool) int {
+	score := s.pathTargetScore(toID, tokens, words)
+	from := s.graph.Nodes[fromID]
+	to := s.graph.Nodes[toID]
+	if from == nil || to == nil {
+		return score
+	}
+	if score > 0 && ownerOf(from.Name) != "" && ownerOf(from.Name) == ownerOf(to.Name) {
+		score += 80
+	}
+	return score
+}
+
+func (s *Server) pathTargetScore(id string, tokens []string, words map[string]bool) int {
+	node := s.graph.Nodes[id]
+	if node == nil {
+		return 0
+	}
+	name := strings.ToLower(node.Name)
+	member := strings.ToLower(memberName(node.Name))
+	score := naturalDottedScore(node.Name, words) + exactMemberScore(node.Name, words)
+	for _, token := range tokens {
+		switch {
+		case name == token:
+			score += 120
+		case member == token:
+			score += 120
+		case strings.HasPrefix(member, token):
+			score += 60
+		case strings.Contains(member, token):
+			score += 35
+		}
+	}
+	for word := range words {
+		if len(word) < 4 {
+			continue
+		}
+		if naturalMemberPartStopwords[word] || (queryStopwords[word] && !hasPathActionStem(word)) {
+			continue
+		}
+		for _, stem := range wordStems(word) {
+			if stem == "" {
+				continue
+			}
+			if pathActionStems[stem] {
+				if nameHasMemberStem(node.Name, stem) {
+					score += 90
+					break
+				}
+				continue
+			}
+			if strings.Contains(name, stem) {
+				score += 45
 				break
 			}
+		}
+	}
+	return score
+}
+
+func ownerOf(name string) string {
+	owner, _, ok := dottedNameParts(name)
+	if !ok {
+		return ""
+	}
+	return strings.ToLower(owner)
+}
+
+var pathActionStems = map[string]bool{
+	"apply":   true,
+	"build":   true,
+	"join":    true,
+	"resolve": true,
+}
+
+func hasPathActionStem(word string) bool {
+	for _, stem := range wordStems(word) {
+		if pathActionStems[stem] {
+			return true
+		}
+	}
+	return false
+}
+
+func nameHasMemberStem(name, stem string) bool {
+	for _, part := range memberWords(memberName(name)) {
+		if part == stem {
+			return true
+		}
+	}
+	return false
+}
+
+func wordStems(word string) []string {
+	out := []string{word}
+	if strings.HasSuffix(word, "ies") && len(word) > 3 {
+		out = append(out, strings.TrimSuffix(word, "ies")+"y")
+	}
+	if strings.HasSuffix(word, "ied") && len(word) > 3 {
+		out = append(out, strings.TrimSuffix(word, "ied")+"y")
+	}
+	if strings.HasSuffix(word, "ved") && len(word) > 3 {
+		out = append(out, strings.TrimSuffix(word, "d"))
+	}
+	for _, suffix := range []string{"ing", "ed", "es", "s"} {
+		if strings.HasSuffix(word, suffix) && len(word) > len(suffix)+2 {
+			out = append(out, strings.TrimSuffix(word, suffix))
 		}
 	}
 	return out
@@ -418,6 +701,9 @@ const exploreHeader = "Compiler-resolved graph snapshot, current as of this call
 	"Re-query only for no match, a node you need that was printed without a body, or source you have edited since. " +
 	"Do not shell/grep/read paths already printed here.\n\n"
 
+const flowHeader = "Compiler-resolved call flow, current as of this call. " +
+	"Answer from these exact path nodes, value-call edges, and code windows; do not shell/grep/read printed paths unless a required line is absent.\n\n"
+
 // maxExploreNodes caps how many ranked nodes a query returns, so a broad
 // keyword query surfaces the most relevant declarations without flooding context.
 const maxExploreNodes = 12
@@ -445,7 +731,8 @@ var queryStopwords = map[string]bool{
 	"path": true, "selected": true, "method": true, "methods": true,
 	"request": true, "requests": true, "process": true, "main": true,
 	"benchmark": true,
-	"build":     true, "builds": true, "built": true, "create": true, "creates": true,
+	"builder":   true, "builders": true,
+	"build": true, "builds": true, "built": true, "create": true, "creates": true,
 	"created": true, "creation": true,
 	"before": true, "after": true, "when": true, "invokes": true, "invoke": true,
 	"invoked": true, "call": true, "calls": true, "called": true, "used": true,
@@ -579,6 +866,53 @@ func naturalDottedScore(name string, words map[string]bool) int {
 	return 650
 }
 
+func naturalDottedAnchor(name string, words map[string]bool) bool {
+	owner, member, ok := dottedNameParts(name)
+	if !ok {
+		return false
+	}
+	member = strings.ToLower(member)
+	if naturalDottedAnchorStopwords[member] {
+		return false
+	}
+	return containsWholeWord(words, owner) && words[member]
+}
+
+var naturalDottedAnchorStopwords = map[string]bool{
+	"builder":  true,
+	"option":   true,
+	"options":  true,
+	"query":    true,
+	"relation": true,
+}
+
+func naturalAnchorPosition(query, name string) int {
+	owner, member, ok := dottedNameParts(strings.ToLower(name))
+	if !ok {
+		return len(query) + 1
+	}
+	ownerAt := strings.Index(query, owner)
+	memberAt := -1
+	if ownerAt >= 0 {
+		if idx := strings.Index(query[ownerAt+len(owner):], member); idx >= 0 {
+			memberAt = ownerAt + len(owner) + idx
+		}
+	}
+	if memberAt < 0 {
+		memberAt = strings.Index(query, member)
+	}
+	switch {
+	case ownerAt >= 0 && memberAt >= 0:
+		return memberAt
+	case ownerAt >= 0:
+		return ownerAt
+	case memberAt >= 0:
+		return memberAt
+	default:
+		return len(query) + 1
+	}
+}
+
 func exactMemberScore(name string, words map[string]bool) int {
 	_, member, ok := dottedNameParts(name)
 	if !ok {
@@ -605,9 +939,11 @@ func (s *Server) matchNodes(query string) []*graph.Node {
 	}
 
 	type scored struct {
-		node   *graph.Node
-		score  int
-		dotted bool
+		node        *graph.Node
+		score       int
+		dotted      bool
+		exactAnchor bool
+		anchorPos   int
 	}
 	ranked := make([]scored, 0)
 	for _, node := range s.graph.Nodes {
@@ -619,15 +955,25 @@ func (s *Server) matchNodes(query string) []*graph.Node {
 		}
 		score := 0
 		dotted := false
+		exactAnchor := false
+		anchorPos := len(whole) + 1
 		if name == whole {
 			score += 1000
+			exactAnchor = strings.Contains(name, ".")
+			anchorPos = 0
 		}
 		if strings.Contains(name, ".") && strings.Contains(whole, name) {
 			score += 900
 			dotted = true
+			exactAnchor = true
+			anchorPos = strings.Index(whole, name)
 		} else if naturalScore := naturalDottedScore(node.Name, words); naturalScore > 0 {
 			score += naturalScore
 			dotted = true
+			exactAnchor = naturalDottedAnchor(node.Name, words)
+			if exactAnchor {
+				anchorPos = naturalAnchorPosition(whole, node.Name)
+			}
 		} else if memberScore := exactMemberScore(node.Name, words); memberScore > 0 {
 			score += memberScore
 			dotted = true
@@ -662,7 +1008,7 @@ func (s *Server) matchNodes(query string) []*graph.Node {
 				score += degree
 			}
 		}
-		ranked = append(ranked, scored{node, score, dotted})
+		ranked = append(ranked, scored{node: node, score: score, dotted: dotted, exactAnchor: exactAnchor, anchorPos: anchorPos})
 	}
 	if len(ranked) > 0 {
 		sort.Slice(ranked, func(i, j int) bool {
@@ -671,6 +1017,32 @@ func (s *Server) matchNodes(query string) []*graph.Node {
 			}
 			return ranked[i].node.ID < ranked[j].node.ID
 		})
+		anchors := make([]*graph.Node, 0)
+		for _, r := range ranked {
+			if r.exactAnchor {
+				anchors = append(anchors, r.node)
+				if len(anchors) >= maxExploreNodes {
+					break
+				}
+			}
+		}
+		if len(anchors) > 0 {
+			anchorPos := make(map[string]int, len(ranked))
+			for _, r := range ranked {
+				if r.exactAnchor {
+					anchorPos[r.node.ID] = r.anchorPos
+				}
+			}
+			sort.SliceStable(anchors, func(i, j int) bool {
+				left := anchorPos[anchors[i].ID]
+				right := anchorPos[anchors[j].ID]
+				if left != right {
+					return left < right
+				}
+				return anchors[i].ID < anchors[j].ID
+			})
+			return anchors
+		}
 		dottedOwners := map[string]bool{}
 		for _, r := range ranked {
 			if !r.dotted {
@@ -890,6 +1262,27 @@ func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSo
 	b.WriteString("\n")
 }
 
+func (s *Server) writeFlowNode(b *strings.Builder, node *graph.Node, included map[string]bool, query string) {
+	s.writeNodeHeader(b, node)
+	s.writeFlowValueEdges(b, node, included)
+	if source, line := s.nodeSource(node); source != "" {
+		b.WriteString(numberLines(source, line))
+		s.writeValueCallExcerptsForQuery(b, node, source, line, query)
+	}
+	b.WriteString("\n")
+}
+
+func (s *Server) writeFlowValueEdges(b *strings.Builder, node *graph.Node, included map[string]bool) {
+	for _, edge := range s.graph.Edges {
+		if edge.From != node.ID || edge.Kind != graph.EdgeValueCall || !included[edge.To] {
+			continue
+		}
+		if to := s.graph.Nodes[edge.To]; to != nil {
+			fmt.Fprintf(b, "  -> %s %s  %s:%d\n", to.Kind, to.Name, s.relFile(to.File), s.declLine(to))
+		}
+	}
+}
+
 // nodeSource returns the verbatim declaration text of node and its 1-based start
 // line, or ("", 0) when the source file is not in the program or the span is out
 // of range. Leading whitespace before the declaration is skipped so the slice
@@ -982,10 +1375,14 @@ func (s *Server) declLine(node *graph.Node) int {
 // (a giant union type, a long class) cannot blow the whole response open.
 const maxSourceLines = 32
 
-// maxCallExcerpts caps the late-body call snippets printed after a truncated
-// declaration. These snippets are tied to checker-resolved value-call edges, so
-// they preserve code-flow context without dumping the whole body.
-const maxCallExcerpts = 6
+// maxCallExcerptWindows caps the late-body call windows printed after a
+// truncated declaration. These snippets are tied to checker-resolved value-call
+// edges, so they preserve code-flow context without dumping the whole body.
+const maxCallExcerptWindows = 6
+
+// maxCallExcerptLines caps the merged excerpt lines across all late calls from a
+// truncated declaration.
+const maxCallExcerptLines = 36
 
 // numberLines prefixes each line of source with its absolute line number so the
 // agent can cite or edit by line without re-reading the file, truncating a long
@@ -1004,16 +1401,41 @@ func numberLines(source string, startLine int) string {
 }
 
 func (s *Server) writeValueCallExcerpts(b *strings.Builder, node *graph.Node, source string, startLine int) {
+	s.writeValueCallExcerptsRanked(b, node, source, startLine, nil, nil)
+}
+
+func (s *Server) writeValueCallExcerptsForQuery(b *strings.Builder, node *graph.Node, source string, startLine int, query string) {
+	s.writeValueCallExcerptsRanked(b, node, source, startLine, queryTokens(query), queryWords(query))
+}
+
+func (s *Server) writeValueCallExcerptsRanked(b *strings.Builder, node *graph.Node, source string, startLine int, tokens []string, words map[string]bool) {
 	lines := strings.Split(source, "\n")
 	if len(lines) <= maxSourceLines {
 		return
 	}
-	shown := 0
-	seen := map[int]bool{}
+	edges := make([]*graph.Edge, 0)
 	for _, edge := range s.graph.Edges {
-		if edge.From != node.ID || edge.Kind != graph.EdgeValueCall {
-			continue
+		if edge.From == node.ID && edge.Kind == graph.EdgeValueCall {
+			edges = append(edges, edge)
 		}
+	}
+	if tokens != nil {
+		sort.SliceStable(edges, func(i, j int) bool {
+			left := s.pathTargetScoreFrom(node.ID, edges[i].To, tokens, words)
+			right := s.pathTargetScoreFrom(node.ID, edges[j].To, tokens, words)
+			if left != right {
+				return left > right
+			}
+			return edges[i].To < edges[j].To
+		})
+	}
+	type lineWindow struct {
+		start int
+		end   int
+	}
+	windows := make([]lineWindow, 0, maxCallExcerptWindows)
+	seen := map[int]bool{}
+	for _, edge := range edges {
 		to := s.graph.Nodes[edge.To]
 		if to == nil {
 			continue
@@ -1022,16 +1444,58 @@ func (s *Server) writeValueCallExcerpts(b *strings.Builder, node *graph.Node, so
 		if idx < 0 || seen[idx] {
 			continue
 		}
-		if shown == 0 {
-			b.WriteString("  call excerpts after truncated body:\n")
-		}
 		seen[idx] = true
-		fmt.Fprintf(b, "  %d\t%s\n", startLine+idx, lines[idx])
-		shown++
-		if shown >= maxCallExcerpts {
-			b.WriteString("  ... (more value-call excerpts omitted)\n")
-			return
+		start := idx - 2
+		if start < maxSourceLines {
+			start = maxSourceLines
 		}
+		end := idx + 5
+		if end >= len(lines) {
+			end = len(lines) - 1
+		}
+		windows = append(windows, lineWindow{start: start, end: end})
+		if len(windows) >= maxCallExcerptWindows {
+			break
+		}
+	}
+	if len(windows) == 0 {
+		return
+	}
+	sort.Slice(windows, func(i, j int) bool {
+		if windows[i].start != windows[j].start {
+			return windows[i].start < windows[j].start
+		}
+		return windows[i].end < windows[j].end
+	})
+	merged := windows[:0]
+	for _, window := range windows {
+		if len(merged) == 0 || window.start > merged[len(merged)-1].end+1 {
+			merged = append(merged, window)
+			continue
+		}
+		if window.end > merged[len(merged)-1].end {
+			merged[len(merged)-1].end = window.end
+		}
+	}
+	b.WriteString("  call excerpts after truncated body:\n")
+	written := 0
+	last := maxSourceLines - 1
+	for _, window := range merged {
+		if window.start > last+1 {
+			b.WriteString("  ...\n")
+		}
+		for i := window.start; i <= window.end; i++ {
+			if written >= maxCallExcerptLines {
+				b.WriteString("  ... (more value-call excerpts omitted)\n")
+				return
+			}
+			fmt.Fprintf(b, "  %d\t%s\n", startLine+i, lines[i])
+			written++
+			last = i
+		}
+	}
+	if len(windows) >= maxCallExcerptWindows {
+		b.WriteString("  ... (more value-call excerpts omitted)\n")
 	}
 }
 

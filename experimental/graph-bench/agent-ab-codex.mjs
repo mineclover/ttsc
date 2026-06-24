@@ -12,7 +12,7 @@
 //
 // codex --json has no cost field, so this reports tokens + tool calls + wall
 // time (not dollars). A "tool call" is a codex command_execution (shell read or
-// grep) or an mcp_tool_call (graph_explore / graph_diagnostics); "graph" counts
+// grep) or an mcp_tool_call (query_nodes / query_diagnostics); "graph" counts
 // only the latter.
 //
 // Spends real codex credits; non-deterministic; not wired into CI. Requires
@@ -485,7 +485,7 @@ function warmDaemon(bin, addr) {
     jsonrpc: "2.0",
     id: 2,
     method: "tools/call",
-    params: { name: "graph_explore", arguments: { query: "main" } },
+    params: { name: "query_nodes", arguments: { query: "main" } },
   });
   const result = cp.spawnSync(bin, ["--connect", addr], {
     input: `${init}\n${call}\n`,

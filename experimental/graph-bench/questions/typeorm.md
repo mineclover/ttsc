@@ -1,1 +1,1 @@
-How are relation options applied when repository.find() builds its query? Trace the call path from the public find method to where the relations are resolved and joined into the query.
+Trace how `Repository.find()` turns `relations` find options into query-builder joins: `Repository.find` -> `EntityManager.find` -> `SelectQueryBuilder.setFindOptions` -> `applyFindOptions` -> `buildRelations`. Explain how relation paths become join aliases and join attributes.

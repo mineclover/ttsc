@@ -17,15 +17,15 @@ interface ToolResult {
  * large-repository primitive instead — a long-lived `--daemon` builds the
  * checker once, publishes its loopback address to a port file, and a transient
  * `--connect <addr>` proxy pipes an agent's stdio to that warm daemon. The same
- * observable explore/diagnostics text must come back through the two-process
+ * observable nodes/diagnostics text must come back through the two-process
  * hop, proving the daemon's TCP listener and the proxy's stdio bridge both
  * work.
  *
  * 1. Materialize a project with a heritage edge (Sub extends Base) and a type
  *    error, spawn the daemon, and poll its port file for the loopback address.
- * 2. Drive initialize, tools/list, and tools/call for graph_explore and
- *    graph_diagnostics through a `--connect` proxy at that address.
- * 3. Assert the explore heritage relation and the TS2322 diagnostic, then kill the
+ * 2. Drive initialize, tools/list, and tools/call for query_nodes and
+ *    query_diagnostics through a `--connect` proxy at that address.
+ * 3. Assert the node heritage relation and the TS2322 diagnostic, then kill the
  *    daemon and remove the port file.
  */
 export const test_ttscgraph_daemon_serves_via_connect_proxy = async () => {
@@ -89,12 +89,14 @@ export const test_ttscgraph_daemon_serves_via_connect_proxy = async () => {
       };
       const names = list.tools.map((tool) => tool.name);
       assert.ok(
-        names.includes("graph_explore") && names.includes("graph_diagnostics"),
-        `tools/list advertises both tools, got ${names.join(", ")}`,
+        names.includes("query_nodes") &&
+          names.includes("query_files") &&
+          names.includes("query_diagnostics"),
+        `tools/list advertises the graph tools, got ${names.join(", ")}`,
       );
 
       const explore = (await client.request("tools/call", {
-        name: "graph_explore",
+        name: "query_nodes",
         arguments: { query: "Sub" },
       })) as ToolResult;
       const exploreText = explore.content[0]?.text ?? "";
@@ -102,17 +104,17 @@ export const test_ttscgraph_daemon_serves_via_connect_proxy = async () => {
         exploreText.includes("Sub") &&
           exploreText.includes("Base") &&
           exploreText.includes("heritage"),
-        `graph_explore renders the Sub -> Base heritage relation:\n${exploreText}`,
+        `query_nodes renders the Sub -> Base heritage relation:\n${exploreText}`,
       );
 
       const diagnostics = (await client.request("tools/call", {
-        name: "graph_diagnostics",
-        arguments: { file: "src/main.ts" },
+        name: "query_diagnostics",
+        arguments: { files: ["src/main.ts"] },
       })) as ToolResult;
       const diagnosticsText = diagnostics.content[0]?.text ?? "";
       assert.ok(
         diagnosticsText.includes("TS2322"),
-        `graph_diagnostics surfaces the TS2322 type error:\n${diagnosticsText}`,
+        `query_diagnostics surfaces the TS2322 type error:\n${diagnosticsText}`,
       );
     } finally {
       client.endStdin();

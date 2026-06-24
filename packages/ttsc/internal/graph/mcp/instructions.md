@@ -3,7 +3,7 @@
 A compiler-resolved graph of TypeScript relationships: calls, callers, types, ownership, blast radius. It mirrors the code; after an edit, query again, not from an old result.
 
 - **How does code connect?** `query_nodes`: one broad query (owner + action + nouns), before grep.
-- **What is in a file?** `query_files` with the paths.
+- **Everything in a file?** `query_files` with the paths: every declaration resolved in full.
 - **A file's errors, or the whole project's?** `query_diagnostics`.
 - **No match, omitted source, or non-TypeScript?** grep/read.
 
@@ -15,9 +15,9 @@ A compiler-resolved graph of TypeScript relationships: calls, callers, types, ow
 - The fuzzy match is the batch: a broad multi-noun query returns the whole cluster in one call, so you do not query one symbol at a time.
 - grep/read cannot assemble that, because the answer depends on resolved relationships, not on where a keyword appears.
 
-## Outline a file with `query_files`
+## Pull a whole file with `query_files`
 
-**Pass file paths to `query_files` to see their declarations as compact signatures**, one block per file, without bodies. Use it to learn a file's shape cheaply instead of reading the whole file; for a declaration's body, query its name with `query_nodes` or read the file.
+**Pass file paths to `query_files` to get every declaration in them resolved in full**: each with its edges, diagnostics, blast radius, and source, one block per file. A file query returns the objects inside and how they relate, not just its imports, so it answers a flow in one call instead of reading the file and chasing symbols one at a time.
 
 ## Check errors with `query_diagnostics`
 
@@ -47,7 +47,7 @@ The one trap is reusing an earlier result: it predates any edit you made after i
 ## Final checklist
 
 - Relationship or flow question? `query_nodes` with one broad owner + action + noun query, before any grep.
-- Want a file's shape? `query_files` with its path.
+- Need everything in a file? `query_files` with its path: every declaration in full.
 - A file's errors, or the whole project's? `query_diagnostics` with paths, or none for everything.
 - No match, omitted source, non-TypeScript, or literal text search? grep/read.
 - Edited a file since exploring? Query again; the result re-checks your edit.

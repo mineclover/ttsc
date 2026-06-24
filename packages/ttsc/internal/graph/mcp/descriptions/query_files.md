@@ -1,5 +1,5 @@
-Outline one or more source files: each file's declarations as compact signatures (kind, name, line, degree), without bodies or edges, so you see a file's shape in one cheap call.
+Render one or more source files in full: every declaration inside, each with its checker-resolved edges (calls, callers, types), the diagnostics on it, its blast radius, and verbatim source.
 
-Pass paths in `locations`; each is answered as its own block, in order.
+Pass paths in `locations`; each file is answered as its own block, in input order.
 
-For a declaration's body, query its name with query_nodes or read the file.
+One call returns a whole file as a graph of its objects and how they relate, which is what a file query is for, not its import surface.

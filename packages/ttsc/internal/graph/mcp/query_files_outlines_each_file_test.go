@@ -11,13 +11,14 @@ import (
 )
 
 // TestQueryFilesOutlinesEachFile verifies query_files returns one content block
-// per requested location, in input order, each listing that file's declarations
-// as signatures (no bodies), so an agent sees a file's shape cheaply.
+// per requested location, in input order, each rendering that file's declarations
+// in full (the query_nodes-grade view, body included), so a file query answers
+// from the objects inside the file, not just its import surface.
 //
 //  1. Compile a two-file fixture, each with a couple of declarations.
 //  2. Call query_files with both paths.
 //  3. Assert two content blocks, in order, each naming its file's declarations
-//     and not dumping a body.
+//     and rendering their verbatim bodies.
 func TestQueryFilesOutlinesEachFile(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "tsconfig.json"), `{
@@ -49,14 +50,15 @@ func TestQueryFilesOutlinesEachFile(t *testing.T) {
 	}
 	// Input order is preserved: b.ts first, a.ts second.
 	if !strings.Contains(blocks[0], "src/b.ts") || !strings.Contains(blocks[0], "beta") {
-		t.Fatalf("first block did not outline src/b.ts:\n%s", blocks[0])
+		t.Fatalf("first block did not render src/b.ts:\n%s", blocks[0])
 	}
 	if !strings.Contains(blocks[1], "src/a.ts") || !strings.Contains(blocks[1], "Alpha") {
-		t.Fatalf("second block did not outline src/a.ts:\n%s", blocks[1])
+		t.Fatalf("second block did not render src/a.ts:\n%s", blocks[1])
 	}
-	// An outline lists signatures, not bodies.
-	if strings.Contains(blocks[0]+blocks[1], "return") {
-		t.Fatalf("outline dumped a body instead of signatures:\n%s\n%s", blocks[0], blocks[1])
+	// A file is rendered in full: the declarations' verbatim bodies are present,
+	// not just their signatures.
+	if !strings.Contains(blocks[0], "return") || !strings.Contains(blocks[1], "return") {
+		t.Fatalf("query_files did not render declaration bodies:\n%s\n%s", blocks[0], blocks[1])
 	}
 }
 

@@ -174,9 +174,9 @@ func (s *Server) queryNodes(args json.RawMessage) (any, *rpcError) {
 	return textResult(s.renderNodes(matches, queryBudget(len(queryTokens(in.Query))), "")), nil
 }
 
-// queryFiles outlines one or more files: each file's declarations as compact
-// signatures, one result block per requested location in input order. Bodies are
-// a query_nodes / read job.
+// queryFiles renders one or more files in full: every declaration inside each file
+// with its query_nodes-grade view (edges, diagnostics, blast radius, body), one
+// result block per requested location in input order.
 func (s *Server) queryFiles(args json.RawMessage) (any, *rpcError) {
 	var in struct {
 		Locations []string `json:"locations"`
@@ -198,7 +198,7 @@ func (s *Server) queryFiles(args json.RawMessage) (any, *rpcError) {
 	}
 	s.refreshIfStale()
 	s.refreshDiagnostics()
-	return textBlocks(s.fileBlocks(locations)), nil
+	return textBlocks(s.fileBlocks(locations, queryBudgetMax)), nil
 }
 
 // renderNodes writes the standard graph view (header, each node's edges, blast
@@ -238,11 +238,13 @@ func textBlocks(blocks []string) any {
 	return map[string]any{"content": content}
 }
 
-// fileBlocks renders one outline block per requested location, in input order,
-// each headed with the location. An outline lists a file's declarations as
-// compact signatures (kind, name, line, degree) without bodies or edges, so an
-// agent sees a file's shape cheaply; bodies are a query/Read job.
-func (s *Server) fileBlocks(locations []string) []string {
+// fileBlocks renders one block per requested location, in input order, each headed
+// with the location. A file is the declarations inside it, so the block renders
+// every declaration with the same query_nodes-grade view (edges, diagnostics,
+// blast radius, and verbatim body): the objects in the file and how they relate
+// are what a file query is for, not its import surface. Declarations past the
+// budget collapse to a one-line signature so one call never floods the context.
+func (s *Server) fileBlocks(locations []string, budget int) []string {
 	blocks := make([]string, 0, len(locations))
 	for _, loc := range locations {
 		var b strings.Builder
@@ -254,6 +256,7 @@ func (s *Server) fileBlocks(locations []string) []string {
 			continue
 		}
 		sort.Strings(files)
+		collapsed := 0
 		for _, f := range files {
 			var nodes []*graph.Node
 			for _, node := range s.graph.Nodes {
@@ -264,8 +267,15 @@ func (s *Server) fileBlocks(locations []string) []string {
 			sort.Slice(nodes, func(i, j int) bool { return s.declLine(nodes[i]) < s.declLine(nodes[j]) })
 			fmt.Fprintf(&b, "%s (%d declarations):\n", s.relFile(f), len(nodes))
 			for _, node := range nodes {
-				fmt.Fprintf(&b, "  %s %s  :%d  (deg %d)\n", node.Kind, node.Name, s.declLine(node), s.degree[node.ID])
+				withSource := b.Len() < budget
+				if !withSource {
+					collapsed++
+				}
+				s.writeNodeRelations(&b, node, withSource)
 			}
+		}
+		if collapsed > 0 {
+			fmt.Fprintf(&b, "(%d further declaration(s) shown as signatures to fit the response budget)\n", collapsed)
 		}
 		blocks = append(blocks, strings.TrimRight(b.String(), "\n"))
 	}
@@ -640,24 +650,24 @@ func isCentralNoise(node *graph.Node) bool {
 		strings.Contains(file, "/decorators/")
 }
 
-// writeNodeRelations renders one node: a header with its source location, its
-// outgoing/incoming checker-resolved edges, a blast-radius estimate, and (when
-// withSource) the verbatim line-numbered declaration source. A signature-only
-// render keeps the header and relationships but drops the body to fit the budget.
-func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSource bool) {
+// writeNodeHeader writes a node's one-line signature: kind, name, an (external)
+// marker when the declaration is outside the program, and its file:declLine. The
+// cite is declLine (the declaration keyword, past any doc comment), the same line
+// the edges to this node report, so one node is cited at one line everywhere.
+func (s *Server) writeNodeHeader(b *strings.Builder, node *graph.Node) {
 	external := ""
 	if node.External {
 		external = " (external)"
 	}
-	source, line := s.nodeSource(node)
-	// The header cites declLine (the declaration keyword, past any doc comment), the
-	// same line the edges to this node report, so one node is cited at one line
-	// everywhere. The body below still renders from `line` (the source start), so a
-	// leading doc comment is shown with its own true line numbers.
 	fmt.Fprintf(b, "%s %s%s  %s:%d\n", node.Kind, node.Name, external, s.relFile(node.File), s.declLine(node))
-	if !withSource {
-		return // past the budget: a one-line signature, no edges or body
-	}
+}
+
+// writeNodeEdges writes a node's checker-resolved relationships: its outgoing
+// edges (what it reaches) then its incoming edges (what reaches it), each capped
+// at maxEdgesPerDirection with an overflow count so a central symbol does not dump
+// hundreds of relationships. This is the call-path material: every edge cites the
+// neighbor at its declLine, so a flow can be followed without another call.
+func (s *Server) writeNodeEdges(b *strings.Builder, node *graph.Node) {
 	outgoing := make([]string, 0, maxEdgesPerDirection)
 	incoming := make([]string, 0, maxEdgesPerDirection)
 	outMore, inMore := 0, 0
@@ -695,35 +705,63 @@ func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSo
 	if inMore > 0 {
 		fmt.Fprintf(b, "  <- (%d more)\n", inMore)
 	}
-	// The live view fused onto the static structure: the diagnostics that land on
-	// this declaration, and — the fix-safety angle — how much of its blast radius
-	// is already broken, so the reach of an edit over current errors is visible
-	// before the edit is made.
-	if own := s.nodeDiagnostics(node); len(own) > 0 {
-		sortDiagnostics(own)
-		fmt.Fprintf(b, "  diagnostics here (%d):\n", len(own))
-		for i, d := range own {
-			if i >= maxNodeDiagnostics {
-				fmt.Fprintf(b, "    ... (%d more)\n", len(own)-maxNodeDiagnostics)
-				break
-			}
-			fmt.Fprintf(b, "    %s\n", formatDiagnostic(d))
+}
+
+// writeNodeDiagnosticsHere writes the diagnostics that land on this declaration,
+// the live error view fused onto the static structure, capped at maxNodeDiagnostics
+// with the total still reported.
+func (s *Server) writeNodeDiagnosticsHere(b *strings.Builder, node *graph.Node) {
+	own := s.nodeDiagnostics(node)
+	if len(own) == 0 {
+		return
+	}
+	sortDiagnostics(own)
+	fmt.Fprintf(b, "  diagnostics here (%d):\n", len(own))
+	for i, d := range own {
+		if i >= maxNodeDiagnostics {
+			fmt.Fprintf(b, "    ... (%d more)\n", len(own)-maxNodeDiagnostics)
+			break
+		}
+		fmt.Fprintf(b, "    %s\n", formatDiagnostic(d))
+	}
+}
+
+// writeNodeBlastRadius writes the fix-safety angle: how many declarations
+// transitively depend on this node and how many already carry errors, so the reach
+// of an edit over current errors is visible before the edit is made.
+func (s *Server) writeNodeBlastRadius(b *strings.Builder, node *graph.Node) {
+	deps := s.dependents(node)
+	if len(deps) == 0 {
+		return
+	}
+	broken := 0
+	for id := range deps {
+		if len(s.diagsByNode[id]) > 0 {
+			broken++
 		}
 	}
-	if deps := s.dependents(node); len(deps) > 0 {
-		broken := 0
-		for id := range deps {
-			if len(s.diagsByNode[id]) > 0 {
-				broken++
-			}
-		}
-		if broken > 0 {
-			fmt.Fprintf(b, "  blast radius: %d transitive dependent(s), %d with current errors\n", len(deps), broken)
-		} else {
-			fmt.Fprintf(b, "  blast radius: %d transitive dependent(s)\n", len(deps))
-		}
+	if broken > 0 {
+		fmt.Fprintf(b, "  blast radius: %d transitive dependent(s), %d with current errors\n", len(deps), broken)
+	} else {
+		fmt.Fprintf(b, "  blast radius: %d transitive dependent(s)\n", len(deps))
 	}
-	if source != "" {
+}
+
+// writeNodeRelations renders one node for query_nodes: a header, its
+// outgoing/incoming checker-resolved edges, the diagnostics on it, a blast-radius
+// estimate, and (when withSource) the verbatim line-numbered declaration source. A
+// signature-only render (withSource false) keeps just the header to fit the budget.
+func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSource bool) {
+	s.writeNodeHeader(b, node)
+	if !withSource {
+		return // past the budget: a one-line signature, no edges or body
+	}
+	s.writeNodeEdges(b, node)
+	s.writeNodeDiagnosticsHere(b, node)
+	s.writeNodeBlastRadius(b, node)
+	// The body renders from the source start line (not declLine), so a leading doc
+	// comment is shown with its own true line numbers.
+	if source, line := s.nodeSource(node); source != "" {
 		b.WriteString(numberLines(source, line))
 		s.writeValueCallExcerpts(b, node, source, line)
 	}

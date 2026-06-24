@@ -18,9 +18,9 @@ interface ToolResult {
  *
  * 1. Materialize a project with a heritage edge (Sub extends Base) and a type
  *    error, then spawn ttscgraph against it.
- * 2. Drive initialize, tools/list, and tools/call for graph_explore and
- *    graph_diagnostics.
- * 3. Assert the explore relationship map, the TS2322 diagnostic, and a clean exit
+ * 2. Drive initialize, tools/list, and tools/call for query_nodes and
+ *    query_diagnostics.
+ * 3. Assert the node relationship map, the TS2322 diagnostic, and a clean exit
  *    on stdin close.
  */
 export const test_ttscgraph_serves_explore_and_diagnostics_over_mcp =
@@ -71,12 +71,14 @@ export const test_ttscgraph_serves_explore_and_diagnostics_over_mcp =
       };
       const names = list.tools.map((tool) => tool.name);
       assert.ok(
-        names.includes("graph_explore") && names.includes("graph_diagnostics"),
-        `tools/list advertises both tools, got ${names.join(", ")}`,
+        names.includes("query_nodes") &&
+          names.includes("query_files") &&
+          names.includes("query_diagnostics"),
+        `tools/list advertises the graph tools, got ${names.join(", ")}`,
       );
 
       const explore = (await client.request("tools/call", {
-        name: "graph_explore",
+        name: "query_nodes",
         arguments: { query: "Sub" },
       })) as ToolResult;
       const exploreText = explore.content[0]?.text ?? "";
@@ -84,17 +86,17 @@ export const test_ttscgraph_serves_explore_and_diagnostics_over_mcp =
         exploreText.includes("Sub") &&
           exploreText.includes("Base") &&
           exploreText.includes("heritage"),
-        `graph_explore renders the Sub -> Base heritage relation:\n${exploreText}`,
+        `query_nodes renders the Sub -> Base heritage relation:\n${exploreText}`,
       );
 
       const diagnostics = (await client.request("tools/call", {
-        name: "graph_diagnostics",
-        arguments: { file: "src/main.ts" },
+        name: "query_diagnostics",
+        arguments: { files: ["src/main.ts"] },
       })) as ToolResult;
       const diagnosticsText = diagnostics.content[0]?.text ?? "";
       assert.ok(
         diagnosticsText.includes("TS2322"),
-        `graph_diagnostics surfaces the TS2322 type error:\n${diagnosticsText}`,
+        `query_diagnostics surfaces the TS2322 type error:\n${diagnosticsText}`,
       );
     } finally {
       client.endStdin();

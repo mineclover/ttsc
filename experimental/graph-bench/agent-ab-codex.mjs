@@ -44,49 +44,46 @@ const REPOS = {
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-vscode.git",
     tsconfig: "src/tsconfig.json",
     question:
-      "Trace how $logExtensionHostMessage reaches MainThreadConsole, naming the source files and functions involved.",
+      "Where do extension-host log messages cross into MainThreadConsole?",
   },
   nestjs: {
     url: "https://github.com/nestjs/nest",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-nestjs.git",
     tsconfig: "tsconfig.graph.json",
-    question:
-      "Trace how RouterExecutionContext.create() invokes a controller handler for an HTTP request, naming the source files and functions involved.",
+    question: "Which RouterExecutionContext path calls a controller handler?",
   },
   vue: {
     url: "https://github.com/vuejs/core",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-vue.git",
     tsconfig: "tsconfig.graph.json",
     question:
-      "Trace how a RefImpl.value write reaches a ReactiveEffect render update, naming the source files and functions involved.",
+      "Which reactive effect path triggers a render update after a ref changes?",
   },
   zod: {
     url: "https://github.com/colinhacks/zod",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-zod.git",
     tsconfig: "tsconfig.graph.json",
-    question:
-      "Trace how ZodType.parse() reaches internal parsing, naming the source files and functions involved.",
+    question: "Which ZodType parse path reaches the internal parser?",
   },
   typeorm: {
     url: "https://github.com/typeorm/typeorm",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-typeorm.git",
     tsconfig: "tsconfig.graph.json",
     question:
-      "Trace how Repository.find() applies relation options while building a query, naming the source files and functions involved.",
+      "How are relation options applied when repository.find() builds its query?",
   },
   rxjs: {
     url: "https://github.com/ReactiveX/rxjs",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-rxjs.git",
     tsconfig: "tsconfig.graph.json",
-    question:
-      "Trace how Observable.subscribe() constructs and uses a Subscriber, naming the source files and functions involved.",
+    question: "Which Observable.subscribe path constructs the Subscriber?",
   },
   "shopping-backend": {
     url: "https://github.com/samchon/shopping-backend",
     fixtureUrl: "https://github.com/samchon/shopping-backend.git",
     tsconfig: "tsconfig.json",
     question:
-      "Trace how ShoppingOrderProvider.create() builds and persists an order, naming the source files and functions involved.",
+      "Which ShoppingOrderProvider path assembles an order create input before saving?",
   },
 };
 

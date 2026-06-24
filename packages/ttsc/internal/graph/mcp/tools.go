@@ -250,7 +250,9 @@ func (s *Server) matchNodes(query string) []*graph.Node {
     if name == whole {
       score += 1000
     }
-    if len(name) >= 8 && strings.Contains(whole, name) {
+    if strings.Contains(name, ".") && strings.Contains(whole, name) {
+      score += 900
+    } else if len(name) >= 8 && strings.Contains(whole, name) {
       score += 500
     }
     for _, token := range tokens {

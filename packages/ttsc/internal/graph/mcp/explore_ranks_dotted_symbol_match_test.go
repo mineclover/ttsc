@@ -62,6 +62,10 @@ export class ShoppingOrderProvider {
   if createAt < 0 {
     t.Fatalf("graph_explore did not return ShoppingOrderProvider.create:\n%s", text)
   }
+  classAt := strings.Index(text, "class ShoppingOrderProvider")
+  if classAt >= 0 && classAt < createAt {
+    t.Fatalf("graph_explore ranked owner class before dotted method match:\n%s", text)
+  }
   if atAt >= 0 && atAt < createAt {
     t.Fatalf("graph_explore ranked sibling method before dotted symbol match:\n%s", text)
   }

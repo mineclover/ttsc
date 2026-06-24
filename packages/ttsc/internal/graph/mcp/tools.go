@@ -323,7 +323,7 @@ func (s *Server) expandNodes(args json.RawMessage) (any, *rpcError) {
     nodes = s.filterFlowNodes(nodes, flowQuery)
     return textResult(s.renderFlowNodes(nodes, flowQuery, note)), nil
   }
-  return textResult(s.renderNodes(nodes, expandBudget(len(nodes)), note)), nil
+  return textResult(s.renderExpandedNodes(nodes, expandBudget(len(nodes)), note)), nil
 }
 
 // queryFiles renders a roster for one or more files: each file's adjacent files
@@ -359,6 +359,14 @@ func (s *Server) queryFiles(args json.RawMessage) (any, *rpcError) {
 // budget to a one-line signature so one call never floods the context. note is an
 // optional line prepended after the header (e.g. names that matched nothing).
 func (s *Server) renderNodes(nodes []*graph.Node, budget int, note string) string {
+  return s.renderNodesWithSourceLimit(nodes, budget, note, maxSourceLines)
+}
+
+func (s *Server) renderExpandedNodes(nodes []*graph.Node, budget int, note string) string {
+  return s.renderNodesWithSourceLimit(nodes, budget, note, expandedSourceLines(len(nodes)))
+}
+
+func (s *Server) renderNodesWithSourceLimit(nodes []*graph.Node, budget int, note string, sourceLines int) string {
   var b strings.Builder
   b.WriteString(exploreHeader)
   if note != "" {
@@ -371,7 +379,7 @@ func (s *Server) renderNodes(nodes []*graph.Node, budget int, note string) strin
     if !withSource {
       collapsed++
     }
-    s.writeNodeRelations(&b, node, withSource)
+    s.writeNodeRelations(&b, node, withSource, sourceLines)
   }
   if collapsed > 0 {
     fmt.Fprintf(&b, "(%d further node(s) shown as signatures to fit the response budget)\n", collapsed)
@@ -1428,7 +1436,7 @@ func (s *Server) writeNodeBlastRadius(b *strings.Builder, node *graph.Node) {
 // outgoing/incoming checker-resolved edges, the diagnostics on it, a blast-radius
 // estimate, and (when withSource) the verbatim line-numbered declaration source. A
 // signature-only render (withSource false) keeps just the header to fit the budget.
-func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSource bool) {
+func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSource bool, sourceLines int) {
   s.writeNodeHeader(b, node)
   if !withSource {
     return // past the budget: a one-line signature, no edges or body
@@ -1439,8 +1447,8 @@ func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSo
   // The body renders from the source start line (not declLine), so a leading doc
   // comment is shown with its own true line numbers.
   if source, line, sourceOffset := s.nodeSourceRange(node); source != "" {
-    b.WriteString(numberLines(source, line))
-    s.writeValueCallExcerpts(b, node, source, line, sourceOffset)
+    b.WriteString(numberLines(source, line, sourceLines))
+    s.writeValueCallExcerpts(b, node, source, line, sourceOffset, sourceLines)
   }
   b.WriteString("\n")
 }
@@ -1449,8 +1457,8 @@ func (s *Server) writeFlowNode(b *strings.Builder, node *graph.Node, included ma
   s.writeNodeHeader(b, node)
   s.writeFlowValueEdges(b, node, included)
   if source, line, sourceOffset := s.nodeSourceRange(node); source != "" {
-    b.WriteString(numberLines(source, line))
-    s.writeValueCallExcerptsForQuery(b, node, source, line, sourceOffset, query)
+    b.WriteString(numberLines(source, line, maxSourceLines))
+    s.writeValueCallExcerptsForQuery(b, node, source, line, sourceOffset, maxSourceLines, query)
   }
   b.WriteString("\n")
 }
@@ -1583,6 +1591,19 @@ func (s *Server) declLine(node *graph.Node) int {
 // (a giant union type, a long class) cannot blow the whole response open.
 const maxSourceLines = 32
 
+const maxExpandedSourceLines = 180
+
+func expandedSourceLines(nodes int) int {
+  switch {
+  case nodes <= 3:
+    return maxExpandedSourceLines
+  case nodes <= 5:
+    return 120
+  default:
+    return 80
+  }
+}
+
 // maxCallExcerptWindows caps the late-body call windows printed after a
 // truncated declaration. These snippets are tied to checker-resolved value-call
 // edges, so they preserve code-flow context without dumping the whole body.
@@ -1595,12 +1616,12 @@ const maxCallExcerptLines = 36
 // numberLines prefixes each line of source with its absolute line number so the
 // agent can cite or edit by line without re-reading the file, truncating a long
 // body to maxSourceLines.
-func numberLines(source string, startLine int) string {
+func numberLines(source string, startLine int, limit int) string {
   lines := strings.Split(source, "\n")
   var b strings.Builder
   for i, line := range lines {
-    if i >= maxSourceLines {
-      fmt.Fprintf(&b, "  ... (%d more lines)\n", len(lines)-maxSourceLines)
+    if i >= limit {
+      fmt.Fprintf(&b, "  ... (%d more lines)\n", len(lines)-limit)
       break
     }
     fmt.Fprintf(&b, "  %d\t%s\n", startLine+i, line)
@@ -1608,17 +1629,17 @@ func numberLines(source string, startLine int) string {
   return b.String()
 }
 
-func (s *Server) writeValueCallExcerpts(b *strings.Builder, node *graph.Node, source string, startLine int, sourceOffset int) {
-  s.writeValueCallExcerptsRanked(b, node, source, startLine, sourceOffset, nil, nil)
+func (s *Server) writeValueCallExcerpts(b *strings.Builder, node *graph.Node, source string, startLine int, sourceOffset int, sourceLines int) {
+  s.writeValueCallExcerptsRanked(b, node, source, startLine, sourceOffset, sourceLines, nil, nil)
 }
 
-func (s *Server) writeValueCallExcerptsForQuery(b *strings.Builder, node *graph.Node, source string, startLine int, sourceOffset int, query string) {
-  s.writeValueCallExcerptsRanked(b, node, source, startLine, sourceOffset, queryTokens(query), queryWords(query))
+func (s *Server) writeValueCallExcerptsForQuery(b *strings.Builder, node *graph.Node, source string, startLine int, sourceOffset int, sourceLines int, query string) {
+  s.writeValueCallExcerptsRanked(b, node, source, startLine, sourceOffset, sourceLines, queryTokens(query), queryWords(query))
 }
 
-func (s *Server) writeValueCallExcerptsRanked(b *strings.Builder, node *graph.Node, source string, startLine int, sourceOffset int, tokens []string, words map[string]bool) {
+func (s *Server) writeValueCallExcerptsRanked(b *strings.Builder, node *graph.Node, source string, startLine int, sourceOffset int, sourceLines int, tokens []string, words map[string]bool) {
   lines := strings.Split(source, "\n")
-  if len(lines) <= maxSourceLines {
+  if len(lines) <= sourceLines {
     return
   }
   edges := make([]*graph.Edge, 0)
@@ -1648,7 +1669,7 @@ func (s *Server) writeValueCallExcerptsRanked(b *strings.Builder, node *graph.No
     if to == nil {
       continue
     }
-    idx := edgeLineIndex(edge, source, sourceOffset)
+    idx := edgeLineIndex(edge, source, sourceOffset, sourceLines)
     if idx < 0 {
       idx = findLateCallLine(lines, memberName(to.Name))
     }
@@ -1657,8 +1678,8 @@ func (s *Server) writeValueCallExcerptsRanked(b *strings.Builder, node *graph.No
     }
     seen[idx] = true
     start := idx - 2
-    if start < maxSourceLines {
-      start = maxSourceLines
+    if start < sourceLines {
+      start = sourceLines
     }
     end := idx + 5
     if end >= len(lines) {
@@ -1690,7 +1711,7 @@ func (s *Server) writeValueCallExcerptsRanked(b *strings.Builder, node *graph.No
   }
   b.WriteString("  value-use excerpts after truncated body:\n")
   written := 0
-  last := maxSourceLines - 1
+  last := sourceLines - 1
   for _, window := range merged {
     if window.start > last+1 {
       b.WriteString("  ...\n")
@@ -1717,12 +1738,12 @@ func memberName(name string) string {
   return name
 }
 
-func edgeLineIndex(edge *graph.Edge, source string, sourceOffset int) int {
+func edgeLineIndex(edge *graph.Edge, source string, sourceOffset int, sourceLines int) int {
   if edge.Pos < sourceOffset || edge.Pos >= sourceOffset+len(source) {
     return -1
   }
   idx := strings.Count(source[:edge.Pos-sourceOffset], "\n")
-  if idx < maxSourceLines {
+  if idx < sourceLines {
     return -1
   }
   return idx

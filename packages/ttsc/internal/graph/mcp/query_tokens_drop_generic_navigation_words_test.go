@@ -1,0 +1,24 @@
+package mcp
+
+import (
+  "reflect"
+  "testing"
+)
+
+// TestQueryTokensDropGenericNavigationWords verifies natural-language graph
+// queries keep domain anchors instead of generic navigation words.
+//
+// Broad code-flow questions often contain words such as "code", "method",
+// "request", or "main" that match high-degree symbols and make graph_explore
+// expensive before it is useful. This pins the tokenizer so prompt guidance can
+// ask for concise domain nouns without those generic terms dominating ranking.
+//
+//  1. Tokenize a typical benchmark-style question with generic navigation words.
+//  2. Assert only the domain anchors remain for graph matching.
+func TestQueryTokensDropGenericNavigationWords(t *testing.T) {
+  got := queryTokens("Which code path invokes the selected RouterExecutionContext method for an HTTP route request?")
+  want := []string{"routerexecutioncontext", "http"}
+  if !reflect.DeepEqual(got, want) {
+    t.Fatalf("queryTokens() = %#v; want %#v", got, want)
+  }
+}

@@ -19,13 +19,13 @@ func toolsListResult() any {
     "tools": []any{
       map[string]any{
         "name":        "graph_explore",
-        "description": "Call once first for code-flow questions, instead of shell/grep/read. One broad query returns the current compiler-resolved TypeScript graph snapshot: source, calls, callers, types, and blast radius. Put the whole flow in `query`, e.g. \"repository find manager query builder\". Answer from the result; do not use shell/grep/read or one-symbol followups unless there is no match. After source edits, old results may be stale.",
+        "description": "Call first for TypeScript code-flow questions, before shell/grep/read. Query concrete domain nouns or symbols, not generic words like code/method/request/main. The result is a compiler-resolved graph snapshot: source, calls, callers, types, and blast radius. If the first result is broad or generic, re-query once with the best returned symbol or file. Answer from graph; read only for no match, signature-only output, non-TS files, or after source edits.",
         "inputSchema": map[string]any{
           "type": "object",
           "properties": map[string]any{
             "query": map[string]any{
               "type":        "string",
-              "description": "Whole flow in one broad query, not one symbol: owner/action/nouns together, e.g. \"repository find manager query builder\".",
+              "description": "Concrete domain nouns or symbols for the flow. Avoid generic words such as code, method, request, process, main, component, value, and route.",
             },
           },
           "required": []any{"query"},
@@ -101,9 +101,9 @@ func textResult(text string) any {
 // broad-batching model dropped from 9 calls to 4 once a broad query returned the
 // whole cluster, while narrow drillers stay cheap per call.
 const (
-  exploreBudgetBase    = 6000
-  exploreBudgetPerTerm = 3000
-  exploreBudgetMax     = 16000
+  exploreBudgetBase    = 3000
+  exploreBudgetPerTerm = 1000
+  exploreBudgetMax     = 6000
 )
 
 // exploreBudget returns the verbatim-source budget for a query with terms salient
@@ -121,7 +121,7 @@ func exploreBudget(terms int) int {
 
 // maxEdgesPerDirection caps the incoming/outgoing edges listed per node so a
 // central symbol does not dump hundreds of relationships into the response.
-const maxEdgesPerDirection = 12
+const maxEdgesPerDirection = 8
 
 // maxNodeDiagnostics caps the diagnostics listed on one node so a declaration
 // with many errors does not flood the response; the count is still reported.
@@ -176,7 +176,7 @@ const exploreHeader = "Compiler-resolved graph snapshot. Answer from this result
 
 // maxExploreNodes caps how many ranked nodes a query returns, so a broad
 // keyword query surfaces the most relevant declarations without flooding context.
-const maxExploreNodes = 12
+const maxExploreNodes = 8
 
 // queryStopwords are dropped so the salient nouns of a natural-language question
 // drive the match.
@@ -186,6 +186,16 @@ var queryStopwords = map[string]bool{
   "for": true, "with": true, "what": true, "where": true, "which": true,
   "this": true, "that": true, "it": true, "its": true, "work": true, "works": true,
   "use": true, "uses": true, "using": true, "from": true, "by": true, "an": true,
+  "code": true, "path": true, "selected": true, "method": true, "methods": true,
+  "request": true, "requests": true, "controller": true, "controllers": true, "handler": true,
+  "handlers": true, "process": true, "main": true, "component": true,
+  "components": true, "value": true, "values": true, "route": true, "routes": true,
+  "build": true, "builds": true, "built": true, "create": true, "creates": true,
+  "created": true, "creation": true, "schedule": true, "schedules": true, "scheduled": true,
+  "before": true, "after": true, "when": true, "invokes": true, "invoke": true,
+  "invoked": true, "call": true, "calls": true, "called": true, "used": true,
+  "toward": true, "into": true, "log": true, "logs": true, "message": true,
+  "messages": true, "extension": true, "host": true,
 }
 
 // queryTokens lowercases query and splits it into salient alphanumeric tokens,
@@ -233,17 +243,26 @@ func (s *Server) matchNodes(query string) []*graph.Node {
       case strings.HasPrefix(name, token):
         score += 40
       case strings.Contains(name, token):
-        score += 20
+        switch {
+        case len(token) >= 8:
+          score += 80
+        case len(token) >= 5:
+          score += 24
+        default:
+          score += 12
+        }
       }
     }
     if score == 0 {
       continue
     }
-    if degree := s.degree[node.ID]; degree > 0 {
-      if degree > 20 {
-        degree = 20
+    if score >= 100 {
+      if degree := s.degree[node.ID]; degree > 0 {
+        if degree > 5 {
+          degree = 5
+        }
+        score += degree
       }
-      score += degree
     }
     ranked = append(ranked, scored{node, score})
   }
@@ -456,7 +475,7 @@ func (s *Server) declLine(node *graph.Node) int {
 
 // maxSourceLines caps the verbatim body shown per node, so one large declaration
 // (a giant union type, a long class) cannot blow the whole response open.
-const maxSourceLines = 32
+const maxSourceLines = 16
 
 // numberLines prefixes each line of source with its absolute line number so the
 // agent can cite or edit by line without re-reading the file, truncating a long

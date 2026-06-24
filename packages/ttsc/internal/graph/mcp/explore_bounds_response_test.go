@@ -12,9 +12,9 @@ import (
 
 // TestExploreBoundsResponse verifies that graph_explore enforces its three render
 // budgets so one query cannot flood an agent's context: a long body is truncated
-// to maxSourceLines (32) with a "more lines" tail, a node with more than
-// maxEdgesPerDirection (12) incoming edges gets a "more" tail, and once the
-// verbatim source crosses the query's budget — exploreBudgetBase (6000) for a
+// to maxSourceLines (16) with a "more lines" tail, a node with more than
+// maxEdgesPerDirection (8) incoming edges gets a "more" tail, and once the
+// verbatim source crosses the query's budget — exploreBudgetBase (3000) for a
 // single-term query like "process" — the remaining matched nodes collapse to
 // signatures.
 //
@@ -28,15 +28,15 @@ func TestExploreBoundsResponse(t *testing.T) {
   var src strings.Builder
 
   // (a) bigBody: a function whose body is 40 trivial statements, past the
-  // maxSourceLines (32) cap, so its render carries a "more lines" tail.
+  // maxSourceLines (16) cap, so its render carries a "more lines" tail.
   src.WriteString("export function bigBody(): void {\n")
   for i := 0; i < 40; i++ {
     fmt.Fprintf(&src, "  const a%d = 0;\n", i)
   }
   src.WriteString("}\n")
 
-  // (b) Hub: an interface referenced as a parameter type by 13 functions, one
-  // past the maxEdgesPerDirection (12) cap, so its incoming edges carry a "more"
+  // (b) Hub: an interface referenced as a parameter type by 13 functions, five
+  // past the maxEdgesPerDirection (8) cap, so its incoming edges carry a "more"
   // tail.
   src.WriteString("export interface Hub {}\n")
   for i := 0; i < 13; i++ {
@@ -44,7 +44,7 @@ func TestExploreBoundsResponse(t *testing.T) {
   }
 
   // (c) Six process* functions each with a large body, so the verbatim source
-  // crosses the single-term budget (exploreBudgetBase, 6000) and the later matches
+  // crosses the single-term budget (exploreBudgetBase, 3000) and the later matches
   // collapse to signatures. The statement lines are deliberately long so the
   // rendered bodies exceed the byte budget.
   for _, name := range []string{"processAlpha", "processBeta", "processGamma", "processDelta", "processEpsilon", "processZeta"} {
@@ -86,15 +86,15 @@ func TestExploreBoundsResponse(t *testing.T) {
     t.Fatalf("graph_explore did not truncate the long body:\n%s", big)
   }
 
-  // (b) A node with 13 incoming edges carries a "<- (1 more)" tail: 13 minus the
-  // 12-edge cap, and the direction (incoming) is pinned, not just any "more".
+  // (b) A node with 13 incoming edges carries a "<- (5 more)" tail: 13 minus the
+  // 8-edge cap, and the direction (incoming) is pinned, not just any "more".
   hub := toolText(t, server, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"graph_explore","arguments":{"query":"Hub"}}}`)
-  if !strings.Contains(hub, "<- (1 more)") {
-    t.Fatalf("graph_explore did not cap the incoming edges at 12 with a '<- (1 more)' tail:\n%s", hub)
+  if !strings.Contains(hub, "<- (5 more)") {
+    t.Fatalf("graph_explore did not cap the incoming edges at 8 with a '<- (5 more)' tail:\n%s", hub)
   }
 
   // (c) Three large bodies cross the char budget, collapsing later matches.
-  process := toolText(t, server, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"graph_explore","arguments":{"query":"process"}}}`)
+  process := toolText(t, server, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"graph_explore","arguments":{"query":"alpha beta gamma delta epsilon zeta"}}}`)
   if !strings.Contains(process, "shown as signatures to fit the response budget") {
     t.Fatalf("graph_explore did not collapse later matches to signatures:\n%s", process)
   }

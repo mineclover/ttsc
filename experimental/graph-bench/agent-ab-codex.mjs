@@ -44,25 +44,25 @@ const REPOS = {
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-vscode.git",
     tsconfig: "src/tsconfig.json",
     question:
-      "Where does an extension host message get forwarded toward the main process?",
+      "Where do extension-host log messages cross into MainThreadConsole?",
   },
   nestjs: {
     url: "https://github.com/nestjs/nest",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-nestjs.git",
     tsconfig: "tsconfig.graph.json",
-    question: "Which code invokes the selected controller method for an HTTP route?",
+    question: "Which RouterExecutionContext path calls a controller handler?",
   },
   vue: {
     url: "https://github.com/vuejs/core",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-vue.git",
     tsconfig: "tsconfig.graph.json",
-    question: "Which code schedules a component update after a ref value changes?",
+    question: "Which reactive effect path triggers a render update after a ref changes?",
   },
   zod: {
     url: "https://github.com/colinhacks/zod",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-zod.git",
     tsconfig: "tsconfig.graph.json",
-    question: "Which internal parse method does a Zod schema's parse() call?",
+    question: "Which ZodType parse path reaches the internal parser?",
   },
   typeorm: {
     url: "https://github.com/typeorm/typeorm",
@@ -75,13 +75,13 @@ const REPOS = {
     url: "https://github.com/ReactiveX/rxjs",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-rxjs.git",
     tsconfig: "tsconfig.graph.json",
-    question: "Which code creates the Subscriber used by Observable.subscribe?",
+    question: "Which Observable.subscribe path constructs the Subscriber?",
   },
   "shopping-backend": {
     url: "https://github.com/samchon/shopping-backend",
     fixtureUrl: "https://github.com/samchon/shopping-backend.git",
     tsconfig: "tsconfig.json",
-    question: "Which code builds the order creation request before persistence?",
+    question: "Which ShoppingOrderProvider path assembles an order create input before saving?",
   },
 };
 
@@ -134,8 +134,9 @@ const cg = args.cg === "1" || args.cg === "true";
 const GUIDANCE = `# Code navigation
 
 For code-flow questions, call the code-graph MCP before grep/read/shell.
-Ask one broad natural-language query: owner + action + nouns, e.g. "repository find manager query builder".
-Do not split symbols across calls or use grep/read/shell to trace or confirm returned source. Read files only for no match, signatures, or non-TS files.
+Query concrete domain nouns or symbols; drop generic words like code, method, request, main.
+If results are broad/generic, re-query once with the best returned symbol or file.
+Answer from graph; read only for no match, signature-only, or non-TS files.
 `;
 // The guided arm models how a normal user actually works: they keep an AGENTS.md
 // and tell the agent, in the prompt, to follow it. That elevates the project file

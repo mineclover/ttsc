@@ -244,10 +244,22 @@ const traceDir = args["trace-dir"]
     );
 fs.mkdirSync(traceDir, { recursive: true });
 
+const MAX_RUN_RETRIES = 4;
 const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
 for (const arm of arms) {
   for (let r = 0; r < runs; r++) {
-    const m = runCodex(question, arm.home, arm.name, r + 1);
+    // A failed run (rate limit or an incomplete turn) carries no usable sample,
+    // so retry it in place rather than letting it thin the median. The trace file
+    // is keyed by run number, so a successful retry overwrites the failed attempt.
+    let m;
+    for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
+      m = runCodex(question, arm.home, arm.name, r + 1);
+      if (m.ok) break;
+      if (attempt < MAX_RUN_RETRIES)
+        console.log(
+          `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED] retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
+        );
+    }
     samples[arm.name].push(m);
     console.log(
       `  ${arm.name.padEnd(8)} run ${r + 1}: ${m.tokens} tok, ${m.tools} tools ` +

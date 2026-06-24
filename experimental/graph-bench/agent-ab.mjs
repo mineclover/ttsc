@@ -244,9 +244,21 @@ fs.mkdirSync(traceDir, { recursive: true });
 
 const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
 let spent = 0;
+const MAX_RUN_RETRIES = 4;
 for (const arm of arms) {
   for (let r = 0; r < runs; r++) {
-    const m = runClaude(question, arm.cfg, arm.name, r + 1);
+    // A failed run (a 529 overload, mostly) carries no usable sample, so retry it
+    // in place rather than letting it thin the median. The trace file is keyed by
+    // run number, so a successful retry overwrites the failed attempt.
+    let m;
+    for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
+      m = runClaude(question, arm.cfg, arm.name, r + 1);
+      if (m.ok) break;
+      if (attempt < MAX_RUN_RETRIES)
+        console.log(
+          `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED] ${m.error || ""} retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
+        );
+    }
     samples[arm.name].push(m);
     spent += m.cost;
     console.log(
@@ -444,7 +456,11 @@ function parseStream(text) {
     other,
     cost: result?.total_cost_usd || 0,
     durMs: result?.duration_ms || 0,
-    ok: result?.subtype === "success",
+    // A 529-overloaded run still reports subtype "success" while carrying
+    // is_error: true and zero token usage, so it must be excluded explicitly or
+    // its empty sample drags the median down and the comparison goes garbage.
+    ok: result?.subtype === "success" && !result?.is_error,
+    error: result?.is_error ? String(result?.result || "").slice(0, 80) : "",
   };
 }
 

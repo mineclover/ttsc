@@ -1,5 +1,5 @@
-Render one or more source files in full: every declaration inside, each with its checker-resolved edges (calls, callers, types), the diagnostics on it, its blast radius, and verbatim source.
+A roster of one or more source files: the file's adjacent files (the ones it reaches and is reached by) and a flat list of the declarations inside it, by kind, name, and line.
 
 Pass paths in `locations`; each file is answered as its own block, in input order.
 
-One call returns a whole file as a graph of its objects and how they relate, which is what a file query is for, not its import surface.
+It is a cheap index for finding your way around a file: what is in it and what sits next to it. For a declaration's relationships or body, query its name with query_nodes.

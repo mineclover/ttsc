@@ -11,14 +11,13 @@ import (
 )
 
 // TestQueryFilesOutlinesEachFile verifies query_files returns one content block
-// per requested location, in input order, each rendering that file's declarations
-// in full (the query_nodes-grade view, body included), so a file query answers
-// from the objects inside the file, not just its import surface.
+// per requested location, in input order, each a cheap roster of that file: the
+// declarations inside it listed by kind and name, without their verbatim bodies.
 //
 //  1. Compile a two-file fixture, each with a couple of declarations.
 //  2. Call query_files with both paths.
 //  3. Assert two content blocks, in order, each naming its file's declarations
-//     and rendering their verbatim bodies.
+//     but not dumping their bodies.
 func TestQueryFilesOutlinesEachFile(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "tsconfig.json"), `{
@@ -55,10 +54,10 @@ func TestQueryFilesOutlinesEachFile(t *testing.T) {
 	if !strings.Contains(blocks[1], "src/a.ts") || !strings.Contains(blocks[1], "Alpha") {
 		t.Fatalf("second block did not render src/a.ts:\n%s", blocks[1])
 	}
-	// A file is rendered in full: the declarations' verbatim bodies are present,
-	// not just their signatures.
-	if !strings.Contains(blocks[0], "return") || !strings.Contains(blocks[1], "return") {
-		t.Fatalf("query_files did not render declaration bodies:\n%s\n%s", blocks[0], blocks[1])
+	// The roster lists declarations but not their bodies: it is a cheap index, so
+	// the verbatim source (here a `return` statement) must not appear.
+	if strings.Contains(blocks[0], "return") || strings.Contains(blocks[1], "return") {
+		t.Fatalf("query_files dumped a body instead of a roster:\n%s\n%s", blocks[0], blocks[1])
 	}
 }
 

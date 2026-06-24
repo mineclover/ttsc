@@ -187,9 +187,10 @@ func (s *Server) queryNodes(args json.RawMessage) (any, *rpcError) {
 	return textResult(s.renderNodes(matches, queryBudget(len(queryTokens(in.Query))), "")), nil
 }
 
-// queryFiles renders one or more files in full: every declaration inside each file
-// with its query_nodes-grade view (edges, diagnostics, blast radius, body), one
-// result block per requested location in input order.
+// queryFiles renders a roster for one or more files: each file's adjacent files
+// and the declarations inside it, one result block per requested location in input
+// order. It is the cheap "what is in this file and what is near it" index; the
+// bodies and per-symbol relationships are a query_nodes job.
 func (s *Server) queryFiles(args json.RawMessage) (any, *rpcError) {
 	var in struct {
 		Locations []string `json:"locations"`
@@ -211,7 +212,7 @@ func (s *Server) queryFiles(args json.RawMessage) (any, *rpcError) {
 	}
 	s.refreshIfStale()
 	s.refreshDiagnostics()
-	return textBlocks(s.fileBlocks(locations, queryBudgetMax)), nil
+	return textBlocks(s.fileBlocks(locations)), nil
 }
 
 // renderNodes writes the standard graph view (header, each node's edges, blast
@@ -251,13 +252,14 @@ func textBlocks(blocks []string) any {
 	return map[string]any{"content": content}
 }
 
-// fileBlocks renders one block per requested location, in input order, each headed
-// with the location. A file is the declarations inside it, so the block renders
-// every declaration with the same query_nodes-grade view (edges, diagnostics,
-// blast radius, and verbatim body): the objects in the file and how they relate
-// are what a file query is for, not its import surface. Declarations past the
-// budget collapse to a one-line signature so one call never floods the context.
-func (s *Server) fileBlocks(locations []string, budget int) []string {
+// fileBlocks renders one roster block per requested location, in input order, each
+// headed with the location. The roster is a cheap index, not a content dump: the
+// file's adjacent files (the ones its declarations reach and are reached by, at
+// file granularity) and a flat list of the declarations inside it (kind, name,
+// line). Bodies and per-symbol edges are a query_nodes job; query_files just tells
+// the agent what is in a file and what sits next to it, so it can query the right
+// symbol next.
+func (s *Server) fileBlocks(locations []string) []string {
 	blocks := make([]string, 0, len(locations))
 	for _, loc := range locations {
 		var b strings.Builder
@@ -269,30 +271,69 @@ func (s *Server) fileBlocks(locations []string, budget int) []string {
 			continue
 		}
 		sort.Strings(files)
-		collapsed := 0
 		for _, f := range files {
+			ids := make(map[string]bool)
 			var nodes []*graph.Node
 			for _, node := range s.graph.Nodes {
 				if node.File == f {
+					ids[node.ID] = true
 					nodes = append(nodes, node)
 				}
 			}
 			sort.Slice(nodes, func(i, j int) bool { return s.declLine(nodes[i]) < s.declLine(nodes[j]) })
-			fmt.Fprintf(&b, "%s (%d declarations):\n", s.relFile(f), len(nodes))
-			for _, node := range nodes {
-				withSource := b.Len() < budget
-				if !withSource {
-					collapsed++
+			// File-level adjacency: walk the edges once and bucket the neighbor's
+			// file by direction, skipping edges that stay inside this file.
+			reaches := make(map[string]bool)
+			reachedBy := make(map[string]bool)
+			for _, edge := range s.graph.Edges {
+				fromIn, toIn := ids[edge.From], ids[edge.To]
+				if fromIn && !toIn {
+					if to := s.graph.Nodes[edge.To]; to != nil && to.File != "" {
+						reaches[s.relFile(to.File)] = true
+					}
 				}
-				s.writeNodeRelations(&b, node, withSource)
+				if toIn && !fromIn {
+					if from := s.graph.Nodes[edge.From]; from != nil && from.File != "" {
+						reachedBy[s.relFile(from.File)] = true
+					}
+				}
 			}
-		}
-		if collapsed > 0 {
-			fmt.Fprintf(&b, "(%d further declaration(s) shown as signatures to fit the response budget)\n", collapsed)
+			fmt.Fprintf(&b, "%s (%d declarations):\n", s.relFile(f), len(nodes))
+			writeFileAdjacency(&b, "reaches", reaches)
+			writeFileAdjacency(&b, "reached by", reachedBy)
+			for _, node := range nodes {
+				external := ""
+				if node.External {
+					external = " (external)"
+				}
+				fmt.Fprintf(&b, "  %s %s%s  :%d\n", node.Kind, node.Name, external, s.declLine(node))
+			}
 		}
 		blocks = append(blocks, strings.TrimRight(b.String(), "\n"))
 	}
 	return blocks
+}
+
+// maxAdjacentFiles caps the adjacency list so a hub file does not dump every
+// neighbor; the overflow count is still reported.
+const maxAdjacentFiles = 20
+
+// writeFileAdjacency writes one sorted, capped line of adjacent files for a
+// direction, or nothing when there are none.
+func writeFileAdjacency(b *strings.Builder, label string, set map[string]bool) {
+	if len(set) == 0 {
+		return
+	}
+	files := make([]string, 0, len(set))
+	for f := range set {
+		files = append(files, f)
+	}
+	sort.Strings(files)
+	if len(files) > maxAdjacentFiles {
+		fmt.Fprintf(b, "  %s: %s (+%d more)\n", label, strings.Join(files[:maxAdjacentFiles], ", "), len(files)-maxAdjacentFiles)
+	} else {
+		fmt.Fprintf(b, "  %s: %s\n", label, strings.Join(files, ", "))
+	}
 }
 
 // exploreHeader prefixes every graph_explore response. It carries only the steer

@@ -3,7 +3,7 @@
 A compiler-resolved graph of TypeScript relationships: calls, callers, types, ownership, blast radius. It mirrors the code; after an edit, query again, not from an old result.
 
 - **How does code connect?** `query_nodes`: one broad query (owner + action + nouns), before grep.
-- **Everything in a file?** `query_files` with the paths: every declaration resolved in full.
+- **What is in a file, what is near it?** `query_files` with the paths: a roster of its declarations and adjacent files.
 - **A file's errors, or the whole project's?** `query_diagnostics`.
 - **No match, omitted source, or non-TypeScript?** grep/read.
 
@@ -15,9 +15,9 @@ A compiler-resolved graph of TypeScript relationships: calls, callers, types, ow
 - The fuzzy match is the batch: a broad multi-noun query returns the whole cluster in one call, so you do not query one symbol at a time.
 - grep/read cannot assemble that, because the answer depends on resolved relationships, not on where a keyword appears.
 
-## Pull a whole file with `query_files`
+## Roster a file with `query_files`
 
-**Pass file paths to `query_files` to get every declaration in them resolved in full**: each with its edges, diagnostics, blast radius, and source, one block per file. A file query returns the objects inside and how they relate, not just its imports, so it answers a flow in one call instead of reading the file and chasing symbols one at a time.
+**Pass file paths to `query_files` for a cheap roster of each**: the declarations inside it (kind, name, line) and its adjacent files (what it reaches and is reached by), one block per file. Use it to find your way around a file, then `query_nodes` the symbol you care about for its relationships and source. It does not return bodies.
 
 ## Check errors with `query_diagnostics`
 
@@ -47,7 +47,7 @@ The one trap is reusing an earlier result: it predates any edit you made after i
 ## Final checklist
 
 - Relationship or flow question? `query_nodes` with one broad owner + action + noun query, before any grep.
-- Need everything in a file? `query_files` with its path: every declaration in full.
+- Need a file's roster? `query_files` with its path: its declarations and adjacent files.
 - A file's errors, or the whole project's? `query_diagnostics` with paths, or none for everything.
 - No match, omitted source, non-TypeScript, or literal text search? grep/read.
 - Edited a file since exploring? Query again; the result re-checks your edit.

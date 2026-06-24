@@ -82,6 +82,10 @@ type Server struct {
   // value-call edge), so a flow query can walk the downstream call path in one
   // pass instead of the agent re-querying each hop.
   forwardCallAdj map[string][]string
+  // reverseValueAdj maps a value target to declarations that read/call it. Flow
+  // uses this only for query-relevant consumers, e.g. a joinAttributes store to
+  // the createJoinExpression method that later consumes it.
+  reverseValueAdj map[string][]string
   // implementorsAdj maps an interface or base to the declarations that implement
   // or extend it (the reverse of every heritage edge), so the call path can cross
   // the dynamic-dispatch seam from an interface method to its concrete body,
@@ -177,6 +181,7 @@ func (s *Server) setProgram(prog *driver.Program) {
   s.degree = make(map[string]int, len(s.graph.Nodes))
   s.reverseAdj = make(map[string][]string, len(s.graph.Nodes))
   s.forwardCallAdj = make(map[string][]string)
+  s.reverseValueAdj = make(map[string][]string)
   s.implementorsAdj = make(map[string][]string)
   for _, edge := range s.graph.Edges {
     s.degree[edge.From]++
@@ -185,6 +190,7 @@ func (s *Server) setProgram(prog *driver.Program) {
     switch edge.Kind {
     case graph.EdgeValueCall, graph.EdgeValueAccess:
       s.forwardCallAdj[edge.From] = append(s.forwardCallAdj[edge.From], edge.To)
+      s.reverseValueAdj[edge.To] = append(s.reverseValueAdj[edge.To], edge.From)
     case graph.EdgeHeritage:
       s.implementorsAdj[edge.To] = append(s.implementorsAdj[edge.To], edge.From)
     }

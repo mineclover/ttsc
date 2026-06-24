@@ -467,7 +467,8 @@ func flowHelperNoise(node *graph.Node, query string, words map[string]bool) bool
   }
   switch {
   case strings.HasPrefix(member, "create"):
-    return !words["create"] && !words["creates"] && !words["created"] && !words["creation"]
+    return !words["create"] && !words["creates"] && !words["created"] && !words["creation"] &&
+      !(strings.Contains(member, "join") && (words["join"] || words["joins"]))
   case strings.HasPrefix(member, "is"), strings.HasPrefix(member, "has"), strings.HasPrefix(member, "can"):
     return true
   case strings.HasPrefix(member, "reject"):
@@ -615,6 +616,14 @@ func (s *Server) rankedPathTargets(cur string, tokens []string, words map[string
       next = append(next, id)
     }
   }
+  if s.allowsReverseConsumerSource(cur) && wantsConsumerHop(words) {
+    for _, id := range s.rankedReverseConsumers(cur, tokens, words) {
+      if !seen[id] {
+        seen[id] = true
+        next = append(next, id)
+      }
+    }
+  }
   sort.Slice(next, func(i, j int) bool {
     left := s.pathTargetScoreFrom(cur, next[i], tokens, words)
     right := s.pathTargetScoreFrom(cur, next[j], tokens, words)
@@ -634,6 +643,48 @@ func (s *Server) rankedPathTargets(cur string, tokens []string, words map[string
     next = next[:positive]
   }
   return next
+}
+
+func (s *Server) allowsReverseConsumerSource(id string) bool {
+  node := s.graph.Nodes[id]
+  return node != nil && node.Kind == graph.NodeVariable
+}
+
+const maxReverseConsumerBranch = 3
+
+func wantsConsumerHop(words map[string]bool) bool {
+  return words["attribute"] || words["attributes"] || words["alias"] ||
+    words["join"] || words["joins"] || words["joined"] || words["consumer"] ||
+    words["consume"] || words["consumes"] || words["used"] || words["uses"]
+}
+
+func (s *Server) rankedReverseConsumers(cur string, tokens []string, words map[string]bool) []string {
+  candidates := append([]string(nil), s.reverseValueAdj[cur]...)
+  sort.Slice(candidates, func(i, j int) bool {
+    left := s.pathTargetScoreFrom(cur, candidates[i], tokens, words)
+    right := s.pathTargetScoreFrom(cur, candidates[j], tokens, words)
+    if left != right {
+      return left > right
+    }
+    return candidates[i] < candidates[j]
+  })
+  out := make([]string, 0, maxReverseConsumerBranch)
+  seen := map[string]bool{}
+  for _, id := range candidates {
+    if seen[id] || s.pathTargetScoreFrom(cur, id, tokens, words) <= 0 {
+      continue
+    }
+    node := s.graph.Nodes[id]
+    if node == nil || node.External || s.ignored[node.File] || isCentralNoise(node) || flowTypeNoise(node) || flowVariableNoise(node, words) {
+      continue
+    }
+    seen[id] = true
+    out = append(out, id)
+    if len(out) >= maxReverseConsumerBranch {
+      break
+    }
+  }
+  return out
 }
 
 func (s *Server) pathTargetScoreFrom(fromID, toID string, tokens []string, words map[string]bool) int {

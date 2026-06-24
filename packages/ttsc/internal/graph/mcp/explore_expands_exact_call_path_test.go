@@ -62,6 +62,7 @@ export class Manager {
 
 export class QueryBuilder {
   private findOptions?: FindOptions;
+  private expressionMap = new QueryExpressionMap();
 
   constructor(private readonly entity: string) {}
 
@@ -84,11 +85,45 @@ export class QueryBuilder {
   }
 
   protected join(relationName: string): void {
-    relationName.toLowerCase();
+    const joinAttribute = new JoinAttribute("root." + relationName, relationName);
+    joinAttribute.alias = relationName;
+    this.expressionMap.joinAttributes.push(joinAttribute);
+  }
+
+  protected createJoinExpression(): string {
+    return this.expressionMap.joinAttributes
+      .map((joinAttribute) => this.createJoinTreeRecursively(joinAttribute))
+      .join(" ");
+  }
+
+  protected createJoinTreeRecursively(joinAttribute: JoinAttribute): string {
+    return joinAttribute.parentAlias + ":" + joinAttribute.alias + ":" + joinAttribute.relation;
   }
 
   getMany(): string[] {
+    this.createJoinExpression();
     return [this.entity];
+  }
+}
+
+export class QueryExpressionMap {
+  joinAttributes: JoinAttribute[] = [];
+}
+
+export class JoinAttribute {
+  alias = "";
+
+  constructor(
+    public readonly entityOrProperty: string,
+    private readonly relationName: string,
+  ) {}
+
+  get parentAlias(): string | undefined {
+    return this.entityOrProperty.slice(0, this.entityOrProperty.indexOf("."));
+  }
+
+  get relation(): string {
+    return this.relationName;
   }
 }
 
@@ -107,10 +142,11 @@ export interface FindOptions {
   defer func() { _ = prog.Close() }()
 
   server := mcp.NewServer(prog)
-  for _, query := range []string{
+  cases := []string{
     "How are relation options applied when Repository.find() builds its query? Trace the call path from the public find method to where the relations are resolved and joined into the query.",
-    "Repository find options relations query builder apply relations joins",
-  } {
+    "Repository find options relations query builder apply relations joins join attributes alias",
+  }
+  for _, query := range cases {
     text := toolText(t, server, fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"query_nodes","arguments":{"query":%q}}}`, query))
     for _, want := range []string{
       "method Repository.find",
@@ -130,6 +166,56 @@ export interface FindOptions {
       if strings.Contains(text, noisy) {
         t.Fatalf("query_nodes rendered noisy sibling %s for query %q:\n%s", noisy, query, text)
       }
+    }
+  }
+}
+
+func TestExploreFollowsRelevantValueConsumers(t *testing.T) {
+  root := t.TempDir()
+  writeFile(t, filepath.Join(root, "tsconfig.json"), `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "strict": true
+  },
+  "files": ["src/main.ts"]
+}
+`)
+  writeFile(t, filepath.Join(root, "src", "main.ts"), `
+export class QueryExpressionMap {
+  joinAttributes: string[] = [];
+}
+
+export class Builder {
+  private expressionMap = new QueryExpressionMap();
+
+  join(attribute: string): void {
+    this.expressionMap.joinAttributes.push(attribute);
+  }
+
+  createJoinExpression(): string {
+    return this.expressionMap.joinAttributes.join(" ");
+  }
+}
+`)
+
+  prog, diags, err := driver.LoadProgram(root, "tsconfig.json", driver.LoadProgramOptions{})
+  if err != nil {
+    t.Fatal(err)
+  }
+  if len(diags) != 0 {
+    t.Fatalf("unexpected parse diagnostics: %v", diags)
+  }
+  defer func() { _ = prog.Close() }()
+
+  server := mcp.NewServer(prog)
+  text := toolText(t, server, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"query_nodes","arguments":{"query":"QueryExpressionMap.joinAttributes join attributes","mode":"flow"}}}`)
+  for _, want := range []string{
+    "variable QueryExpressionMap.joinAttributes",
+    "method Builder.createJoinExpression",
+  } {
+    if !strings.Contains(text, want) {
+      t.Fatalf("query_nodes did not include %s in the reverse consumer flow:\n%s", want, text)
     }
   }
 }

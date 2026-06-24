@@ -65,6 +65,10 @@ export function top(): number {
   if !strings.Contains(text, "value-call") {
     t.Fatalf("query_nodes did not show the incoming call edge from mid:\n%s", text)
   }
+  midUse := strings.ReplaceAll(filepath.Join(root, "src", "mid.ts"), "\\", "/")
+  if !strings.Contains(text, "use:"+midUse+":3") {
+    t.Fatalf("query_nodes did not show the incoming callsite line from mid:\n%s", text)
+  }
   if !strings.Contains(text, "blast radius: 2") {
     t.Fatalf("query_nodes did not report 2 transitive dependents for leaf:\n%s", text)
   }

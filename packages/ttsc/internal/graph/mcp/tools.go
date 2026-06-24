@@ -1342,7 +1342,8 @@ func (s *Server) writeNodeHeader(b *strings.Builder, node *graph.Node) {
 // edges (what it reaches) then its incoming edges (what reaches it), each capped
 // at maxEdgesPerDirection with an overflow count so a central symbol does not dump
 // hundreds of relationships. This is the call-path material: every edge cites the
-// neighbor at its declLine, so a flow can be followed without another call.
+// neighbor at its declLine and the source use line when available, so a flow can
+// be followed without another call.
 func (s *Server) writeNodeEdges(b *strings.Builder, node *graph.Node) {
   outgoing := make([]string, 0, maxEdgesPerDirection)
   incoming := make([]string, 0, maxEdgesPerDirection)
@@ -1351,7 +1352,7 @@ func (s *Server) writeNodeEdges(b *strings.Builder, node *graph.Node) {
     if edge.From == node.ID {
       if to := s.graph.Nodes[edge.To]; to != nil {
         if len(outgoing) < maxEdgesPerDirection {
-          outgoing = append(outgoing, fmt.Sprintf("  -> (%s) %s %s  %s:%d", edge.Kind, to.Kind, to.Name, s.relFile(to.File), s.declLine(to)))
+          outgoing = append(outgoing, fmt.Sprintf("  -> (%s) %s %s  %s:%d%s", edge.Kind, to.Kind, to.Name, s.relFile(to.File), s.declLine(to), s.edgeUseSuffix(edge)))
         } else {
           outMore++
         }
@@ -1360,7 +1361,7 @@ func (s *Server) writeNodeEdges(b *strings.Builder, node *graph.Node) {
     if edge.To == node.ID {
       if from := s.graph.Nodes[edge.From]; from != nil {
         if len(incoming) < maxEdgesPerDirection {
-          incoming = append(incoming, fmt.Sprintf("  <- (%s) %s %s  %s:%d", edge.Kind, from.Kind, from.Name, s.relFile(from.File), s.declLine(from)))
+          incoming = append(incoming, fmt.Sprintf("  <- (%s) %s %s  %s:%d%s", edge.Kind, from.Kind, from.Name, s.relFile(from.File), s.declLine(from), s.edgeUseSuffix(edge)))
         } else {
           inMore++
         }
@@ -1464,9 +1465,25 @@ func (s *Server) writeFlowValueEdges(b *strings.Builder, node *graph.Node, inclu
       if edge.Kind == graph.EdgeValueAccess {
         label = "~>"
       }
-      fmt.Fprintf(b, "  %s %s %s  %s:%d\n", label, to.Kind, to.Name, s.relFile(to.File), s.declLine(to))
+      fmt.Fprintf(b, "  %s %s %s  %s:%d%s\n", label, to.Kind, to.Name, s.relFile(to.File), s.declLine(to), s.edgeUseSuffix(edge))
     }
   }
+}
+
+func (s *Server) edgeUseSuffix(edge *graph.Edge) string {
+  from := s.graph.Nodes[edge.From]
+  if from == nil || edge.Pos < 0 {
+    return ""
+  }
+  file := s.prog.SourceFile(from.File)
+  if file == nil {
+    return ""
+  }
+  text := file.Text()
+  if edge.Pos > len(text) {
+    return ""
+  }
+  return fmt.Sprintf("  use:%s:%d", s.relFile(from.File), 1+strings.Count(text[:edge.Pos], "\n"))
 }
 
 // nodeSource returns the verbatim declaration text of node and its 1-based start

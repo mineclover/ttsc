@@ -377,6 +377,11 @@ func (s *Server) matchNodes(query string) []*graph.Node {
 	ranked := make([]scored, 0)
 	for _, node := range s.graph.Nodes {
 		name := strings.ToLower(node.Name)
+		// De-surface git-ignored generated code: keep it reachable only by an
+		// exact name query, so it never dominates a broad or keyword match.
+		if s.ignored[node.File] && name != whole {
+			continue
+		}
 		score := 0
 		dotted := false
 		if name == whole {
@@ -490,6 +495,9 @@ func (s *Server) centralNodes() []*graph.Node {
 	ranked := make([]scored, 0)
 	for _, node := range s.graph.Nodes {
 		if node.External {
+			continue
+		}
+		if s.ignored[node.File] {
 			continue
 		}
 		if isCentralNoise(node) {

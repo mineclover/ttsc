@@ -1,8 +1,9 @@
-`ttsc-graph` is the TS compiler graph: symbols, source, calls, callers, types, diagnostics.
+`ttsc-graph` is the TS compiler graph: symbols, source, calls, callers, types.
 
-- Use `graph_explore` before broad grep/read for TS architecture, code-flow, and impact.
-- It returns nodes, source, edges, and blast radius faster than file search.
-- Query named symbols/files/domain nouns; broad onboarding may ask orientation once.
-- Re-query for missing/narrower symbol/file, or after source edits.
-- Avoid chasing every edge or re-reading returned source.
+- Prefer `graph_explore` for TS architecture/code-flow before grep/read.
+- Query named symbols/files/domain nouns; avoid generic words.
+- Broad query: synthesize from first relevant result.
+- Re-query only for missing symbol/file, narrower follow-up, or edits.
+- Do not chase every edge; avoid duplicate graph/read calls.
+- Read only for no match, non-TS, edited source, or missing context.
 - Use diagnostics for file errors.

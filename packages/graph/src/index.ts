@@ -42,9 +42,11 @@ export function resolveGraphBinary(
   }
 }
 
-/** The project root and tsconfig the server was pointed at, mirroring the
+/**
+ * The project root and tsconfig the server was pointed at, mirroring the
  * `--cwd` / `--tsconfig` flags ttscgraph itself parses, so the background
- * diagnostics worker checks the same project. */
+ * diagnostics worker checks the same project.
+ */
 function parseProjectArgs(argv: readonly string[]): {
   cwd: string;
   tsconfig: string;
@@ -56,15 +58,26 @@ function parseProjectArgs(argv: readonly string[]): {
     if (arg === "--cwd" && i + 1 < argv.length) cwd = argv[++i]!;
     else if (arg.startsWith("--cwd=")) cwd = arg.slice("--cwd=".length);
     else if (arg === "--tsconfig" && i + 1 < argv.length) tsconfig = argv[++i]!;
-    else if (arg.startsWith("--tsconfig=")) tsconfig = arg.slice("--tsconfig=".length);
+    else if (arg.startsWith("--tsconfig="))
+      tsconfig = arg.slice("--tsconfig=".length);
   }
   return { cwd: path.resolve(cwd), tsconfig };
 }
 
-/** A `--connect` proxy pipes stdio to a running daemon and serves no graph of
- * its own, so it needs no diagnostics computed locally. */
+/**
+ * A `--connect` proxy pipes stdio to a running daemon and serves no graph of
+ * its own, so it needs no diagnostics computed locally.
+ */
 function isConnectProxy(argv: readonly string[]): boolean {
   return argv.some((a) => a === "--connect" || a.startsWith("--connect="));
+}
+
+/**
+ * `dump` is a one-shot that builds the graph and exits, so it needs no
+ * background diagnostics worker (which would load the Program a second time).
+ */
+function isDumpCommand(argv: readonly string[]): boolean {
+  return argv[0] === "dump";
 }
 
 /**
@@ -125,7 +138,7 @@ export function runGraph(
   const env: NodeJS.ProcessEnv = { ...process.env };
   let diagnosticsFile: string | null = null;
   let worker: ReturnType<typeof spawn> | null = null;
-  if (!isConnectProxy(argv)) {
+  if (!isConnectProxy(argv) && !isDumpCommand(argv)) {
     diagnosticsFile = path.join(
       os.tmpdir(),
       `ttsc-graph-diagnostics-${process.pid}.json`,

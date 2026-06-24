@@ -203,6 +203,17 @@ function runSetup(projects, targetBranch) {
   });
 }
 
+// agentLabel maps a concrete model to a version-agnostic cell label. Claude tiers
+// (sonnet, opus) are already version-agnostic. Codex models collapse to a tier so
+// version bumps do not fork the grid: gpt-5.5 -> codex-gpt, gpt-5.4-mini ->
+// codex-gpt-mini. The exact id is recorded separately as modelVersion.
+function agentLabel(codex, resolvedModel) {
+  if (!codex) return resolvedModel;
+  if (/mini/i.test(resolvedModel)) return "codex-gpt-mini";
+  if (/nano/i.test(resolvedModel)) return "codex-gpt-nano";
+  return "codex-gpt";
+}
+
 function runAgentCell({
   project,
   spec,
@@ -220,9 +231,12 @@ function runAgentCell({
   const codex = model === "codex" || model.startsWith("gpt-");
   const harness = codex ? codexHarness : claudeHarness;
   const resolvedModel = codex ? (model === "codex" ? codexModel : model) : model;
-  const logStem = `${project}-${branch}-${filenamePart(
-    `${tool}-${codex ? `codex-${resolvedModel}` : resolvedModel}`,
-  )}`;
+  // The cell is keyed by tier, not by the exact model string, so the benchmark
+  // grid and website stay stable as OpenAI bumps versions (gpt-5.5 -> gpt-5.6
+  // overwrites the same cell instead of forking a new one). The precise id is
+  // kept in modelVersion below.
+  const label = agentLabel(codex, resolvedModel);
+  const logStem = `${project}-${branch}-${filenamePart(`${tool}-${label}`)}`;
   const args = [
     harness,
     `--repo=${project}`,
@@ -254,7 +268,8 @@ function runAgentCell({
       ? { toolSetupMs: codegraphIndexMs }
       : {}),
     repo: data.repo ?? project,
-    model: data.model ?? resolvedModel,
+    model: label,
+    modelVersion: data.model ?? resolvedModel,
     ...(data.effort ? { effort: data.effort } : {}),
     fixtureBranch: data.fixtureBranch ?? branch,
     daemon: daemon === "1" || daemon === "true",
@@ -271,7 +286,8 @@ function runAgentCell({
         ? { toolSetupMs: codegraphIndexMs }
         : {}),
       harness: harnessName,
-      model: resolvedModel,
+      model: label,
+      modelVersion: resolvedModel,
       repoDir,
       tsconfig: spec.tsconfig,
       log: path.relative(repoRoot, `${path.join(outDir, logStem)}.out.log`),

@@ -246,32 +246,36 @@ fs.mkdirSync(traceDir, { recursive: true });
 
 const MAX_RUN_RETRIES = 4;
 const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
-// Run-major, not arm-major: for each run index do every arm back to back, so a
-// baseline/graph pair shares the same wall-clock window and a time-varying
-// condition (a rate-limit spell) cannot land on one arm and not the other. Still
-// strictly sequential, one invocation at a time, so the arms never contend.
-for (let r = 0; r < runs; r++) {
-  for (const arm of arms) {
-    // A failed run (rate limit or an incomplete turn) carries no usable sample,
-    // so retry it in place rather than letting it thin the median. The trace file
-    // is keyed by run number, so a successful retry overwrites the failed attempt.
-    let m;
-    for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
-      m = runCodex(question, arm.home, arm.name, r + 1);
-      if (m.ok) break;
-      if (attempt < MAX_RUN_RETRIES)
+// Fire every arm and every run at once. This is the experiment loop, so it favors
+// wall-clock turnaround over isolation: all arms x runs are launched concurrently
+// and awaited together. Each invocation is its own codex process with its own
+// CODEX_HOME and trace file, so they do not share state.
+await Promise.all(
+  arms.flatMap((arm) =>
+    Array.from({ length: runs }, (_, r) =>
+      (async () => {
+        // A failed run (rate limit or an incomplete turn) carries no usable
+        // sample, so retry it in place rather than letting it thin the median. The
+        // trace file is keyed by run number, so a retry overwrites the attempt.
+        let m;
+        for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
+          m = await runCodex(question, arm.home, arm.name, r + 1);
+          if (m.ok) break;
+          if (attempt < MAX_RUN_RETRIES)
+            console.log(
+              `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED] retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
+            );
+        }
+        samples[arm.name].push(m);
         console.log(
-          `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED] retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
+          `  ${arm.name.padEnd(8)} run ${r + 1}: ${m.tokens} tok, ${m.tools} tools ` +
+            `(shell ${m.shell}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
+            (m.ok ? "" : "  [FAILED]"),
         );
-    }
-    samples[arm.name].push(m);
-    console.log(
-      `  ${arm.name.padEnd(8)} run ${r + 1}: ${m.tokens} tok, ${m.tools} tools ` +
-        `(shell ${m.shell}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
-        (m.ok ? "" : "  [FAILED]"),
-    );
-  }
-}
+      })(),
+    ),
+  ),
+);
 
 const med = (arm, k) =>
   median(samples[arm].filter((m) => m.ok).map((m) => m[k]));
@@ -332,9 +336,9 @@ function codegraphServerArgs(targetRepoDir) {
     : args;
 }
 
-function runCodex(question, codexHome, armName, runNumber) {
+async function runCodex(question, codexHome, armName, runNumber) {
   const start = Date.now();
-  const result = cp.spawnSync(
+  const result = await spawnAsync(
     "codex",
     [
       "exec",
@@ -347,11 +351,9 @@ function runCodex(question, codexHome, armName, runNumber) {
     ],
     {
       input: question,
-      encoding: "utf8",
       windowsHide: true,
       shell: true,
       env: { ...process.env, CODEX_HOME: codexHome },
-      maxBuffer: 256 * 1024 * 1024,
       timeout: 1_200_000,
     },
   );
@@ -362,6 +364,27 @@ function runCodex(question, codexHome, armName, runNumber) {
   fs.writeFileSync(path.join(traceDir, `${base}.stream.jsonl`), stdout);
   if (stderr) fs.writeFileSync(path.join(traceDir, `${base}.stderr.log`), stderr);
   return parseStream(stdout, Date.now() - start);
+}
+
+// spawnAsync runs a child to completion and resolves its captured stdout/stderr,
+// so many runs can be in flight at once via Promise.all instead of blocking the
+// loop the way spawnSync would.
+function spawnAsync(command, commandArgs, { input, ...spawnOpts }) {
+  return new Promise((resolve) => {
+    const child = cp.spawn(command, commandArgs, spawnOpts);
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (d) => (stdout += d));
+    child.stderr?.on("data", (d) => (stderr += d));
+    child.on("error", (error) => resolve({ error, stdout, stderr }));
+    child.on("close", () => resolve({ stdout, stderr }));
+    if (input) {
+      child.stdin?.write(input);
+      child.stdin?.end();
+    }
+  });
 }
 
 // parseStream sums per-turn usage (input + output) across turn.completed events,

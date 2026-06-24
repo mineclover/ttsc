@@ -245,35 +245,38 @@ fs.mkdirSync(traceDir, { recursive: true });
 const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
 let spent = 0;
 const MAX_RUN_RETRIES = 4;
-// Run-major, not arm-major: for each run index do every arm back to back, so a
-// baseline/graph pair shares the same wall-clock window. Arm-major (all baseline,
-// then all graph) lets a time-varying condition like a 529 storm land on one arm
-// and not the other, biasing the comparison. Still strictly sequential, one
-// invocation at a time, so there is no resource contention between arms.
-for (let r = 0; r < runs; r++) {
-  for (const arm of arms) {
-    // A failed run (a 529 overload, mostly) carries no usable sample, so retry it
-    // in place rather than letting it thin the median. The trace file is keyed by
-    // run number, so a successful retry overwrites the failed attempt.
-    let m;
-    for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
-      m = runClaude(question, arm.cfg, arm.name, r + 1);
-      if (m.ok) break;
-      if (attempt < MAX_RUN_RETRIES)
+// Fire every arm and every run at once. This is the experiment loop, so it favors
+// wall-clock turnaround over isolation: all arms x runs are launched concurrently
+// and awaited together. Each invocation is its own process with its own MCP
+// server and trace file, so they do not share state.
+await Promise.all(
+  arms.flatMap((arm) =>
+    Array.from({ length: runs }, (_, r) =>
+      (async () => {
+        // A failed run (a 529 overload, mostly) carries no usable sample, so retry
+        // it in place rather than letting it thin the median. The trace file is
+        // keyed by run number, so a successful retry overwrites the failed attempt.
+        let m;
+        for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
+          m = await runClaude(question, arm.cfg, arm.name, r + 1);
+          if (m.ok) break;
+          if (attempt < MAX_RUN_RETRIES)
+            console.log(
+              `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED] ${m.error || ""} retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
+            );
+        }
+        samples[arm.name].push(m);
+        spent += m.cost;
         console.log(
-          `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED] ${m.error || ""} retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
+          `  ${arm.name.padEnd(8)} run ${r + 1}: $${m.cost.toFixed(3)}, ${m.tokens} tok, ${m.tools} tools ` +
+            `(read ${m.reads}, grep ${m.grep}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
+            (m.ok ? "" : "  [FAILED]") +
+            `  [running $${spent.toFixed(2)}]`,
         );
-    }
-    samples[arm.name].push(m);
-    spent += m.cost;
-    console.log(
-      `  ${arm.name.padEnd(8)} run ${r + 1}: $${m.cost.toFixed(3)}, ${m.tokens} tok, ${m.tools} tools ` +
-        `(read ${m.reads}, grep ${m.grep}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
-        (m.ok ? "" : "  [FAILED]") +
-        `  [running $${spent.toFixed(2)}]`,
-    );
-  }
-}
+      })(),
+    ),
+  ),
+);
 
 const med = (arm, k) =>
   median(samples[arm].filter((m) => m.ok).map((m) => m[k]));
@@ -353,7 +356,7 @@ function syncSleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-function runClaude(question, cfg, armName, runNumber) {
+async function runClaude(question, cfg, armName, runNumber) {
   // Prevent Claude's built-in Agent tool from turning an MCP benchmark into
   // subagent IO. Do not use --bare here: it disables OAuth/keychain auth.
   const claudeArgs = [
@@ -375,19 +378,13 @@ function runClaude(question, cfg, armName, runNumber) {
     "--mcp-config",
     cfg,
   ];
-  const result = cp.spawnSync(
-    "claude",
-    claudeArgs,
-    {
-      cwd: repoDir,
-      input: question,
-      encoding: "utf8",
-      windowsHide: true,
-      shell: true,
-      maxBuffer: 256 * 1024 * 1024,
-      timeout: 900_000,
-    },
-  );
+  const result = await spawnAsync("claude", claudeArgs, {
+    cwd: repoDir,
+    input: question,
+    windowsHide: true,
+    shell: true,
+    timeout: 900_000,
+  });
   if (result.error) throw result.error;
   const stdout = result.stdout ?? "";
   const stderr = result.stderr ?? "";
@@ -395,6 +392,28 @@ function runClaude(question, cfg, armName, runNumber) {
   fs.writeFileSync(path.join(traceDir, `${base}.stream.jsonl`), stdout);
   if (stderr) fs.writeFileSync(path.join(traceDir, `${base}.stderr.log`), stderr);
   return parseStream(stdout);
+}
+
+// spawnAsync runs a child to completion and resolves its captured stdout/stderr,
+// so many runs can be in flight at once via Promise.all. An async spawn never
+// blocks the loop the way spawnSync would, which is what lets every arm and run
+// fire concurrently.
+function spawnAsync(command, commandArgs, { input, ...spawnOpts }) {
+  return new Promise((resolve) => {
+    const child = cp.spawn(command, commandArgs, spawnOpts);
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (d) => (stdout += d));
+    child.stderr?.on("data", (d) => (stderr += d));
+    child.on("error", (error) => resolve({ error, stdout, stderr }));
+    child.on("close", () => resolve({ stdout, stderr }));
+    if (input) {
+      child.stdin?.write(input);
+      child.stdin?.end();
+    }
+  });
 }
 
 function codegraphServerConfig(targetRepoDir) {

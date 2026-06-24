@@ -39,26 +39,26 @@ const REPOS = {
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-vscode.git",
     tsconfig: "src/tsconfig.json",
     question:
-      "Where do extension-host log messages cross into MainThreadConsole?",
+      "Where does $logExtensionHostMessage cross into MainThreadConsole?",
   },
   nestjs: {
     url: "https://github.com/nestjs/nest",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-nestjs.git",
     tsconfig: "tsconfig.graph.json",
-    question: "Which RouterExecutionContext path calls a controller handler?",
+    question: "Which RouterExecutionContext.create() path calls a controller handler?",
   },
   vue: {
     url: "https://github.com/vuejs/core",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-vue.git",
     tsconfig: "tsconfig.graph.json",
     question:
-      "Which reactive effect path triggers a render update after a ref changes?",
+      "Which RefImpl.value and ReactiveEffect path triggers a render update after a ref changes?",
   },
   zod: {
     url: "https://github.com/colinhacks/zod",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-zod.git",
     tsconfig: "tsconfig.graph.json",
-    question: "Which ZodType parse path reaches the internal parser?",
+    question: "Which ZodType.parse() path reaches the internal parser?",
   },
   typeorm: {
     url: "https://github.com/typeorm/typeorm",
@@ -71,14 +71,14 @@ const REPOS = {
     url: "https://github.com/ReactiveX/rxjs",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-rxjs.git",
     tsconfig: "tsconfig.graph.json",
-    question: "Which Observable.subscribe path constructs the Subscriber?",
+    question: "Which Observable.subscribe() path constructs the Subscriber?",
   },
   "shopping-backend": {
     url: "https://github.com/samchon/shopping-backend",
     fixtureUrl: "https://github.com/samchon/shopping-backend.git",
     tsconfig: "tsconfig.json",
     question:
-      "Which ShoppingOrderProvider path assembles an order create input before saving?",
+      "Which ShoppingOrderProvider.create() path assembles an order input before saving?",
   },
 };
 

@@ -187,11 +187,9 @@ var queryStopwords = map[string]bool{
   "this": true, "that": true, "it": true, "its": true, "work": true, "works": true,
   "use": true, "uses": true, "using": true, "from": true, "by": true, "an": true,
   "code": true, "path": true, "selected": true, "method": true, "methods": true,
-  "request": true, "requests": true, "controller": true, "controllers": true, "handler": true,
-  "handlers": true, "process": true, "main": true, "component": true,
-  "components": true, "value": true, "values": true, "route": true, "routes": true,
+  "request": true, "requests": true, "process": true, "main": true,
   "build": true, "builds": true, "built": true, "create": true, "creates": true,
-  "created": true, "creation": true, "schedule": true, "schedules": true, "scheduled": true,
+  "created": true, "creation": true,
   "before": true, "after": true, "when": true, "invokes": true, "invoke": true,
   "invoked": true, "call": true, "calls": true, "called": true, "used": true,
   "toward": true, "into": true, "log": true, "logs": true, "message": true,
@@ -235,6 +233,9 @@ func (s *Server) matchNodes(query string) []*graph.Node {
     score := 0
     if name == whole {
       score += 1000
+    }
+    if len(name) >= 8 && strings.Contains(whole, name) {
+      score += 500
     }
     for _, token := range tokens {
       switch {

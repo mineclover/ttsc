@@ -1,0 +1,68 @@
+package mcp_test
+
+import (
+  "path/filepath"
+  "strings"
+  "testing"
+
+  "github.com/samchon/ttsc/packages/ttsc/driver"
+  "github.com/samchon/ttsc/packages/ttsc/internal/graph/mcp"
+)
+
+// TestExploreRanksDottedSymbolMatch verifies graph_explore prefers a full dotted
+// symbol mentioned in a natural-language query over same-owner siblings.
+//
+// Benchmark prompts often name methods as `Owner.method()`. Splitting only into
+// natural-language tokens makes generic method names such as "create" either too
+// noisy when kept or invisible when dropped as stopwords. A full dotted-symbol
+// phrase should therefore anchor the exact node before sibling methods.
+//
+//  1. Build a tiny project with three same-owner methods.
+//  2. Query for `ShoppingOrderProvider.create`.
+//  3. Assert the create method appears before the sibling `at` method.
+func TestExploreRanksDottedSymbolMatch(t *testing.T) {
+  root := t.TempDir()
+  writeFile(t, filepath.Join(root, "tsconfig.json"), `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "strict": true
+  },
+  "files": ["src/main.ts"]
+}
+`)
+  writeFile(t, filepath.Join(root, "src", "main.ts"), `
+export class ShoppingOrderProvider {
+  at(): number {
+    return 1;
+  }
+  create(): number {
+    return 2;
+  }
+  erase(): number {
+    return 3;
+  }
+}
+`)
+
+  prog, diags, err := driver.LoadProgram(root, "tsconfig.json", driver.LoadProgramOptions{})
+  if err != nil {
+    t.Fatal(err)
+  }
+  if len(diags) != 0 {
+    t.Fatalf("unexpected parse diagnostics: %v", diags)
+  }
+  defer func() { _ = prog.Close() }()
+
+  server := mcp.NewServer(prog)
+  text := toolText(t, server, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"graph_explore","arguments":{"query":"ShoppingOrderProvider.create order path"}}}`)
+
+  createAt := strings.Index(text, "method ShoppingOrderProvider.create")
+  atAt := strings.Index(text, "method ShoppingOrderProvider.at")
+  if createAt < 0 {
+    t.Fatalf("graph_explore did not return ShoppingOrderProvider.create:\n%s", text)
+  }
+  if atAt >= 0 && atAt < createAt {
+    t.Fatalf("graph_explore ranked sibling method before dotted symbol match:\n%s", text)
+  }
+}

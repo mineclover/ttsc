@@ -17,7 +17,7 @@ import (
 //  2. Assert only the domain anchors remain for graph matching.
 func TestQueryTokensDropGenericNavigationWords(t *testing.T) {
   got := queryTokens("Which code path invokes the selected RouterExecutionContext method for an HTTP route request?")
-  want := []string{"routerexecutioncontext", "http"}
+  want := []string{"routerexecutioncontext", "http", "route"}
   if !reflect.DeepEqual(got, want) {
     t.Fatalf("queryTokens() = %#v; want %#v", got, want)
   }

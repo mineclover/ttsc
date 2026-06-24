@@ -251,36 +251,45 @@ fs.mkdirSync(traceDir, { recursive: true });
 
 const MAX_RUN_RETRIES = 4;
 const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
-// Fire every arm and every run at once. This is the experiment loop, so it favors
-// wall-clock turnaround over isolation: all arms x runs are launched concurrently
-// and awaited together. Each invocation is its own codex process with its own
-// CODEX_HOME and trace file, so they do not share state.
-await Promise.all(
-  arms.flatMap((arm) =>
-    Array.from({ length: runs }, (_, r) =>
-      (async () => {
-        // A failed run (rate limit or an incomplete turn) carries no usable
-        // sample, so retry it in place rather than letting it thin the median. The
-        // trace file is keyed by run number, so a retry overwrites the attempt.
-        let m;
-        for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
-          m = await runCodex(question, arm.home, arm.name, r + 1);
-          if (m.ok) break;
-          if (attempt < MAX_RUN_RETRIES)
-            console.log(
-              `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED] retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
-            );
-        }
-        samples[arm.name].push(m);
+// Launch arms x runs concurrently, capped at TTSC_BENCH_CONCURRENCY (default
+// unlimited). A high cap is fastest for experiment iteration; a low cap keeps the
+// host quiet enough that per-run timings and token counts settle. Each invocation
+// is its own codex process with its own CODEX_HOME and trace file.
+const concurrency = Number(process.env.TTSC_BENCH_CONCURRENCY) || Infinity;
+const thunks = arms.flatMap((arm) =>
+  Array.from({ length: runs }, (_, r) => async () => {
+    // A failed run (rate limit or an incomplete turn) carries no usable sample, so
+    // retry it in place rather than letting it thin the median. The trace file is
+    // keyed by run number, so a retry overwrites the attempt.
+    let m;
+    for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
+      m = await runCodex(question, arm.home, arm.name, r + 1);
+      if (m.ok) break;
+      if (attempt < MAX_RUN_RETRIES)
         console.log(
-          `  ${arm.name.padEnd(8)} run ${r + 1}: ${m.tokens} tok, ${m.tools} tools ` +
-            `(shell ${m.shell}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
-            (m.ok ? "" : "  [FAILED]"),
+          `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED] retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
         );
-      })(),
-    ),
-  ),
+    }
+    samples[arm.name].push(m);
+    console.log(
+      `  ${arm.name.padEnd(8)} run ${r + 1}: ${m.tokens} tok, ${m.tools} tools ` +
+        `(shell ${m.shell}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
+        (m.ok ? "" : "  [FAILED]"),
+    );
+  }),
 );
+await runWithConcurrency(thunks, concurrency);
+
+// runWithConcurrency runs thunks with at most `limit` in flight at once, draining a
+// shared cursor so a slow run never blocks a free worker.
+async function runWithConcurrency(work, limit) {
+  let next = 0;
+  const worker = async () => {
+    while (next < work.length) await work[next++]();
+  };
+  const lanes = Math.max(1, Math.min(limit, work.length));
+  await Promise.all(Array.from({ length: lanes }, worker));
+}
 
 const med = (arm, k) =>
   median(samples[arm].filter((m) => m.ok).map((m) => m[k]));

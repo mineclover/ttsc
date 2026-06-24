@@ -89,9 +89,132 @@ function modelLabel(cell: AgentCell): string {
   return `${cell.model} (${cell.harness})`;
 }
 
-function toolLabel(cell: AgentCell): string {
-  if ((cell.tool ?? "ttsc-graph") === "codegraph") return "codegraph";
-  return "@ttsc/graph";
+function repoLabel(repo: string): string {
+  switch (repo) {
+    case "vscode":
+      return "VS Code";
+    case "rxjs":
+      return "RxJS";
+    case "typeorm":
+      return "TypeORM";
+    case "nestjs":
+      return "NestJS";
+    case "excalidraw":
+      return "Excalidraw";
+    case "vue":
+      return "Vue";
+    case "zod":
+      return "Zod";
+    default:
+      return repo;
+  }
+}
+
+const TOOL_TTSC = "ttsc-graph";
+const TOOL_CODEGRAPH = "codegraph";
+
+function cellTool(cell: AgentCell): string {
+  return cell.tool ?? TOOL_TTSC;
+}
+
+/** Display order for the model rows inside a project tab. */
+function modelOrder(model: string): number {
+  const order = ["sonnet", "opus", "gpt-5.5"];
+  const index = order.indexOf(model);
+  return index === -1 ? order.length : index;
+}
+
+/** Stable group-by that preserves first-appearance order of the keys. */
+function groupBy<T>(
+  items: T[],
+  key: (item: T) => string,
+): { key: string; items: T[] }[] {
+  const out: { key: string; items: T[] }[] = [];
+  const index = new Map<string, { key: string; items: T[] }>();
+  for (const item of items) {
+    const k = key(item);
+    let bucket = index.get(k);
+    if (!bucket) {
+      bucket = { key: k, items: [] };
+      index.set(k, bucket);
+      out.push(bucket);
+    }
+    bucket.items.push(item);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Grouped model: one (repo, model) compared as baseline / ttsc-graph / codegraph
+// ---------------------------------------------------------------------------
+
+interface Metrics {
+  tokens: number;
+  tools: number;
+  dur: number;
+}
+
+interface ModelGroup {
+  model: string;
+  label: string;
+  harness: string;
+  runs?: number;
+  codegraphSetupMs?: number;
+  baseline: Metrics;
+  ttsc?: Metrics;
+  codegraph?: Metrics;
+}
+
+interface ProjectGroup {
+  repo: string;
+  question?: string;
+  models: ModelGroup[];
+}
+
+function medianMetrics(samples: AgentSample[]): Metrics {
+  return {
+    tokens: median(samples.map((s) => s.tokens)),
+    tools: median(samples.map((s) => s.tools)),
+    dur: median(samples.map((s) => s.durMs ?? 0)),
+  };
+}
+
+/**
+ * Reshape the flat cell list into project -> model groups. Each model row
+ * carries one empty-MCP baseline (the median of every baseline sample measured
+ * for that model in this repo, across the ttsc-graph and codegraph cells, which
+ * are the same A against different B), plus the ttsc-graph and codegraph graph
+ * medians when those cells exist.
+ */
+function buildProjectGroups(cells: AgentCell[]): ProjectGroup[] {
+  return groupBy(cells, (cell) => cell.repo).map(
+    ({ key: repo, items: repoCells }) => {
+      const models = groupBy(repoCells, (cell) => cell.model)
+        .map(({ items: modelCells }): ModelGroup => {
+          const ttscCell = modelCells.find((c) => cellTool(c) === TOOL_TTSC);
+          const codegraphCell = modelCells.find(
+            (c) => cellTool(c) === TOOL_CODEGRAPH,
+          );
+          const baselineSamples = modelCells.flatMap((c) => c.samples.baseline);
+          const head = modelCells[0]!;
+          return {
+            model: head.model,
+            label: modelLabel(head),
+            harness: head.harness,
+            runs: ttscCell?.runs ?? codegraphCell?.runs,
+            codegraphSetupMs: codegraphCell?.toolSetupMs,
+            baseline: medianMetrics(baselineSamples),
+            ttsc: ttscCell ? medianMetrics(ttscCell.samples.graph) : undefined,
+            codegraph: codegraphCell
+              ? medianMetrics(codegraphCell.samples.graph)
+              : undefined,
+          };
+        })
+        .sort((a, b) => modelOrder(a.model) - modelOrder(b.model));
+      const question = repoCells.find((c) => c.question)?.question;
+      return { repo, question, models };
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -99,6 +222,11 @@ function toolLabel(cell: AgentCell): string {
 // ---------------------------------------------------------------------------
 
 const ACCENT = "#36e2ee";
+
+const BASELINE_FILL = "#4b5563";
+const TTSC_FILL = `linear-gradient(90deg, ${ACCENT}, #19b6c9)`;
+const CODEGRAPH_FILL = "linear-gradient(90deg, #f5b042, #d97706)";
+const CODEGRAPH_TEXT = "#f5b042";
 
 const panelClass =
   "overflow-hidden rounded-lg border border-[#222834] bg-[#0c0e13] shadow-[0_24px_60px_rgba(0,0,0,0.35)]";
@@ -152,276 +280,243 @@ function SectionHeader({
 }
 
 // ---------------------------------------------------------------------------
-// Agent cost: the percentages are the hero
+// Agent cost: each metric is a grouped bar (baseline / ttsc-graph / codegraph)
 // ---------------------------------------------------------------------------
 
-/**
- * One metric as a split usage bar.
- *
- * The whole track is the empty-MCP baseline (100%). The cyan segment is how
- * much the graph still uses (graphMedian / baselineMedian), the grey remainder
- * is what it saves. So "86% saved" shows as a bar that is mostly the grey
- * "saved" region, never an 86%-full bar that could read as "86% remains". The
- * raw token and tool counts appear only on hover (the bar's title); the
- * percentages stay visible. An optional second row shows the guided arm.
- */
-function UsageBar({
-  metric,
-  baseMedian,
-  graphMedian,
-  baselineRaw,
-  graphRaw,
-  rowLabel,
+interface BarSpec {
+  key: string;
+  label: string;
+  value: number;
+  fill: string;
+  textColor: string;
+  baseline?: boolean;
+}
+
+interface Metric {
+  key: keyof Metrics;
+  label: string;
+  fmt: (n: number) => string;
+}
+
+const METRICS: Metric[] = [
+  { key: "tokens", label: "tokens", fmt: (n) => fmt(Math.round(n)) },
+  {
+    key: "tools",
+    label: "tool calls",
+    fmt: (n) => (n % 1 === 0 ? fmt(Math.round(n)) : n.toFixed(1)),
+  },
+  { key: "dur", label: "wall time", fmt: (n) => fmtSecs(n) },
+];
+
+/** One horizontal bar in a metric group, scaled against the group's max. */
+function BarRow({
+  bar,
+  max,
+  baseValue,
+  raw,
 }: {
-  metric: string;
-  baseMedian: number;
-  graphMedian: number;
-  baselineRaw: string;
-  graphRaw: string;
-  rowLabel?: string;
+  bar: BarSpec;
+  max: number;
+  baseValue: number;
+  raw: string;
 }) {
-  const usedWidth =
-    baseMedian > 0 ? Math.min(100, (graphMedian / baseMedian) * 100) : 100;
-  const saved = pctSaved(baseMedian, graphMedian);
-  const used = 100 - saved;
-  // A hair of cyan always shows so a 0%-saved row still reads as deliberate.
-  const fillWidth = Math.max(1.5, usedWidth);
-  const comparisonLabel = rowLabel ?? "graph";
+  const width = max > 0 ? Math.max(2, (bar.value / max) * 100) : 2;
+  const saved = bar.baseline ? null : pctSaved(baseValue, bar.value);
 
   return (
-    <div
-      className="space-y-1.5"
-      title={`${metric}: baseline ${baselineRaw} -> ${comparisonLabel} ${graphRaw}`}
-    >
-      <div className="flex items-baseline justify-between font-mono text-[10px] uppercase tracking-wider">
-        <span style={{ color: ACCENT }}>
-          {used}% used
-          {rowLabel ? (
-            <span className="ml-1 text-neutral-500 normal-case tracking-normal">
-              {rowLabel}
-            </span>
-          ) : null}
-        </span>
-        <span className="text-neutral-500">{saved}% saved</span>
-      </div>
-      <div className="relative h-3 w-full overflow-hidden rounded-full bg-[#161b24] ring-1 ring-inset ring-white/[0.04]">
-        <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.035)_0,rgba(255,255,255,0.035)_6px,transparent_6px,transparent_12px)]" />
+    <div className="flex items-center gap-2.5" title={`${bar.label}: ${raw}`}>
+      <span
+        className="w-[5.5rem] shrink-0 truncate font-mono text-[10px]"
+        style={{ color: bar.textColor }}
+      >
+        {bar.label}
+      </span>
+      <div className="relative h-3.5 flex-1 overflow-hidden rounded-full bg-[#161b24] ring-1 ring-inset ring-white/[0.04]">
         <div
-          className="relative h-full rounded-full"
-          style={{
-            width: `${fillWidth}%`,
-            background: rowLabel
-              ? `linear-gradient(90deg, ${ACCENT}aa, ${ACCENT}66)`
-              : `linear-gradient(90deg, ${ACCENT}, #19b6c9)`,
-            boxShadow: rowLabel
-              ? "none"
-              : `0 0 12px ${ACCENT}55, inset 0 1px 0 rgba(255,255,255,0.25)`,
-          }}
-        >
-          <span className="absolute right-0 top-0 h-full w-px bg-white/40" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MetricBlock({
-  metric,
-  baseMedian,
-  graphMedian,
-  baselineRaw,
-  graphRaw,
-  guided,
-}: {
-  metric: string;
-  baseMedian: number;
-  graphMedian: number;
-  baselineRaw: string;
-  graphRaw: string;
-  guided?: { median: number; raw: string };
-}) {
-  return (
-    <div className="space-y-2.5 rounded-md border border-[#1c2230] bg-[#0e1117] px-3.5 py-3">
-      <div className="flex items-baseline justify-between">
-        <p className="font-mono text-[11px] font-medium uppercase tracking-wide text-neutral-300">
-          {metric}
-        </p>
-        <p className="font-mono text-[10px] text-neutral-500">
-          baseline {baselineRaw} to graph {graphRaw}
-        </p>
-      </div>
-      <UsageBar
-        metric={metric}
-        baseMedian={baseMedian}
-        graphMedian={graphMedian}
-        baselineRaw={baselineRaw}
-        graphRaw={graphRaw}
-      />
-      {guided ? (
-        <UsageBar
-          metric={metric}
-          baseMedian={baseMedian}
-          graphMedian={guided.median}
-          baselineRaw={baselineRaw}
-          graphRaw={guided.raw}
-          rowLabel="guided (AGENTS.md)"
+          className="h-full rounded-full"
+          style={{ width: `${width}%`, background: bar.fill }}
         />
-      ) : null}
+      </div>
+      <span className="w-[4.75rem] shrink-0 text-right font-mono text-[10px] tabular-nums text-neutral-300">
+        {raw}
+      </span>
+      <span className="w-12 shrink-0 text-right font-mono text-[10px] tabular-nums">
+        {saved === null ? (
+          <span className="text-neutral-600">baseline</span>
+        ) : saved >= 0 ? (
+          <span style={{ color: ACCENT }}>↓{saved}%</span>
+        ) : (
+          <span className="text-rose-400">↑{-saved}%</span>
+        )}
+      </span>
     </div>
   );
 }
 
-/** Oversized used / saved headline: the hero numerals of each model row. */
-function SavingHeadline({ tokensPct }: { tokensPct: number }) {
-  const used = 100 - tokensPct;
+/** One metric (tokens / tool calls / wall time) as a group of bars. */
+function MetricGroup({ metric, model }: { metric: Metric; model: ModelGroup }) {
+  const baseValue = model.baseline[metric.key];
+  const bars: BarSpec[] = [
+    {
+      key: "baseline",
+      label: "baseline",
+      value: baseValue,
+      fill: BASELINE_FILL,
+      textColor: "#9ca3af",
+      baseline: true,
+    },
+  ];
+  if (model.ttsc)
+    bars.push({
+      key: "ttsc",
+      label: "@ttsc/graph",
+      value: model.ttsc[metric.key],
+      fill: TTSC_FILL,
+      textColor: ACCENT,
+    });
+  if (model.codegraph)
+    bars.push({
+      key: "codegraph",
+      label: "codegraph",
+      value: model.codegraph[metric.key],
+      fill: CODEGRAPH_FILL,
+      textColor: CODEGRAPH_TEXT,
+    });
+
+  const max = Math.max(1, ...bars.map((bar) => bar.value));
+
   return (
-    <div className="mt-4">
-      <div className="flex items-end gap-1.5 font-mono font-black tabular-nums leading-none tracking-tight">
-        <span className="text-[44px] md:text-[52px]" style={{ color: ACCENT }}>
-          {used}
-          <span className="align-top text-[26px] font-bold md:text-[30px]">%</span>
-        </span>
-        <span className="text-[30px] font-bold text-neutral-700 md:text-[36px]">
-          /
-        </span>
-        <span className="text-[44px] text-neutral-300 md:text-[52px]">
-          {tokensPct}
-          <span className="align-top text-[26px] font-bold md:text-[30px]">%</span>
-        </span>
-      </div>
-      <div className="mt-1.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-        <span style={{ color: ACCENT }}>used</span>
-        <span className="text-neutral-700">/</span>
-        <span>saved / tokens</span>
+    <div className="space-y-1.5 rounded-md border border-[#1c2230] bg-[#0e1117] px-3.5 py-3">
+      <p className="font-mono text-[11px] font-medium uppercase tracking-wide text-neutral-300">
+        {metric.label}
+      </p>
+      <div className="space-y-1.5">
+        {bars.map((bar) => (
+          <BarRow
+            key={bar.key}
+            bar={bar}
+            max={max}
+            baseValue={baseValue}
+            raw={metric.fmt(bar.value)}
+          />
+        ))}
       </div>
     </div>
   );
 }
 
-function AgentCostSection({ cells }: { cells: AgentCell[] }) {
+/** One model row: its identity on the left, the metric groups on the right. */
+function ModelBlock({ model }: { model: ModelGroup }) {
+  return (
+    <div className="grid gap-5 px-5 py-5 md:grid-cols-[minmax(8rem,12rem)_minmax(0,1fr)] md:gap-6">
+      <div className="md:border-r md:border-[#1a1f29] md:pr-6">
+        <p className="text-[15px] font-semibold tracking-tight text-neutral-50">
+          {model.label}
+        </p>
+        <p className="mt-1.5 font-mono text-[11px] text-neutral-500">
+          {model.harness}
+          {model.runs !== undefined
+            ? ` · ${model.runs} run${model.runs !== 1 ? "s" : ""}`
+            : ""}
+        </p>
+        {model.codegraphSetupMs !== undefined ? (
+          <p className="mt-1 font-mono text-[11px] text-neutral-500">
+            codegraph index {fmtSecs(model.codegraphSetupMs)}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2.5">
+        {METRICS.map((metric) => (
+          <MetricGroup key={metric.key} metric={metric} model={model} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LegendDot({ fill, label }: { fill: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        className="inline-block h-2.5 w-2.5 rounded-full"
+        style={{ background: fill }}
+      />
+      {label}
+    </span>
+  );
+}
+
+function ProjectPanel({
+  group,
+  aside,
+}: {
+  group: ProjectGroup;
+  aside?: string;
+}) {
   return (
     <section className={panelClass}>
       <SectionHeader
         eyebrow="Agent cost"
-        title="What the code graph saves a coding agent"
-        description="Each bar compares the baseline run with graph, and the optional second bar shows guided. Hover any bar for the raw median counts."
-        aside={`${cells.length} cell${cells.length !== 1 ? "s" : ""}`}
+        title={repoLabel(group.repo)}
+        description={
+          group.question ??
+          "Median tokens, tool calls and wall time per model, bar the empty-MCP baseline against @ttsc/graph and codegraph."
+        }
+        aside={aside}
       />
 
       <div className="divide-y divide-[#1a1f29]">
-        {cells.map((cell) => {
-          const baseTokens = median(
-            cell.samples.baseline.map((s) => s.tokens),
-          );
-          const graphTokens = median(cell.samples.graph.map((s) => s.tokens));
-          const baseTools = median(cell.samples.baseline.map((s) => s.tools));
-          const graphTools = median(cell.samples.graph.map((s) => s.tools));
-          const baseDur = median(
-            cell.samples.baseline.map((s) => s.durMs ?? 0),
-          );
-          const graphDur = median(cell.samples.graph.map((s) => s.durMs ?? 0));
-          const tokensPct = pctSaved(baseTokens, graphTokens);
+        {group.models.map((model) => (
+          <ModelBlock key={model.model} model={model} />
+        ))}
+      </div>
 
-          const guided = Array.isArray(cell.samples.guided)
-            ? cell.samples.guided
-            : undefined;
-          const guidedTokens = guided
-            ? median(guided.map((s) => s.tokens))
-            : undefined;
-          const guidedTools = guided
-            ? median(guided.map((s) => s.tools))
-            : undefined;
-          const guidedDur = guided
-            ? median(guided.map((s) => s.durMs ?? 0))
-            : undefined;
-
-          return (
-            <div
-              key={`${cell.harness}:${cell.tool ?? "ttsc-graph"}:${cell.repo}:${cell.model}:${cell.effort ?? ""}:${cell.fixtureBranch ?? ""}:${cell.daemon === true ? "daemon" : "single"}`}
-              className="grid gap-5 px-5 py-5 md:grid-cols-[minmax(9rem,15rem)_minmax(0,1fr)] md:gap-6"
-            >
-              <div className="md:border-r md:border-[#1a1f29] md:pr-6">
-                <p className="text-[15px] font-semibold tracking-tight text-neutral-50">
-                  {modelLabel(cell)}
-                </p>
-                <p className="mt-1.5 font-mono text-[11px] text-neutral-500">
-                  {cell.repo} - {toolLabel(cell)} - {cell.harness}
-                  {cell.fixtureBranch ? ` - ${cell.fixtureBranch}` : ""}
-                  {cell.daemon !== undefined
-                    ? ` - ${cell.daemon ? "daemon" : "single"}`
-                    : ""}
-                  {cell.runs !== undefined ? ` - ${cell.runs} runs` : ""}
-                  {cell.toolSetupMs !== undefined
-                    ? ` - index ${fmtSecs(cell.toolSetupMs)}`
-                    : ""}
-                </p>
-                {cell.question ? (
-                  <p className="mt-2 max-w-[18rem] text-[12px] italic leading-snug text-neutral-400">
-                    {cell.question}
-                  </p>
-                ) : null}
-                <SavingHeadline tokensPct={tokensPct} />
-              </div>
-
-              <div className="space-y-2.5">
-                <MetricBlock
-                  metric="tokens"
-                  baseMedian={baseTokens}
-                  graphMedian={graphTokens}
-                  baselineRaw={fmt(Math.round(baseTokens))}
-                  graphRaw={fmt(Math.round(graphTokens))}
-                  guided={
-                    guidedTokens !== undefined
-                      ? {
-                          median: guidedTokens,
-                          raw: fmt(Math.round(guidedTokens)),
-                        }
-                      : undefined
-                  }
-                />
-                <MetricBlock
-                  metric="tool calls"
-                  baseMedian={baseTools}
-                  graphMedian={graphTools}
-                  baselineRaw={fmt(Math.round(baseTools))}
-                  graphRaw={
-                    graphTools % 1 === 0
-                      ? fmt(Math.round(graphTools))
-                      : graphTools.toFixed(1)
-                  }
-                  guided={
-                    guidedTools !== undefined
-                      ? {
-                          median: guidedTools,
-                          raw:
-                            guidedTools % 1 === 0
-                              ? fmt(Math.round(guidedTools))
-                              : guidedTools.toFixed(1),
-                        }
-                      : undefined
-                  }
-                />
-                <MetricBlock
-                  metric="wall time"
-                  baseMedian={baseDur}
-                  graphMedian={graphDur}
-                  baselineRaw={fmtSecs(baseDur)}
-                  graphRaw={fmtSecs(graphDur)}
-                  guided={
-                    guidedDur !== undefined
-                      ? {
-                          median: guidedDur,
-                          raw: fmtSecs(guidedDur),
-                        }
-                      : undefined
-                  }
-                />
-              </div>
-            </div>
-          );
-        })}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[#1a1f29] px-5 py-3 font-mono text-[10px] text-neutral-500">
+        <LegendDot fill={BASELINE_FILL} label="empty-MCP baseline" />
+        <LegendDot fill={ACCENT} label="@ttsc/graph" />
+        <LegendDot fill={CODEGRAPH_TEXT} label="codegraph" />
+        <span className="text-neutral-600">
+          ↓ saved vs baseline · ↑ over baseline
+        </span>
       </div>
     </section>
+  );
+}
+
+/** Project tab strip; mirrors the BenchmarkDashboard nav voice. */
+function ProjectTabs({
+  groups,
+  active,
+  onSelect,
+}: {
+  groups: ProjectGroup[];
+  active: string;
+  onSelect: (repo: string) => void;
+}) {
+  return (
+    <nav
+      aria-label="Graph benchmark projects"
+      className="flex gap-1 overflow-x-auto rounded-lg border border-[#222834] bg-[#0c0e13] p-1"
+    >
+      {groups.map((group) => {
+        const isActive = group.repo === active;
+        return (
+          <button
+            key={group.repo}
+            type="button"
+            className={`shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
+              isActive
+                ? "bg-[#1b212c] text-neutral-50 shadow-sm"
+                : "text-neutral-400 hover:bg-[#13171f] hover:text-neutral-100"
+            }`}
+            onClick={() => onSelect(group.repo)}
+          >
+            {repoLabel(group.repo)}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -597,6 +692,7 @@ export default function GraphBenchmark({
 }: GraphBenchmarkProps) {
   const [report, setReport] = useState<GraphReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeRepo, setActiveRepo] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -622,12 +718,45 @@ export default function GraphBenchmark({
 
   if (!report) return <Notice>Loading graph benchmark results...</Notice>;
 
-  const cells = report.agent?.cells ?? [];
+  const groups = buildProjectGroups(report.agent?.cells ?? []);
+
+  // The landing summary shows only the hero project (vscode) without tabs,
+  // matching the index prose; the full page tabs across every project.
+  if (variant === "summary") {
+    const hero = groups.find((g) => g.repo === "vscode") ?? groups[0];
+    return (
+      <div className="not-prose my-6 space-y-5">
+        {hero ? <ProjectPanel group={hero} /> : null}
+      </div>
+    );
+  }
+
+  const active =
+    activeRepo && groups.some((g) => g.repo === activeRepo)
+      ? activeRepo
+      : groups[0]?.repo;
+  const activeGroup = groups.find((g) => g.repo === active);
 
   return (
     <div className="not-prose my-6 space-y-5">
-      {cells.length > 0 ? <AgentCostSection cells={cells} /> : null}
-      {variant === "full" && report.structural ? (
+      {groups.length > 0 && active ? (
+        <>
+          <ProjectTabs
+            groups={groups}
+            active={active}
+            onSelect={setActiveRepo}
+          />
+          {activeGroup ? (
+            <ProjectPanel
+              group={activeGroup}
+              aside={`${activeGroup.models.length} model${
+                activeGroup.models.length !== 1 ? "s" : ""
+              }`}
+            />
+          ) : null}
+        </>
+      ) : null}
+      {report.structural ? (
         <StructuralSection data={report.structural} />
       ) : null}
     </div>

@@ -9,6 +9,7 @@ export interface RawNode {
   kind: string;
   file: string;
   external?: boolean;
+  ignored?: boolean;
   pos?: number;
   end?: number;
 }
@@ -33,6 +34,7 @@ export interface ViewerNode {
   kind: string;
   file: string;
   external: boolean;
+  ignored: boolean;
   degree: number;
 }
 
@@ -48,6 +50,7 @@ export interface ViewerCounts {
   nodes: number;
   links: number;
   droppedExternal: number;
+  droppedIgnored: number;
   droppedByCap: number;
 }
 
@@ -78,8 +81,10 @@ function commonRoot(files: string[]): string {
   return parts.join("/");
 }
 
-/** Make an absolute path project-relative; a path outside the project keeps the
- * portion from its last node_modules/ segment, or its base name. */
+/**
+ * Make an absolute path project-relative; a path outside the project keeps the
+ * portion from its last node_modules/ segment, or its base name.
+ */
 function relativize(abs: string, root: string): string {
   const a = posix(abs);
   const r = posix(root).replace(/\/+$/, "");
@@ -91,8 +96,10 @@ function relativize(abs: string, root: string): string {
   return slash >= 0 ? a.slice(slash + 1) : a;
 }
 
-/** A node id is `<path>#<name>:<kind>`; rewrite only the path prefix so ids stay
- * a stable key and every edge endpoint (also an id) relativizes identically. */
+/**
+ * A node id is `<path>#<name>:<kind>`; rewrite only the path prefix so ids stay
+ * a stable key and every edge endpoint (also an id) relativizes identically.
+ */
 function rewriteId(id: string, root: string): string {
   const hash = id.indexOf("#");
   if (hash < 0) return id;
@@ -112,31 +119,40 @@ function degreeOf(
 }
 
 /**
- * Reduce a raw dump to the viewer payload: relativized, external-free, capped to
- * the highest-degree nodes, with orphans pruned.
+ * Reduce a raw dump to the viewer payload: relativized, external-free, capped
+ * to the highest-degree nodes, with orphans pruned.
  */
 export function reduce(
   raw: RawDump,
-  { maxNodes = 1000, keepExternal = false }: { maxNodes?: number; keepExternal?: boolean } = {},
+  {
+    maxNodes = 1000,
+    keepExternal = false,
+    keepIgnored = false,
+  }: { maxNodes?: number; keepExternal?: boolean; keepIgnored?: boolean } = {},
 ): ViewerPayload {
-  const keptByExternal = raw.nodes.filter((n) => keepExternal || !n.external);
+  // Drop external boundary leaves and git-ignored generated code (a Prisma
+  // client and the like, tagged `ignored` by the dump) so the authored graph is
+  // not buried under codegen.
+  const keep = (n: RawNode) =>
+    (keepExternal || !n.external) && (keepIgnored || !n.ignored);
+  const keptBoundary = raw.nodes.filter(keep);
   const root = commonRoot(
-    raw.nodes.filter((n) => !n.external).map((n) => n.file),
+    raw.nodes.filter((n) => !n.external && !n.ignored).map((n) => n.file),
   );
 
-  const liveIds = new Set(keptByExternal.map((n) => n.id));
+  const liveIds = new Set(keptBoundary.map((n) => n.id));
   const liveEdges = raw.edges.filter(
     (e) => liveIds.has(e.from) && liveIds.has(e.to),
   );
 
-  const degree = degreeOf(keptByExternal, liveEdges);
-  let kept = keptByExternal;
+  const degree = degreeOf(keptBoundary, liveEdges);
+  let kept = keptBoundary;
   let droppedByCap = 0;
   if (kept.length > maxNodes) {
     kept = [...kept]
       .sort((a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0))
       .slice(0, maxNodes);
-    droppedByCap = keptByExternal.length - kept.length;
+    droppedByCap = keptBoundary.length - kept.length;
   }
 
   const keptIds = new Set(kept.map((n) => n.id));
@@ -153,6 +169,7 @@ export function reduce(
       kind: n.kind,
       file: relativize(n.file, root),
       external: n.external === true,
+      ignored: n.ignored === true,
       degree: finalDegree.get(n.id) ?? 0,
     }));
 
@@ -174,7 +191,12 @@ export function reduce(
       rawEdges: raw.edges.length,
       nodes: nodes.length,
       links: links.length,
-      droppedExternal: raw.nodes.length - keptByExternal.length,
+      droppedExternal: keepExternal
+        ? 0
+        : raw.nodes.filter((n) => n.external).length,
+      droppedIgnored: keepIgnored
+        ? 0
+        : raw.nodes.filter((n) => n.ignored && !n.external).length,
       droppedByCap,
     },
     nodes,
@@ -189,13 +211,14 @@ function isObject(value: unknown): value is Record<string, unknown> {
 /** A raw graphdump: `{ nodes: [...], edges: [{from,to,kind}] }`. */
 export function isRawDump(json: unknown): json is RawDump {
   return (
-    isObject(json) &&
-    Array.isArray(json.nodes) &&
-    Array.isArray(json.edges)
+    isObject(json) && Array.isArray(json.nodes) && Array.isArray(json.edges)
   );
 }
 
-/** An already-reduced viewer payload: `{ nodes: [...], links: [{source,target}] }`. */
+/**
+ * An already-reduced viewer payload: `{ nodes: [...], links: [{source,target}]
+ * }`.
+ */
 export function isViewerPayload(json: unknown): json is ViewerPayload {
   return (
     isObject(json) && Array.isArray(json.nodes) && Array.isArray(json.links)

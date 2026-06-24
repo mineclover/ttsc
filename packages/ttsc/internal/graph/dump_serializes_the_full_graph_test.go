@@ -44,7 +44,7 @@ export function main(): void {
 
 	g := Build(prog)
 
-	data, err := MarshalDump(g, root, "tsconfig.json", false)
+	data, err := MarshalDump(g, root, "tsconfig.json", nil, false)
 	if err != nil {
 		t.Fatalf("MarshalDump: %v", err)
 	}
@@ -104,7 +104,7 @@ export function main(): void {
 		}
 	}
 
-	pretty, err := MarshalDump(g, root, "tsconfig.json", true)
+	pretty, err := MarshalDump(g, root, "tsconfig.json", nil, true)
 	if err != nil {
 		t.Fatalf("MarshalDump pretty: %v", err)
 	}

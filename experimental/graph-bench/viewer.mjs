@@ -78,25 +78,33 @@ function rewriteId(id, root) {
  * to the highest-degree nodes, with orphans pruned. Returns `{ nodes, links }`
  * shaped for react-force-graph (node.id, link.source/target).
  */
-export function reduce(raw, { maxNodes = 1500, keepExternal = false } = {}) {
-  const keptByExternal = raw.nodes.filter((n) => keepExternal || !n.external);
+export function reduce(
+  raw,
+  { maxNodes = 1500, keepExternal = false, keepIgnored = false } = {},
+) {
+  // Drop external boundary leaves and git-ignored generated code (a Prisma
+  // client and the like, tagged `ignored` by the dump) so the authored graph is
+  // not buried under codegen.
+  const keep = (n) =>
+    (keepExternal || !n.external) && (keepIgnored || !n.ignored);
+  const keptBoundary = raw.nodes.filter(keep);
   const root = commonRoot(
-    raw.nodes.filter((n) => !n.external).map((n) => n.file),
+    raw.nodes.filter((n) => !n.external && !n.ignored).map((n) => n.file),
   );
 
-  const liveIds = new Set(keptByExternal.map((n) => n.id));
+  const liveIds = new Set(keptBoundary.map((n) => n.id));
   const liveEdges = raw.edges.filter(
     (e) => liveIds.has(e.from) && liveIds.has(e.to),
   );
 
-  const degree = degreeOf(keptByExternal, liveEdges);
-  let kept = keptByExternal;
+  const degree = degreeOf(keptBoundary, liveEdges);
+  let kept = keptBoundary;
   let droppedByCap = 0;
   if (kept.length > maxNodes) {
     kept = [...kept]
       .sort((a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0))
       .slice(0, maxNodes);
-    droppedByCap = keptByExternal.length - kept.length;
+    droppedByCap = keptBoundary.length - kept.length;
   }
 
   const keptIds = new Set(kept.map((n) => n.id));
@@ -113,6 +121,7 @@ export function reduce(raw, { maxNodes = 1500, keepExternal = false } = {}) {
       kind: n.kind,
       file: relativize(n.file, root),
       external: n.external === true,
+      ignored: n.ignored === true,
       degree: finalDegree.get(n.id) ?? 0,
     }));
 
@@ -134,7 +143,12 @@ export function reduce(raw, { maxNodes = 1500, keepExternal = false } = {}) {
       rawEdges: raw.edges.length,
       nodes: nodes.length,
       links: links.length,
-      droppedExternal: raw.nodes.length - keptByExternal.length,
+      droppedExternal: keepExternal
+        ? 0
+        : raw.nodes.filter((n) => n.external).length,
+      droppedIgnored: keepIgnored
+        ? 0
+        : raw.nodes.filter((n) => n.ignored && !n.external).length,
       droppedByCap,
     },
     nodes,
@@ -254,9 +268,11 @@ function parseArgs(argv) {
   return opts;
 }
 
-/** Run the Go graphdump for a prepared fixture and return the parsed raw dump.
+/**
+ * Run the Go graphdump for a prepared fixture and return the parsed raw dump.
  * The go.mod is rooted at packages/ttsc, so go runs there with the package path
- * relative to it and an absolute --cwd for the fixture. */
+ * relative to it and an absolute --cwd for the fixture.
+ */
 function dumpFromGo(root, tsconfig) {
   const stdout = execFileSync(
     "go",
@@ -315,7 +331,7 @@ function main() {
   const c = reduced.counts;
   console.error(
     `${name}: ${c.nodes} nodes / ${c.links} links ` +
-      `(raw ${c.rawNodes}/${c.rawEdges}, dropped ${c.droppedExternal} external + ${c.droppedByCap} by cap) -> ${path.relative(REPO_ROOT, out)}`,
+      `(raw ${c.rawNodes}/${c.rawEdges}, dropped ${c.droppedExternal} external + ${c.droppedIgnored} ignored + ${c.droppedByCap} by cap) -> ${path.relative(REPO_ROOT, out)}`,
   );
 }
 

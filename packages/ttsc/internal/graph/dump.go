@@ -14,8 +14,12 @@ type DumpNode struct {
 	Kind     string `json:"kind"`
 	File     string `json:"file"`
 	External bool   `json:"external"`
-	Pos      int    `json:"pos"`
-	End      int    `json:"end"`
+	// Ignored marks a node whose file git ignores (generated code like a Prisma
+	// client emitted as .ts). The viewer drops these by default so generated
+	// output does not bury the authored graph; see graph.GitIgnoredFiles.
+	Ignored bool `json:"ignored"`
+	Pos     int  `json:"pos"`
+	End     int  `json:"end"`
 }
 
 type DumpEdge struct {
@@ -34,8 +38,10 @@ type Dump struct {
 }
 
 // NewDump projects a built graph onto the export shape. Paths are left absolute
-// (the viewer relativizes them); this stays a faithful serialization.
-func NewDump(g *Graph, project, tsconfig string) Dump {
+// (the viewer relativizes them); this stays a faithful serialization. ignored is
+// the set of git-ignored source files from graph.GitIgnoredFiles (nil for a
+// non-git project); their nodes are tagged so the viewer can drop them.
+func NewDump(g *Graph, project, tsconfig string, ignored map[string]bool) Dump {
 	d := Dump{
 		SchemaVersion: 1,
 		Project:       project,
@@ -51,6 +57,7 @@ func NewDump(g *Graph, project, tsconfig string) Dump {
 			Kind:     string(n.Kind),
 			File:     n.File,
 			External: n.External,
+			Ignored:  ignored[n.File],
 			Pos:      n.Pos,
 			End:      n.End,
 		})
@@ -66,8 +73,9 @@ func NewDump(g *Graph, project, tsconfig string) Dump {
 }
 
 // MarshalDump serializes a built graph to the export JSON, indented when pretty.
-func MarshalDump(g *Graph, project, tsconfig string, pretty bool) ([]byte, error) {
-	d := NewDump(g, project, tsconfig)
+// ignored is the git-ignored file set (see NewDump).
+func MarshalDump(g *Graph, project, tsconfig string, ignored map[string]bool, pretty bool) ([]byte, error) {
+	d := NewDump(g, project, tsconfig, ignored)
 	if pretty {
 		return json.MarshalIndent(d, "", "  ")
 	}

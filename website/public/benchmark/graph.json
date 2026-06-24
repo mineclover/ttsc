@@ -280,116 +280,6 @@
         }
       },
       {
-        "harness": "codex",
-        "repo": "excalidraw",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "runs": 6,
-        "question": "How does Excalidraw render and update canvas elements?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 708720,
-              "tools": 41,
-              "shell": 41,
-              "graph": 0,
-              "durMs": 173000,
-              "ok": true
-            },
-            {
-              "tokens": 733178,
-              "tools": 33,
-              "shell": 33,
-              "graph": 0,
-              "durMs": 151000,
-              "ok": true
-            },
-            {
-              "tokens": 870208,
-              "tools": 38,
-              "shell": 38,
-              "graph": 0,
-              "durMs": 151000,
-              "ok": true
-            },
-            {
-              "tokens": 1137624,
-              "tools": 49,
-              "shell": 49,
-              "graph": 0,
-              "durMs": 173000,
-              "ok": true
-            },
-            {
-              "tokens": 755435,
-              "tools": 47,
-              "shell": 47,
-              "graph": 0,
-              "durMs": 161000,
-              "ok": true
-            },
-            {
-              "tokens": 1062172,
-              "tools": 32,
-              "shell": 32,
-              "graph": 0,
-              "durMs": 153000,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 675843,
-              "tools": 41,
-              "shell": 41,
-              "graph": 0,
-              "durMs": 137000,
-              "ok": true
-            },
-            {
-              "tokens": 599076,
-              "tools": 24,
-              "shell": 22,
-              "graph": 2,
-              "durMs": 139000,
-              "ok": true
-            },
-            {
-              "tokens": 963363,
-              "tools": 41,
-              "shell": 41,
-              "graph": 0,
-              "durMs": 172000,
-              "ok": true
-            },
-            {
-              "tokens": 780591,
-              "tools": 32,
-              "shell": 27,
-              "graph": 5,
-              "durMs": 138000,
-              "ok": true
-            },
-            {
-              "tokens": 844309,
-              "tools": 34,
-              "shell": 32,
-              "graph": 2,
-              "durMs": 183000,
-              "ok": true
-            },
-            {
-              "tokens": 974803,
-              "tools": 43,
-              "shell": 43,
-              "graph": 0,
-              "durMs": 165000,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
         "harness": "claude-code",
         "tool": "ttsc-graph",
         "repo": "typeorm",
@@ -460,52 +350,6 @@
               "other": 0,
               "cost": 0.335669,
               "durMs": 36823,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
-        "harness": "codex",
-        "tool": "ttsc-graph",
-        "repo": "typeorm",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "How are relation options applied when repository.find() builds its query?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 625682,
-              "cached": 511872,
-              "turns": 1,
-              "tools": 25,
-              "shell": 25,
-              "graph": 0,
-              "types": {
-                "agent_message": 6,
-                "command_execution": 25
-              },
-              "durMs": 101631,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 623347,
-              "cached": 517632,
-              "turns": 1,
-              "tools": 17,
-              "shell": 12,
-              "graph": 5,
-              "types": {
-                "agent_message": 12,
-                "mcp_tool_call": 5,
-                "command_execution": 12
-              },
-              "durMs": 94324,
               "ok": true
             }
           ]
@@ -627,52 +471,6 @@
         }
       },
       {
-        "harness": "codex",
-        "tool": "ttsc-graph",
-        "repo": "vue",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "Which code schedules a component update after a ref value changes?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 203054,
-              "cached": 119168,
-              "turns": 1,
-              "tools": 11,
-              "shell": 11,
-              "graph": 0,
-              "types": {
-                "agent_message": 4,
-                "command_execution": 11
-              },
-              "durMs": 59587,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 405621,
-              "cached": 312704,
-              "turns": 1,
-              "tools": 11,
-              "shell": 5,
-              "graph": 6,
-              "types": {
-                "agent_message": 7,
-                "mcp_tool_call": 6,
-                "command_execution": 5
-              },
-              "durMs": 61726,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
         "harness": "claude-code",
         "tool": "codegraph",
         "toolSetupMs": 13322.9696,
@@ -751,52 +549,6 @@
         }
       },
       {
-        "harness": "codex",
-        "tool": "codegraph",
-        "toolSetupMs": 13322.9696,
-        "repo": "vue",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "Which code schedules a component update after a ref value changes?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 317269,
-              "cached": 223872,
-              "turns": 1,
-              "tools": 14,
-              "shell": 14,
-              "graph": 0,
-              "types": {
-                "agent_message": 4,
-                "command_execution": 14
-              },
-              "durMs": 65359,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 158247,
-              "cached": 69376,
-              "turns": 1,
-              "tools": 4,
-              "shell": 0,
-              "graph": 4,
-              "types": {
-                "agent_message": 5,
-                "mcp_tool_call": 4
-              },
-              "durMs": 34689,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
         "harness": "claude-code",
         "tool": "ttsc-graph",
         "repo": "rxjs",
@@ -867,51 +619,6 @@
               "other": 0,
               "cost": 0.265745,
               "durMs": 24971,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
-        "harness": "codex",
-        "tool": "ttsc-graph",
-        "repo": "rxjs",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "Which code creates the Subscriber used by Observable.subscribe?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 308038,
-              "cached": 244480,
-              "turns": 1,
-              "tools": 13,
-              "shell": 13,
-              "graph": 0,
-              "types": {
-                "agent_message": 5,
-                "command_execution": 13
-              },
-              "durMs": 68785,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 96165,
-              "cached": 31360,
-              "turns": 1,
-              "tools": 2,
-              "shell": 0,
-              "graph": 2,
-              "types": {
-                "agent_message": 3,
-                "mcp_tool_call": 2
-              },
-              "durMs": 28366,
               "ok": true
             }
           ]
@@ -996,52 +703,6 @@
         }
       },
       {
-        "harness": "codex",
-        "tool": "codegraph",
-        "toolSetupMs": 13462.5135,
-        "repo": "rxjs",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "Which code creates the Subscriber used by Observable.subscribe?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 194082,
-              "cached": 86528,
-              "turns": 1,
-              "tools": 11,
-              "shell": 11,
-              "graph": 0,
-              "types": {
-                "agent_message": 4,
-                "command_execution": 11
-              },
-              "durMs": 44319,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 141104,
-              "cached": 51968,
-              "turns": 1,
-              "tools": 4,
-              "shell": 0,
-              "graph": 4,
-              "types": {
-                "agent_message": 4,
-                "mcp_tool_call": 4
-              },
-              "durMs": 30926,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
         "harness": "claude-code",
         "tool": "codegraph",
         "toolSetupMs": 48022.9344,
@@ -1075,52 +736,6 @@
               "other": 2,
               "cost": 0.624453,
               "durMs": 67038,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
-        "harness": "codex",
-        "tool": "codegraph",
-        "toolSetupMs": 48022.9344,
-        "repo": "typeorm",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "How are relation options applied when repository.find() builds its query?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 474269,
-              "cached": 385920,
-              "turns": 1,
-              "tools": 21,
-              "shell": 21,
-              "graph": 0,
-              "types": {
-                "agent_message": 6,
-                "command_execution": 21
-              },
-              "durMs": 103979,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 367424,
-              "cached": 280704,
-              "turns": 1,
-              "tools": 9,
-              "shell": 0,
-              "graph": 9,
-              "types": {
-                "agent_message": 5,
-                "mcp_tool_call": 9
-              },
-              "durMs": 57034,
               "ok": true
             }
           ]
@@ -1197,51 +812,6 @@
               "other": 0,
               "cost": 0.206033,
               "durMs": 18500,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
-        "harness": "codex",
-        "tool": "ttsc-graph",
-        "repo": "zod",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "Which internal parse method does a Zod schema's parse() call?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 302403,
-              "cached": 248576,
-              "turns": 1,
-              "tools": 9,
-              "shell": 9,
-              "graph": 0,
-              "types": {
-                "agent_message": 3,
-                "command_execution": 9
-              },
-              "durMs": 42359,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 143600,
-              "cached": 90112,
-              "turns": 1,
-              "tools": 3,
-              "shell": 0,
-              "graph": 3,
-              "types": {
-                "agent_message": 3,
-                "mcp_tool_call": 3
-              },
-              "durMs": 39342,
               "ok": true
             }
           ]
@@ -1326,52 +896,6 @@
         }
       },
       {
-        "harness": "codex",
-        "tool": "codegraph",
-        "toolSetupMs": 11057.8929,
-        "repo": "zod",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "Which internal parse method does a Zod schema's parse() call?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 265459,
-              "cached": 197376,
-              "turns": 1,
-              "tools": 11,
-              "shell": 11,
-              "graph": 0,
-              "types": {
-                "agent_message": 4,
-                "command_execution": 11
-              },
-              "durMs": 49141,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 268018,
-              "cached": 172800,
-              "turns": 1,
-              "tools": 5,
-              "shell": 0,
-              "graph": 5,
-              "types": {
-                "agent_message": 4,
-                "mcp_tool_call": 5
-              },
-              "durMs": 44653,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
         "harness": "claude-code",
         "tool": "ttsc-graph",
         "repo": "nestjs",
@@ -1442,52 +966,6 @@
               "other": 0,
               "cost": 0.345724,
               "durMs": 30674,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
-        "harness": "codex",
-        "tool": "ttsc-graph",
-        "repo": "nestjs",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "Which code invokes the selected controller method for an HTTP route?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 234922,
-              "cached": 134016,
-              "turns": 1,
-              "tools": 11,
-              "shell": 11,
-              "graph": 0,
-              "types": {
-                "agent_message": 5,
-                "command_execution": 11
-              },
-              "durMs": 55971,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 271879,
-              "cached": 162432,
-              "turns": 1,
-              "tools": 12,
-              "shell": 9,
-              "graph": 3,
-              "types": {
-                "agent_message": 7,
-                "mcp_tool_call": 3,
-                "command_execution": 9
-              },
-              "durMs": 65579,
               "ok": true
             }
           ]
@@ -1572,52 +1050,6 @@
         }
       },
       {
-        "harness": "codex",
-        "tool": "codegraph",
-        "toolSetupMs": 17412.2349,
-        "repo": "nestjs",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "Which code invokes the selected controller method for an HTTP route?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 242032,
-              "cached": 159104,
-              "turns": 1,
-              "tools": 13,
-              "shell": 13,
-              "graph": 0,
-              "types": {
-                "agent_message": 4,
-                "command_execution": 13
-              },
-              "durMs": 53749,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 156418,
-              "cached": 46848,
-              "turns": 1,
-              "tools": 4,
-              "shell": 0,
-              "graph": 4,
-              "types": {
-                "agent_message": 4,
-                "mcp_tool_call": 4
-              },
-              "durMs": 42272,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
         "harness": "claude-code",
         "tool": "ttsc-graph",
         "repo": "vscode",
@@ -1688,52 +1120,6 @@
               "other": 0,
               "cost": 0.52074,
               "durMs": 84809,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
-        "harness": "codex",
-        "tool": "ttsc-graph",
-        "repo": "vscode",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "Where does an extension host message get forwarded toward the main process?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 928555,
-              "cached": 785920,
-              "turns": 1,
-              "tools": 34,
-              "shell": 34,
-              "graph": 0,
-              "types": {
-                "agent_message": 10,
-                "command_execution": 34
-              },
-              "durMs": 127900,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 811497,
-              "cached": 683392,
-              "turns": 1,
-              "tools": 12,
-              "shell": 1,
-              "graph": 11,
-              "types": {
-                "agent_message": 13,
-                "mcp_tool_call": 11,
-                "command_execution": 1
-              },
-              "durMs": 119245,
               "ok": true
             }
           ]
@@ -1818,53 +1204,6 @@
         }
       },
       {
-        "harness": "codex",
-        "tool": "codegraph",
-        "toolSetupMs": 679477.2477,
-        "repo": "vscode",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "Where does an extension host message get forwarded toward the main process?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 874442,
-              "cached": 742400,
-              "turns": 1,
-              "tools": 32,
-              "shell": 32,
-              "graph": 0,
-              "types": {
-                "agent_message": 7,
-                "command_execution": 32
-              },
-              "durMs": 134397,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 784263,
-              "cached": 656256,
-              "turns": 1,
-              "tools": 27,
-              "shell": 25,
-              "graph": 2,
-              "types": {
-                "agent_message": 13,
-                "command_execution": 25,
-                "mcp_tool_call": 2
-              },
-              "durMs": 137002,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
         "harness": "claude-code",
         "tool": "ttsc-graph",
         "repo": "shopping-backend",
@@ -1935,52 +1274,6 @@
               "other": 0,
               "cost": 0.39071599999999995,
               "durMs": 33047,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
-        "harness": "codex",
-        "tool": "ttsc-graph",
-        "repo": "shopping-backend",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "Which code builds the order creation request before persistence?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 490952,
-              "cached": 370176,
-              "turns": 1,
-              "tools": 16,
-              "shell": 16,
-              "graph": 0,
-              "types": {
-                "agent_message": 6,
-                "command_execution": 16
-              },
-              "durMs": 76639,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 303091,
-              "cached": 213120,
-              "turns": 1,
-              "tools": 12,
-              "shell": 10,
-              "graph": 2,
-              "types": {
-                "agent_message": 7,
-                "mcp_tool_call": 2,
-                "command_execution": 10
-              },
-              "durMs": 59897,
               "ok": true
             }
           ]
@@ -2059,53 +1352,6 @@
               "other": 0,
               "cost": 0.1721365,
               "durMs": 19064,
-              "ok": true
-            }
-          ]
-        }
-      },
-      {
-        "harness": "codex",
-        "tool": "codegraph",
-        "toolSetupMs": 7759.1223,
-        "repo": "shopping-backend",
-        "model": "gpt-5.5",
-        "effort": "high",
-        "fixtureBranch": "ttsc",
-        "daemon": false,
-        "runs": 1,
-        "question": "Which code builds the order creation request before persistence?",
-        "samples": {
-          "baseline": [
-            {
-              "tokens": 238766,
-              "cached": 88960,
-              "turns": 1,
-              "tools": 11,
-              "shell": 11,
-              "graph": 0,
-              "types": {
-                "agent_message": 5,
-                "command_execution": 11
-              },
-              "durMs": 50411,
-              "ok": true
-            }
-          ],
-          "graph": [
-            {
-              "tokens": 279911,
-              "cached": 190976,
-              "turns": 1,
-              "tools": 10,
-              "shell": 6,
-              "graph": 4,
-              "types": {
-                "agent_message": 7,
-                "mcp_tool_call": 4,
-                "command_execution": 6
-              },
-              "durMs": 44406,
               "ok": true
             }
           ]

@@ -1,0 +1,100 @@
+# Tools
+
+`@ttsc/graph` exposes two MCP tools. An agent calls them on its own; you never invoke them by hand. Both answer from the resident `Program`, so the result is the compiler's own, at the same code and location `ttsc` reports.
+
+## graph_explore
+
+The primary tool. Its one argument is the query:
+
+```ts
+interface GraphExploreArguments {
+  /**
+   * A symbol name, a file-path fragment, or the salient nouns of a
+   * "how does X work" question. Name the whole flow in one broad query
+   * rather than one symbol at a time, owner / action / nouns together,
+   * e.g. "repository find manager query builder".
+   */
+  query: string;
+}
+```
+
+For each matching node it returns:
+
+- the verbatim, line-numbered source of the declaration;
+- its checker-resolved edges in both directions: `heritage`, `value-call`, `type-ref` (see [Edge kinds](#edge-kinds));
+- its blast radius, the transitive dependents a change would reach;
+- its own diagnostics, and how many of those dependents are already broken.
+
+One call is usually enough context to answer, instead of fanning out to read files.
+
+```json
+{ "name": "graph_explore", "arguments": { "query": "repository find query builder" } }
+```
+
+A query can name several symbols at once. The server ranks matches by name match and edge centrality, so a flow question such as "how is a payment charged" surfaces the cluster of declarations involved, not a single literal hit. The response is bounded, an edge cap, a per-node source cap, and a total budget that scales with how many symbols the query names, so a broad match returns a few kilobytes rather than the whole project.
+
+## graph_diagnostics
+
+Both arguments are optional:
+
+```ts
+interface GraphDiagnosticsArguments {
+  /**
+   * An absolute path or a trailing fragment of one source file,
+   * e.g. "src/main.ts". Omit it for the whole project.
+   */
+  file?: string;
+
+  /** Keep only `error` or only `warning` findings. Omit for both. */
+  severity?: "error" | "warning";
+}
+```
+
+With `file`, it reports that one file's diagnostics, at the same code and location `ttsc` reports. With `file` omitted, it lists every current diagnostic across the project, grouped by file, for a "what is broken now" check after an edit.
+
+```json
+{ "name": "graph_diagnostics", "arguments": { "file": "src/payment/service.ts" } }
+```
+
+The diagnostics, here and in the errors fused into `graph_explore`, are the project's full set:
+
+- TypeScript type and compile errors.
+- `@ttsc/lint` rule violations.
+- Transform-plugin errors, from plugins like typia and nestia.
+
+The type errors come from the graph's resident `Program`. The lint and plugin findings come from a background `ttsc` check that runs your project's plugins, fused onto the same graph.
+
+When that background check cannot run (no `ttsc`, no Go toolchain, or a project that does not compile), the graph falls back to the type errors alone.
+
+## Edge kinds
+
+| Kind | Meaning |
+| --- | --- |
+| `heritage` | A class or interface `extends` / `implements` a base. |
+| `value-call` | A declaration or method calls a function, method, or constructor (`new T()`) at runtime. |
+| `type-ref` | A declaration mentions a named type in a type position. |
+
+Splitting `value-call` from `type-ref` lets an impact query separate "used at runtime" from "depends on this type".
+
+## Scope
+
+This is a v1. The nodes are the declarations and their methods, including the members of a `namespace`. The edges are the kinds above, resolved by the checker: a method-to-method call, a `new T()` constructor call, and a call from inside a top-level `const fn = () => …` are all edges.
+
+A file watcher and on-disk persistence are not included yet. The node identity is position-invariant, so an incremental layer can be added later without re-keying the graph.
+
+## Large projects
+
+The server answers `initialize` and `tools/list` immediately and builds the `Program` in the background, so the agent always sees the tools; only the first query blocks on the type-check. On a large repository that one-time build can take minutes.
+
+To pay that build once and share it across every session, run a resident daemon:
+
+| Flag | Effect |
+| --- | --- |
+| `--daemon` | Build the `Program` once and serve many connections over a loopback (`127.0.0.1`) port, instead of repeating the type-check per session. |
+| `--connect <host:port>` | Proxy this session's stdio to a running daemon. |
+| `--port-file <path>` | Daemon: write the chosen `host:port` here (mode `0600`), so a launcher can find it. |
+| `--idle <dur>` | Daemon: exit after this idle period (default `5m`; `0` disables). |
+
+The benchmark walks this path end to end on a roughly 7,000-file repository; see the [large-repository path in the Benchmark](/docs/benchmark/graph#vs-code-the-large-repository-path).
+
+> The daemon's loopback port is **unauthenticated**: any process on the machine that connects to it can read this project's source through the graph, so run the daemon only on a single-user host. The default `--stdio` transport has no port, spawns one server per session, and is what the `@ttsc/graph` launcher always uses; the daemon is opt-in.

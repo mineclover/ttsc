@@ -159,7 +159,7 @@ Point your agent's MCP client at it. For Claude Code:
 
 On codegraph's own agent-cost benchmark, Claude agents answer reading zero files, cutting tokens by 77% to 86% and tool calls by 94% to 95%. See [`@ttsc/graph`](https://github.com/samchon/ttsc/tree/master/packages/graph) and the [benchmark](https://ttsc.dev/docs/benchmark/graph).
 
-Claude Code follows the server's instructions and uses the graph on its own. Codex is more conservative with third-party MCP tools and tends to fall back to the shell, so tell it directly: add a line to your `AGENTS.md` asking it to call `graph_explore` first. See [Setup](https://ttsc.dev/docs/setup#codex-and-other-tool-conservative-agents).
+Your agent picks the tools up from the MCP handshake and uses them on its own. See [Setup](https://ttsc.dev/docs/setup#coding-agents-ttscgraph) for the full walk-through.
 
 ## Plugins
 
@@ -298,4 +298,4 @@ Your [donation](https://github.com/sponsors/samchon) encourages `ttsc` developme
 
 - TypeScript runners: [`ts-node`](https://github.com/TypeStrong/ts-node) and [`tsx`](https://github.com/privatenumber/tsx)
 - Transformer tooling: [`ttypescript`](https://github.com/cevek/ttypescript) and [`ts-patch`](https://github.com/nonara/ts-patch)
-- Inspired by: [`typical`](https://github.com/elliots/typical) and [`tsgonest`](https://github.com/tsgonest/tsgonest)
+- Inspired by: [`typical`](https://github.com/elliots/typical), [`tsgonest`](https://github.com/tsgonest/tsgonest) and [`codegraph`](https://github.com/colbymchenry/codegraph).

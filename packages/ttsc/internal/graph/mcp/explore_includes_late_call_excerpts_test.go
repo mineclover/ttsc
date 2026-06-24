@@ -64,3 +64,51 @@ func TestExploreIncludesLateCallExcerpts(t *testing.T) {
     t.Fatalf("query_nodes did not include the late value-call excerpt:\n%s", text)
   }
 }
+
+// TestExploreUsesEdgeSpansForLateAccessExcerpts verifies late value-access
+// evidence is sourced from graph edge spans, not from call-looking text search.
+// A property read like `this.value` has no trailing `(`, but it is still the
+// resolved use an agent needs when a long TypeORM-style method body is truncated.
+func TestExploreUsesEdgeSpansForLateAccessExcerpts(t *testing.T) {
+  root := t.TempDir()
+  var src strings.Builder
+  src.WriteString("export class Store {\n")
+  src.WriteString("  value = 1;\n")
+  src.WriteString("  read(): number {\n")
+  for i := 0; i < 40; i++ {
+    fmt.Fprintf(&src, "    const filler%d = %d;\n", i, i)
+  }
+  src.WriteString("    return this.value;\n")
+  src.WriteString("  }\n")
+  src.WriteString("}\n")
+
+  writeFile(t, filepath.Join(root, "tsconfig.json"), `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "strict": true
+  },
+  "files": ["src/main.ts"]
+}
+`)
+  writeFile(t, filepath.Join(root, "src", "main.ts"), src.String())
+
+  prog, diags, err := driver.LoadProgram(root, "tsconfig.json", driver.LoadProgramOptions{})
+  if err != nil {
+    t.Fatal(err)
+  }
+  if len(diags) != 0 {
+    t.Fatalf("unexpected parse diagnostics: %v", diags)
+  }
+  defer func() { _ = prog.Close() }()
+
+  server := mcp.NewServer(prog)
+  text := toolText(t, server, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"query_nodes","arguments":{"query":"Store.read"}}}`)
+  if !strings.Contains(text, "more lines)") {
+    t.Fatalf("query_nodes did not truncate the long method body:\n%s", text)
+  }
+  if !strings.Contains(text, "value-use excerpts after truncated body:") ||
+    !strings.Contains(text, "return this.value;") {
+    t.Fatalf("query_nodes did not include the late value-access excerpt:\n%s", text)
+  }
+}

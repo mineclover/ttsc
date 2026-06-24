@@ -62,11 +62,15 @@ const (
 )
 
 // Edge is a directed, checker-resolved relationship from one node to another,
-// both referenced by Node.ID.
+// both referenced by Node.ID. Pos and End bound the source expression in the
+// From node's file that produced the edge. They are evidence, not identity; a
+// duplicate relationship keeps the first source-order span.
 type Edge struct {
   From string
   To   string
   Kind EdgeKind
+  Pos  int
+  End  int
 }
 
 // Graph is the in-memory adjacency the MCP tools query. Edges are added by the

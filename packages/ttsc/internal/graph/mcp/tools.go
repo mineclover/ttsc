@@ -1437,9 +1437,9 @@ func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSo
   s.writeNodeBlastRadius(b, node)
   // The body renders from the source start line (not declLine), so a leading doc
   // comment is shown with its own true line numbers.
-  if source, line := s.nodeSource(node); source != "" {
+  if source, line, sourceOffset := s.nodeSourceRange(node); source != "" {
     b.WriteString(numberLines(source, line))
-    s.writeValueCallExcerpts(b, node, source, line)
+    s.writeValueCallExcerpts(b, node, source, line, sourceOffset)
   }
   b.WriteString("\n")
 }
@@ -1447,9 +1447,9 @@ func (s *Server) writeNodeRelations(b *strings.Builder, node *graph.Node, withSo
 func (s *Server) writeFlowNode(b *strings.Builder, node *graph.Node, included map[string]bool, query string) {
   s.writeNodeHeader(b, node)
   s.writeFlowValueEdges(b, node, included)
-  if source, line := s.nodeSource(node); source != "" {
+  if source, line, sourceOffset := s.nodeSourceRange(node); source != "" {
     b.WriteString(numberLines(source, line))
-    s.writeValueCallExcerptsForQuery(b, node, source, line, query)
+    s.writeValueCallExcerptsForQuery(b, node, source, line, sourceOffset, query)
   }
   b.WriteString("\n")
 }
@@ -1474,19 +1474,24 @@ func (s *Server) writeFlowValueEdges(b *strings.Builder, node *graph.Node, inclu
 // of range. Leading whitespace before the declaration is skipped so the slice
 // starts at the declaration keyword (or its leading doc comment).
 func (s *Server) nodeSource(node *graph.Node) (string, int) {
+  source, line, _ := s.nodeSourceRange(node)
+  return source, line
+}
+
+func (s *Server) nodeSourceRange(node *graph.Node) (string, int, int) {
   file := s.prog.SourceFile(node.File)
   if file == nil {
-    return "", 0
+    return "", 0, 0
   }
   text := file.Text()
   if node.Pos < 0 || node.End > len(text) || node.Pos >= node.End {
-    return "", 0
+    return "", 0, 0
   }
   start := node.Pos
   for start < node.End && isSpace(text[start]) {
     start++
   }
-  return text[start:node.End], 1 + strings.Count(text[:start], "\n")
+  return text[start:node.End], 1 + strings.Count(text[:start], "\n"), start
 }
 
 func isSpace(c byte) bool {
@@ -1586,15 +1591,15 @@ func numberLines(source string, startLine int) string {
   return b.String()
 }
 
-func (s *Server) writeValueCallExcerpts(b *strings.Builder, node *graph.Node, source string, startLine int) {
-  s.writeValueCallExcerptsRanked(b, node, source, startLine, nil, nil)
+func (s *Server) writeValueCallExcerpts(b *strings.Builder, node *graph.Node, source string, startLine int, sourceOffset int) {
+  s.writeValueCallExcerptsRanked(b, node, source, startLine, sourceOffset, nil, nil)
 }
 
-func (s *Server) writeValueCallExcerptsForQuery(b *strings.Builder, node *graph.Node, source string, startLine int, query string) {
-  s.writeValueCallExcerptsRanked(b, node, source, startLine, queryTokens(query), queryWords(query))
+func (s *Server) writeValueCallExcerptsForQuery(b *strings.Builder, node *graph.Node, source string, startLine int, sourceOffset int, query string) {
+  s.writeValueCallExcerptsRanked(b, node, source, startLine, sourceOffset, queryTokens(query), queryWords(query))
 }
 
-func (s *Server) writeValueCallExcerptsRanked(b *strings.Builder, node *graph.Node, source string, startLine int, tokens []string, words map[string]bool) {
+func (s *Server) writeValueCallExcerptsRanked(b *strings.Builder, node *graph.Node, source string, startLine int, sourceOffset int, tokens []string, words map[string]bool) {
   lines := strings.Split(source, "\n")
   if len(lines) <= maxSourceLines {
     return
@@ -1626,7 +1631,10 @@ func (s *Server) writeValueCallExcerptsRanked(b *strings.Builder, node *graph.No
     if to == nil {
       continue
     }
-    idx := findLateCallLine(lines, memberName(to.Name))
+    idx := edgeLineIndex(edge, source, sourceOffset)
+    if idx < 0 {
+      idx = findLateCallLine(lines, memberName(to.Name))
+    }
     if idx < 0 || seen[idx] {
       continue
     }
@@ -1690,6 +1698,17 @@ func memberName(name string) string {
     return name[dot+1:]
   }
   return name
+}
+
+func edgeLineIndex(edge *graph.Edge, source string, sourceOffset int) int {
+  if edge.Pos < sourceOffset || edge.Pos >= sourceOffset+len(source) {
+    return -1
+  }
+  idx := strings.Count(source[:edge.Pos-sourceOffset], "\n")
+  if idx < maxSourceLines {
+    return -1
+  }
+  return idx
 }
 
 func findLateCallLine(lines []string, member string) int {

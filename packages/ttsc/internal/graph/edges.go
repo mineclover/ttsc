@@ -25,12 +25,16 @@ func (g *Graph) addEdges(prog *driver.Program) {
 // caller that invokes the same function several times yields one edge, not one
 // per call site. The dedup is an O(1) set lookup, so building N edges is O(N).
 func (g *Graph) addEdge(from, to string, kind EdgeKind) {
+  g.addEdgeAt(from, to, kind, -1, -1)
+}
+
+func (g *Graph) addEdgeAt(from, to string, kind EdgeKind, pos, end int) {
   key := from + "\x00" + to + "\x00" + string(kind)
   if _, exists := g.seen[key]; exists {
     return
   }
   g.seen[key] = struct{}{}
-  g.Edges = append(g.Edges, &Edge{From: from, To: to, Kind: kind})
+  g.Edges = append(g.Edges, &Edge{From: from, To: to, Kind: kind, Pos: pos, End: end})
 }
 
 // collectHeritage adds a heritage edge for every base of every class and
@@ -90,7 +94,7 @@ func (g *Graph) heritageEdges(checker *shimchecker.Checker, path string, node *s
       if to == "" {
         continue
       }
-      g.addEdge(from, to, EdgeHeritage)
+      g.addEdgeAt(from, to, EdgeHeritage, base.Expression.Pos(), base.Expression.End())
     }
   }
 }
@@ -326,6 +330,9 @@ func (g *Graph) accessEdge(checker *shimchecker.Checker, from string, access *sh
 }
 
 func (g *Graph) valueUseEdge(checker *shimchecker.Checker, from string, targetExpr *shimast.Node, kind EdgeKind) {
+  if targetExpr == nil {
+    return
+  }
   target := Resolve(checker, targetExpr)
   if target == nil || target.Symbol == nil {
     return
@@ -334,7 +341,7 @@ func (g *Graph) valueUseEdge(checker *shimchecker.Checker, from string, targetEx
   if to == "" || to == from {
     return
   }
-  g.addEdge(from, to, kind)
+  g.addEdgeAt(from, to, kind, targetExpr.Pos(), targetExpr.End())
 }
 
 // collectTypeRefs records a type-ref edge from each top-level function, class,
@@ -383,6 +390,9 @@ func (g *Graph) typeRefsWithin(checker *shimchecker.Checker, from string, node *
 // typeRefEdge resolves a type name to its declaration and records a type-ref
 // edge, skipping an unresolved name and a self-reference.
 func (g *Graph) typeRefEdge(checker *shimchecker.Checker, from string, typeName *shimast.Node) {
+  if typeName == nil {
+    return
+  }
   target := Resolve(checker, typeName)
   if target == nil || target.Symbol == nil {
     return
@@ -391,7 +401,7 @@ func (g *Graph) typeRefEdge(checker *shimchecker.Checker, from string, typeName 
   if to == "" || to == from {
     return
   }
-  g.addEdge(from, to, EdgeTypeRef)
+  g.addEdgeAt(from, to, EdgeTypeRef, typeName.Pos(), typeName.End())
 }
 
 // ensureTargetNode returns the node id for a resolved edge target, creating the

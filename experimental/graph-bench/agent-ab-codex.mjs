@@ -31,59 +31,57 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..");
 const ttscDir = path.join(repoRoot, "packages", "ttsc");
+const ARCHITECTURE_QUESTION =
+  "Explain this project's code architecture. Name the main subsystems, the key files/classes/functions that connect them, and the control/data flow between those parts.";
 
 // TypeScript benchmark repos and their medium-difficulty questions.
 const REPOS = {
   excalidraw: {
     url: "https://github.com/excalidraw/excalidraw",
     tsconfig: "tsconfig.json",
-    question: "What code would be impacted by changing the scene redraw scheduling path?",
+    question: ARCHITECTURE_QUESTION,
   },
   vscode: {
     url: "https://github.com/microsoft/vscode",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-vscode.git",
     tsconfig: "src/tsconfig.json",
-    question:
-      "What code would be impacted by changing MainThreadConsole.$logExtensionHostMessage?",
+    question: ARCHITECTURE_QUESTION,
   },
   nestjs: {
     url: "https://github.com/nestjs/nest",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-nestjs.git",
     tsconfig: "tsconfig.graph.json",
-    question: "What code would be impacted by changing RouterExecutionContext.create()?",
+    question: ARCHITECTURE_QUESTION,
   },
   vue: {
     url: "https://github.com/vuejs/core",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-vue.git",
     tsconfig: "tsconfig.graph.json",
-    question:
-      "What code would be impacted by changing RefImpl.value?",
+    question: ARCHITECTURE_QUESTION,
   },
   zod: {
     url: "https://github.com/colinhacks/zod",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-zod.git",
     tsconfig: "tsconfig.graph.json",
-    question: "What code would be impacted by changing ZodType.parse()?",
+    question: ARCHITECTURE_QUESTION,
   },
   typeorm: {
     url: "https://github.com/typeorm/typeorm",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-typeorm.git",
     tsconfig: "tsconfig.graph.json",
-    question:
-      "What code would be impacted by changing FindOptionsUtils.applyRelationsRecursively?",
+    question: ARCHITECTURE_QUESTION,
   },
   rxjs: {
     url: "https://github.com/ReactiveX/rxjs",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-rxjs.git",
     tsconfig: "tsconfig.graph.json",
-    question: "What code would be impacted by changing Observable.subscribe()?",
+    question: ARCHITECTURE_QUESTION,
   },
   "shopping-backend": {
     url: "https://github.com/samchon/shopping-backend",
     fixtureUrl: "https://github.com/samchon/shopping-backend.git",
     tsconfig: "tsconfig.json",
-    question:
-      "What code would be impacted by changing ShoppingOrderProvider.create()?",
+    question: ARCHITECTURE_QUESTION,
   },
 };
 

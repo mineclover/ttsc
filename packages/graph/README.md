@@ -40,6 +40,8 @@ You can also browse the whole graph in 3D. This is TypeORM rendered as a navigab
 
 [![The TypeORM code graph rendered in 3D](https://ttsc.dev/graph/typeorm-preview.png)](https://ttsc.dev/docs/graph/viewer)
 
+Run `npx @ttsc/graph view` in your own project to open that viewer in your browser, served from a local port.
+
 ## Install
 
 ```bash

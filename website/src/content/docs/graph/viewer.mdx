@@ -10,13 +10,21 @@ Drag to orbit, scroll to zoom, hover a node for its name, kind, and file.
 
 ## Use it on your own project
 
-Produce the graph for your project, then drop the file into "Load your own JSON" above. Nothing leaves your browser: the file is read and reduced locally.
+The fastest way is to run the viewer locally against your own project:
+
+```bash
+npx @ttsc/graph view
+```
+
+`view` builds your project's graph, reduces it, and opens this same 3D viewer in your browser, served from a local port. Nothing leaves your machine.
+
+To get the data as a file instead (to keep, share, or drop into "Load your own JSON" above):
 
 ```bash
 npx @ttsc/graph dump --tsconfig tsconfig.json > graph.json
 ```
 
-`dump` builds the whole graph from your project's resident `Program` and prints it as JSON: every declaration and every edge, keyed by absolute path. The viewer reduces it client-side (drops `node_modules`, keeps the highest-degree nodes, relativizes paths) so a large project stays legible instead of a hairball. It also accepts an already-reduced payload, so a graph you trimmed yourself loads as-is.
+`dump` prints the whole graph as JSON: every declaration and every edge, keyed by absolute path. The viewer reduces it client-side (drops `node_modules`, keeps the highest-degree nodes, relativizes paths) so a large project stays legible instead of a hairball. It also accepts an already-reduced payload, so a graph you trimmed yourself loads as-is.
 
 ## What the colors mean
 

@@ -4,6 +4,8 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 
+import { runView } from "./view";
+
 /**
  * Resolve the per-platform `ttscgraph` MCP server binary, or `null` when it
  * cannot be located.
@@ -124,7 +126,11 @@ function startDiagnosticsWorker(
  */
 export function runGraph(
   argv: readonly string[] = process.argv.slice(2),
-): number {
+): number | void {
+  // `view` is JS-orchestrated (dump -> reduce -> serve -> open), not a passthrough
+  // to the native binary, so it is handled before the spawn below.
+  if (argv[0] === "view") return runView(argv.slice(1));
+
   const binary = resolveGraphBinary();
   if (binary === null) {
     process.stderr.write(

@@ -1,0 +1,1 @@
+The compiler's diagnostics for one file: TypeScript type errors, plus the project's @ttsc/lint rule violations and transform-plugin (typia, nestia) findings when it has them, each with its code and location exactly as ttsc reports them.

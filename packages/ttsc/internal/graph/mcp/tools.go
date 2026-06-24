@@ -19,13 +19,13 @@ func toolsListResult() any {
     "tools": []any{
       map[string]any{
         "name":        "graph_explore",
-        "description": "Call first for TypeScript architecture/code-flow questions, before shell/grep/read. Query named symbols, files, or domain nouns; avoid generic words like code/method/request/main. The result is a compiler-resolved graph snapshot: source, calls, callers, types, and blast radius. For broad questions, synthesize from the first relevant result; do not chase every returned edge. Re-query only for a missing symbol/file, narrower follow-up, or after edits. Read only for no match, non-TS files, edited source, or missing context.",
+        "description": graphExploreDescription,
         "inputSchema": map[string]any{
           "type": "object",
           "properties": map[string]any{
             "query": map[string]any{
               "type":        "string",
-              "description": "Architecture/code-flow query using named symbols, files, or domain nouns. Batch related names once; avoid generic words such as code, method, request, process, main, component, value, and route.",
+              "description": graphExploreQueryDescription,
             },
           },
           "required": []any{"query"},
@@ -33,13 +33,13 @@ func toolsListResult() any {
       },
       map[string]any{
         "name":        "graph_diagnostics",
-        "description": "The compiler's diagnostics for one file — TypeScript type errors, plus the project's @ttsc/lint rule violations and transform-plugin (typia, nestia) findings when it has them — each with its code and location, exactly as ttsc reports them.",
+        "description": graphDiagnosticsDescription,
         "inputSchema": map[string]any{
           "type": "object",
           "properties": map[string]any{
             "file": map[string]any{
               "type":        "string",
-              "description": "An absolute path or a trailing fragment of a project source file (e.g. \"src/main.ts\").",
+              "description": graphDiagnosticsFileDescription,
             },
           },
           "required": []any{"file"},

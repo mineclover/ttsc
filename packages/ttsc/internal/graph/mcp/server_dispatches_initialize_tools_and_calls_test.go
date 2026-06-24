@@ -75,11 +75,32 @@ export const bad: number = "not a number";
   if !names["graph_explore"] || !names["graph_diagnostics"] {
     t.Fatalf("tools/list missing expected tools: %v", names)
   }
+  tools := toolsByName(t, list)
+  explore := tools["graph_explore"]
+  if desc, _ := explore["description"].(string); !strings.Contains(desc, "do not chase every returned edge") {
+    t.Fatalf("graph_explore did not use the embedded description: %v", desc)
+  }
+  exploreSchema := explore["inputSchema"].(map[string]any)
+  exploreProperties := exploreSchema["properties"].(map[string]any)
+  queryProperty := exploreProperties["query"].(map[string]any)
+  if desc, _ := queryProperty["description"].(string); !strings.Contains(desc, "Batch related names once") {
+    t.Fatalf("graph_explore query did not use the embedded description: %v", desc)
+  }
+  diagnostics := tools["graph_diagnostics"]
+  if desc, _ := diagnostics["description"].(string); !strings.Contains(desc, "exactly as ttsc reports them") {
+    t.Fatalf("graph_diagnostics did not use the embedded description: %v", desc)
+  }
+  diagnosticsSchema := diagnostics["inputSchema"].(map[string]any)
+  diagnosticsProperties := diagnosticsSchema["properties"].(map[string]any)
+  fileProperty := diagnosticsProperties["file"].(map[string]any)
+  if desc, _ := fileProperty["description"].(string); !strings.Contains(desc, "src/main.ts") {
+    t.Fatalf("graph_diagnostics file did not use the embedded description: %v", desc)
+  }
 
   // graph_explore renders the heritage relationship for Sub.
-  explore := toolText(t, server, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"graph_explore","arguments":{"query":"Sub"}}}`)
-  if !strings.Contains(explore, "Sub") || !strings.Contains(explore, "Base") || !strings.Contains(explore, "heritage") {
-    t.Fatalf("graph_explore did not render the Sub -> Base heritage edge:\n%s", explore)
+  exploreText := toolText(t, server, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"graph_explore","arguments":{"query":"Sub"}}}`)
+  if !strings.Contains(exploreText, "Sub") || !strings.Contains(exploreText, "Base") || !strings.Contains(exploreText, "heritage") {
+    t.Fatalf("graph_explore did not render the Sub -> Base heritage edge:\n%s", exploreText)
   }
 
   // graph_diagnostics surfaces the type error with its tsc code.
@@ -138,19 +159,31 @@ func errorOf(t *testing.T, server *mcp.Server, message string) map[string]any {
 // toolNames returns the set of tool names from a tools/list result.
 func toolNames(t *testing.T, list map[string]any) map[string]bool {
   t.Helper()
+  names := map[string]bool{}
+  for name := range toolsByName(t, list) {
+    names[name] = true
+  }
+  return names
+}
+
+// toolsByName returns the advertised tools keyed by MCP tool name.
+func toolsByName(t *testing.T, list map[string]any) map[string]map[string]any {
+  t.Helper()
   tools, ok := list["tools"].([]any)
   if !ok {
     t.Fatalf("tools/list has no tools array: %v", list)
   }
-  names := map[string]bool{}
+  out := map[string]map[string]any{}
   for _, entry := range tools {
-    if tool, ok := entry.(map[string]any); ok {
-      if name, ok := tool["name"].(string); ok {
-        names[name] = true
-      }
+    tool, ok := entry.(map[string]any)
+    if !ok {
+      continue
+    }
+    if name, ok := tool["name"].(string); ok {
+      out[name] = tool
     }
   }
-  return names
+  return out
 }
 
 // toolText drives a tools/call request and returns the text of its first content

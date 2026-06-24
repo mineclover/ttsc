@@ -1,10 +1,10 @@
 # ttsc-graph
 
-A compiler-resolved graph of TypeScript relationships: calls, callers, type references, ownership, and blast radius.
+A compiler-resolved graph of TypeScript relationships: calls, callers, types, ownership, blast radius. It mirrors the code, so an edit changes it; re-query after editing, not from an old result.
 
-- **Tracing how code connects?** Call `graph_explore` with one broad query (owner + action + domain nouns), then answer from its source, edges, callers, and types.
-- **A specific file's errors?** Call `graph_diagnostics`.
-- **No match, omitted source, edited file, or non-TypeScript?** Use grep/read.
+- **How does code connect?** Reach for `graph_explore` before grep: one broad query (owner + action + nouns); answer from its result.
+- **A file's errors, or all of them?** Call `graph_diagnostics` (omit the file for all).
+- **Graph can't answer** (no match, omitted source, non-TypeScript)? grep/read.
 
 ## Call `graph_explore` for relationship questions
 
@@ -41,19 +41,19 @@ A compiler-resolved graph of TypeScript relationships: calls, callers, type refe
 
 each with its code and location exactly as ttsc reports them. It inspects one file's problems; tracing relationships stays `graph_explore`'s job.
 
-## Re-query, and distrust a stale snapshot
+## Re-query freely
 
 **Re-query freely; never ration calls to a fixed number.** Do it when:
 
 - a better entry node appears in the result,
 - a needed symbol was missing,
-- the source changed after the snapshot.
+- you have edited a file since the last query.
 
-The graph reflects the program as it was last built, so edits make earlier results stale. Trust the current file on disk over an outdated snapshot.
+The one trap is reusing an earlier result: it predates any edit you made after it, so query again instead of trusting what is already in your context.
 
 ## Final checklist
 
 - Relationship or flow question? Use `graph_explore` with one broad owner + action + noun query.
-- A specific file's errors? Use `graph_diagnostics` with its path.
+- A file's errors, or the whole project's? Use `graph_diagnostics` with a path, or none for everything.
 - No match, omitted source, non-TypeScript, or literal text search? Use grep/read.
-- Edited the source since exploring? Re-query; the snapshot may be stale.
+- Edited a file since exploring? Query again; the result re-checks your edit.

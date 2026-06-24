@@ -20,9 +20,13 @@ var graphDiagnosticsDescriptionMarkdown string
 //go:embed descriptions/graph_diagnostics_file.md
 var graphDiagnosticsFileDescriptionMarkdown string
 
+//go:embed descriptions/graph_diagnostics_severity.md
+var graphDiagnosticsSeverityDescriptionMarkdown string
+
 var (
-	graphExploreDescription         = strings.TrimSpace(graphExploreDescriptionMarkdown)
-	graphExploreQueryDescription    = strings.TrimSpace(graphExploreQueryDescriptionMarkdown)
-	graphDiagnosticsDescription     = strings.TrimSpace(graphDiagnosticsDescriptionMarkdown)
-	graphDiagnosticsFileDescription = strings.TrimSpace(graphDiagnosticsFileDescriptionMarkdown)
+	graphExploreDescription             = strings.TrimSpace(graphExploreDescriptionMarkdown)
+	graphExploreQueryDescription        = strings.TrimSpace(graphExploreQueryDescriptionMarkdown)
+	graphDiagnosticsDescription         = strings.TrimSpace(graphDiagnosticsDescriptionMarkdown)
+	graphDiagnosticsFileDescription     = strings.TrimSpace(graphDiagnosticsFileDescriptionMarkdown)
+	graphDiagnosticsSeverityDescription = strings.TrimSpace(graphDiagnosticsSeverityDescriptionMarkdown)
 )

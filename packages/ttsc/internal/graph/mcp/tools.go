@@ -186,6 +186,14 @@ var queryStopwords = map[string]bool{
   "for": true, "with": true, "what": true, "where": true, "which": true,
   "this": true, "that": true, "it": true, "its": true, "work": true, "works": true,
   "use": true, "uses": true, "using": true, "from": true, "by": true, "an": true,
+  "new": true, "only": true, "have": true, "few": true, "me": true, "give": true,
+  "one": true,
+  "quick": true, "practical": true, "typescript": true, "project": true,
+  "codebase": true, "orientation": true, "onboarding": true, "overview": true,
+  "architecture": true, "subsystem": true, "subsystems": true, "best": true,
+  "entry": true, "point": true, "points": true, "start": true, "reading": true,
+  "representative": true, "execution": true, "flow": true, "shows": true,
+  "piece": true, "pieces": true, "fit": true, "together": true, "minutes": true,
   "code": true, "path": true, "selected": true, "method": true, "methods": true,
   "request": true, "requests": true, "process": true, "main": true,
   "build": true, "builds": true, "built": true, "create": true, "creates": true,
@@ -222,6 +230,9 @@ func queryTokens(query string) []string {
 func (s *Server) matchNodes(query string) []*graph.Node {
   whole := strings.ToLower(strings.TrimSpace(query))
   tokens := queryTokens(query)
+  if isBroadGraphQuery(whole, tokens) {
+    return s.centralNodes()
+  }
 
   type scored struct {
     node  *graph.Node
@@ -295,6 +306,55 @@ func (s *Server) matchNodes(query string) []*graph.Node {
     byFile = byFile[:maxExploreNodes]
   }
   return byFile
+}
+
+// isBroadGraphQuery detects onboarding-style questions that intentionally carry
+// no project-specific symbol. In that case returning central project nodes is
+// more useful than matching arbitrary generic words such as "flow" or "entry".
+func isBroadGraphQuery(query string, tokens []string) bool {
+  if len(tokens) != 0 {
+    return false
+  }
+  for _, marker := range []string{"architecture", "orientation", "onboarding", "overview", "subsystem", "entry point", "execution flow"} {
+    if strings.Contains(query, marker) {
+      return true
+    }
+  }
+  return false
+}
+
+// centralNodes returns high-degree project nodes for broad codebase-orientation
+// questions that do not name a symbol yet.
+func (s *Server) centralNodes() []*graph.Node {
+  type scored struct {
+    node   *graph.Node
+    degree int
+  }
+  ranked := make([]scored, 0)
+  for _, node := range s.graph.Nodes {
+    if node.External {
+      continue
+    }
+    degree := s.degree[node.ID]
+    if degree == 0 {
+      continue
+    }
+    ranked = append(ranked, scored{node: node, degree: degree})
+  }
+  sort.Slice(ranked, func(i, j int) bool {
+    if ranked[i].degree != ranked[j].degree {
+      return ranked[i].degree > ranked[j].degree
+    }
+    return ranked[i].node.ID < ranked[j].node.ID
+  })
+  out := make([]*graph.Node, 0, maxExploreNodes)
+  for _, r := range ranked {
+    if len(out) >= maxExploreNodes {
+      break
+    }
+    out = append(out, r.node)
+  }
+  return out
 }
 
 // writeNodeRelations renders one node: a header with its source location, its

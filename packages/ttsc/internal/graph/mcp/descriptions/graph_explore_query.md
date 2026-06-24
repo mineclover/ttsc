@@ -1,1 +1,1 @@
-Architecture/code-flow query using named symbols, files, or domain nouns. For onboarding/overview, use one broad architecture query. Batch related names once; avoid generic words such as code, method, request, process, main, component, value, and route.
+Symbol, file, or domain query for architecture, code-flow, and impact exploration. Broad onboarding may use one orientation query. Batch related names when they form one question; avoid generic words when possible.

@@ -32,9 +32,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..");
 const ttscDir = path.join(repoRoot, "packages", "ttsc");
 // The shared structural question, kept as a markdown task spec so both harnesses
-// pose an identical, rigorous prompt: a verified hop-by-hop call path with
-// file:line citations for every node and edge, which a shallow grep guess cannot
-// satisfy. Holding both arms to that bar is what makes the token comparison fair.
+// pose an identical prompt. It is deliberately tool-neutral: it demands a
+// complete, verified call path (traced to the real work, no guessed hops), not
+// our graph's output shape, so neither grep nor the graph is handed the answer's
+// format. The rigor stops a shallow guess from passing; the neutrality keeps the
+// token comparison honest.
 const ARCHITECTURE_QUESTION = fs
   .readFileSync(path.join(here, "questions", "architecture-callpath.md"), "utf8")
   .trim();

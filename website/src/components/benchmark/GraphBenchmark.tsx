@@ -161,8 +161,12 @@ interface ModelGroup {
   runs?: number;
   codegraphSetupMs?: number;
   baseline: Metrics;
+  // Each tool is measured twice: `graph` is the MCP server alone; `guided` is
+  // the same A/B with an AGENTS.md line telling the agent to use the tool.
   ttsc?: Metrics;
+  ttscGuided?: Metrics;
   codegraph?: Metrics;
+  codegraphGuided?: Metrics;
 }
 
 interface ProjectGroup {
@@ -197,6 +201,12 @@ function buildProjectGroups(cells: AgentCell[]): ProjectGroup[] {
           );
           const baselineSamples = modelCells.flatMap((c) => c.samples.baseline);
           const head = modelCells[0]!;
+          const guidedOf = (cell?: AgentCell): Metrics | undefined =>
+            cell &&
+            Array.isArray(cell.samples.guided) &&
+            cell.samples.guided.length > 0
+              ? medianMetrics(cell.samples.guided)
+              : undefined;
           return {
             model: head.model,
             label: modelLabel(head),
@@ -205,9 +215,11 @@ function buildProjectGroups(cells: AgentCell[]): ProjectGroup[] {
             codegraphSetupMs: codegraphCell?.toolSetupMs,
             baseline: medianMetrics(baselineSamples),
             ttsc: ttscCell ? medianMetrics(ttscCell.samples.graph) : undefined,
+            ttscGuided: guidedOf(ttscCell),
             codegraph: codegraphCell
               ? medianMetrics(codegraphCell.samples.graph)
               : undefined,
+            codegraphGuided: guidedOf(codegraphCell),
           };
         })
         .sort((a, b) => modelOrder(a.model) - modelOrder(b.model));
@@ -227,6 +239,10 @@ const BASELINE_FILL = "#4b5563";
 const TTSC_FILL = `linear-gradient(90deg, ${ACCENT}, #19b6c9)`;
 const CODEGRAPH_FILL = "linear-gradient(90deg, #f5b042, #d97706)";
 const CODEGRAPH_TEXT = "#f5b042";
+// The instructed (AGENTS.md-guided) arm of each tool: same hue, dimmed, so a
+// glance reads it as the lighter companion of the MCP-only bar above it.
+const TTSC_GUIDED_FILL = `linear-gradient(90deg, ${ACCENT}66, #19b6c966)`;
+const CODEGRAPH_GUIDED_FILL = "linear-gradient(90deg, #f5b04266, #d9770666)";
 
 const panelClass =
   "overflow-hidden rounded-lg border border-[#222834] bg-[#0c0e13] shadow-[0_24px_60px_rgba(0,0,0,0.35)]";
@@ -286,6 +302,7 @@ function SectionHeader({
 interface BarSpec {
   key: string;
   label: string;
+  mode?: string;
   value: number;
   fill: string;
   textColor: string;
@@ -324,12 +341,18 @@ function BarRow({
   const saved = bar.baseline ? null : pctSaved(baseValue, bar.value);
 
   return (
-    <div className="flex items-center gap-2.5" title={`${bar.label}: ${raw}`}>
+    <div
+      className="flex items-center gap-2.5"
+      title={`${bar.label}${bar.mode ? ` ${bar.mode}` : ""}: ${raw}`}
+    >
       <span
-        className="w-[5.5rem] shrink-0 truncate font-mono text-[10px]"
+        className="w-32 shrink-0 truncate font-mono text-[10px]"
         style={{ color: bar.textColor }}
       >
         {bar.label}
+        {bar.mode ? (
+          <span className="text-neutral-500"> · {bar.mode}</span>
+        ) : null}
       </span>
       <div className="relative h-3.5 flex-1 overflow-hidden rounded-full bg-[#161b24] ring-1 ring-inset ring-white/[0.04]">
         <div
@@ -370,16 +393,36 @@ function MetricGroup({ metric, model }: { metric: Metric; model: ModelGroup }) {
     bars.push({
       key: "ttsc",
       label: "@ttsc/graph",
+      mode: "mcp",
       value: model.ttsc[metric.key],
       fill: TTSC_FILL,
+      textColor: ACCENT,
+    });
+  if (model.ttscGuided)
+    bars.push({
+      key: "ttsc-guided",
+      label: "@ttsc/graph",
+      mode: "instr",
+      value: model.ttscGuided[metric.key],
+      fill: TTSC_GUIDED_FILL,
       textColor: ACCENT,
     });
   if (model.codegraph)
     bars.push({
       key: "codegraph",
       label: "codegraph",
+      mode: "mcp",
       value: model.codegraph[metric.key],
       fill: CODEGRAPH_FILL,
+      textColor: CODEGRAPH_TEXT,
+    });
+  if (model.codegraphGuided)
+    bars.push({
+      key: "codegraph-guided",
+      label: "codegraph",
+      mode: "instr",
+      value: model.codegraphGuided[metric.key],
+      fill: CODEGRAPH_GUIDED_FILL,
       textColor: CODEGRAPH_TEXT,
     });
 
@@ -461,7 +504,7 @@ function ProjectPanel({
         title={repoLabel(group.repo)}
         description={
           group.question ??
-          "Median tokens, tool calls and wall time per model, bar the empty-MCP baseline against @ttsc/graph and codegraph."
+          "Median tokens, tool calls and wall time per model, against the empty-MCP baseline. Each tool is shown twice: mcp (the server alone) and instr (with an AGENTS.md line telling the agent to use it)."
         }
         aside={aside}
       />
@@ -477,7 +520,8 @@ function ProjectPanel({
         <LegendDot fill={ACCENT} label="@ttsc/graph" />
         <LegendDot fill={CODEGRAPH_TEXT} label="codegraph" />
         <span className="text-neutral-600">
-          ↓ saved vs baseline · ↑ over baseline
+          mcp = server only · instr = + AGENTS.md · ↓ saved vs baseline · ↑ over
+          baseline
         </span>
       </div>
     </section>
@@ -731,10 +775,16 @@ export default function GraphBenchmark({
     );
   }
 
+  // Default to the first project that carries the full comparison (codegraph +
+  // both modes), so the dual measurement is visible on load rather than the
+  // excalidraw cell that only has the @ttsc/graph arm.
+  const defaultRepo =
+    groups.find((g) => g.models.some((m) => m.codegraph))?.repo ??
+    groups[0]?.repo;
   const active =
     activeRepo && groups.some((g) => g.repo === activeRepo)
       ? activeRepo
-      : groups[0]?.repo;
+      : defaultRepo;
   const activeGroup = groups.find((g) => g.repo === active);
 
   return (

@@ -1,0 +1,1 @@
+When you call `.parse(data)` on a `z.object({...})` schema, how does Zod validate the input against each property of the shape and throw on failure? Trace the call path from the public `parse` closure through `core._parse` and the object schema's `_zod.run` into its `_zod.parse` per-key loop down to where issues are collected and a `$ZodError` is thrown.

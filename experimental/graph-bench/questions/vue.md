@@ -1,0 +1,1 @@
+When a property of a `reactive()` object is mutated, how does that change cause a `ReactiveEffect` (the effect behind `watchEffect`) to re-run? Trace the call path from the proxy's `MutableReactiveHandler.set` trap through `trigger` and `Dep.notify` down to where the effect is scheduled and `ReactiveEffect.run` re-executes.

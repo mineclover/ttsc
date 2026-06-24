@@ -1,0 +1,1 @@
+How does the `map()` operator transform each emitted value when you call `subscribe()` on the resulting Observable? Trace the call path from `map()` through `operate` and the `Subscriber` created for the subscription down to where the `project` function is applied in `Subscriber.next` and the transformed value is forwarded to the destination observer.

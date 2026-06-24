@@ -32,7 +32,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..");
 const ttscDir = path.join(repoRoot, "packages", "ttsc");
 const ARCHITECTURE_QUESTION =
-  "I'm new to this TypeScript project and only have a few minutes. Give me a practical code architecture orientation: the main subsystems, the best source entry points to start reading, and one representative execution flow that shows how the pieces fit together.";
+  "I'm joining this TypeScript project and need a fast code architecture map. Identify the major subsystems, the best source entry points to read first, and one representative dependency/call flow from public API into internals, naming the key files/classes/functions.";
 
 // TypeScript benchmark repos and their medium-difficulty questions.
 const REPOS = {

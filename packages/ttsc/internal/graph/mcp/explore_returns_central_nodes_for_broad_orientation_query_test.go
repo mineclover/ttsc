@@ -73,4 +73,9 @@ export function start(): number {
   if !strings.Contains(text, "function route") {
     t.Fatalf("graph_explore matched package-name noise instead of central nodes:\n%s", text)
   }
+
+  text = toolText(t, server, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"graph_explore","arguments":{"query":"public entry point exports benchmark"}}}`)
+  if !strings.Contains(text, "function route") {
+    t.Fatalf("graph_explore did not return central nodes for public entry flow query:\n%s", text)
+  }
 }

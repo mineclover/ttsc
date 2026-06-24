@@ -339,6 +339,9 @@ func (s *Server) centralNodes() []*graph.Node {
     if node.External {
       continue
     }
+    if isCentralNoise(node) {
+      continue
+    }
     degree := s.degree[node.ID]
     if degree == 0 {
       continue
@@ -359,6 +362,18 @@ func (s *Server) centralNodes() []*graph.Node {
     out = append(out, r.node)
   }
   return out
+}
+
+// isCentralNoise filters nodes that are often high-degree but poor architecture
+// anchors for broad onboarding queries: error hierarchies and decorator helpers.
+func isCentralNoise(node *graph.Node) bool {
+  name := strings.ToLower(node.Name)
+  file := "/" + strings.ToLower(filepath.ToSlash(node.File))
+  return strings.HasSuffix(name, "error") ||
+    strings.Contains(file, "/error/") ||
+    strings.Contains(file, "/errors/") ||
+    strings.Contains(file, "/decorator/") ||
+    strings.Contains(file, "/decorators/")
 }
 
 // writeNodeRelations renders one node: a header with its source location, its

@@ -28,3 +28,24 @@ func TestQueryTokensDropGenericNavigationWords(t *testing.T) {
     t.Fatalf("queryTokens() = %#v; want %#v", got, want)
   }
 }
+
+func TestQueryWordsKeepCamelCaseParts(t *testing.T) {
+  got := queryWords("SelectQueryBuilder joinAttributes relationPropertyPath")
+  for _, want := range []string{
+    "selectquerybuilder",
+    "select",
+    "query",
+    "builder",
+    "joinattributes",
+    "join",
+    "attributes",
+    "relationpropertypath",
+    "relation",
+    "property",
+    "path",
+  } {
+    if !got[want] {
+      t.Fatalf("queryWords() did not keep %q in %#v", want, got)
+    }
+  }
+}

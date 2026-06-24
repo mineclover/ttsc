@@ -1028,13 +1028,19 @@ func queryTokens(query string) []string {
 }
 
 func queryWords(query string) map[string]bool {
-  fields := strings.FieldsFunc(strings.ToLower(query), func(r rune) bool {
-    return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9')
+  fields := strings.FieldsFunc(query, func(r rune) bool {
+    return !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9'))
   })
-  words := make(map[string]bool, len(fields))
+  words := make(map[string]bool, len(fields)*2)
   for _, field := range fields {
-    if len(field) >= 2 {
-      words[field] = true
+    lower := strings.ToLower(field)
+    if len(lower) >= 2 {
+      words[lower] = true
+    }
+    for _, part := range memberWords(field) {
+      if len(part) >= 2 {
+        words[part] = true
+      }
     }
   }
   return words

@@ -298,7 +298,7 @@ func (s *Server) filterFlowNodes(nodes []*graph.Node, query string) []*graph.Nod
 	return out
 }
 
-const maxFlowNodes = 8
+const maxFlowNodes = 16
 
 func flowTypeNoise(node *graph.Node) bool {
 	switch strings.ToLower(string(node.Kind)) {
@@ -333,9 +333,9 @@ func flowHelperNoise(node *graph.Node, query string, words map[string]bool) bool
 // maxPathNodes caps how many downstream call-path nodes a flow query pulls in
 // beyond its direct matches, so one query returns the chain without a hub
 // exploding the response. The render budget collapses the tail past it.
-const maxPathNodes = 8
+const maxPathNodes = 16
 
-const maxPathBranch = 2
+const maxPathBranch = 8
 
 // withCallPath appends to the matched seeds the declarations downstream of them
 // along value-call edges (the runtime call flow), breadth-first and bounded, so a
@@ -530,7 +530,7 @@ func (s *Server) pathTargetScore(id string, tokens []string, words map[string]bo
 				}
 				continue
 			}
-			if strings.Contains(name, stem) {
+			if strings.Contains(member, stem) {
 				score += 45
 				break
 			}

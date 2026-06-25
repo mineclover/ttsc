@@ -6,9 +6,15 @@ import {
   findMeasurement,
   formatDuration,
   formatMultiplier,
+  lintPluginMs,
   measurementMs,
 } from "./format";
-import type { BenchmarkProject, BenchmarkReport } from "./types";
+import type {
+  BenchmarkOp,
+  BenchmarkProject,
+  BenchmarkReport,
+  BenchmarkThreading,
+} from "./types";
 
 // ---------------------------------------------------------------------------
 // Style tokens — mirrors GraphBenchmark.tsx
@@ -30,19 +36,100 @@ function Eyebrow({ label }: { label: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Headline stats — one per operation, in display order
 // ---------------------------------------------------------------------------
-
-function minMs(samples: number[]): number {
-  return samples.length > 0 ? Math.min(...samples) : 0;
-}
 
 interface HeadlineStat {
   op: string;
+  baselineLabel: string;
+  fastLabel: string;
   baselineMs: number;
   fastMs: number;
   factor: number;
-  threading: string;
+  note: string;
+}
+
+/** Fastest-first so the first cell found with data is the fastest available. */
+const TTSC_CANDIDATES: readonly BenchmarkThreading[] = [
+  "checkers8",
+  "checkers4",
+  "checkers2",
+  "single",
+];
+
+/** CLI flag suffix for a threading variant. */
+function flagLabel(threading: BenchmarkThreading): string {
+  switch (threading) {
+    case "single":
+      return "--singleThreaded";
+    case "checkers2":
+      return "--checkers 2";
+    case "checkers4":
+      return "--checkers 4";
+    case "checkers8":
+      return "--checkers 8";
+    case "multi":
+      return "";
+  }
+}
+
+function fastestTtsc(
+  m: BenchmarkProject["measurements"],
+  op: BenchmarkOp,
+): { ms: number; threading: BenchmarkThreading } | undefined {
+  for (const threading of TTSC_CANDIDATES) {
+    const cell = findMeasurement(m, {
+      branch: "ttsc",
+      tool: "ttsc",
+      op,
+      threading,
+    });
+    if (cell && measurementMs(cell) > 0)
+      return { ms: measurementMs(cell), threading };
+  }
+  return undefined;
+}
+
+/**
+ * The native `@ttsc/lint` pass time — the single line the project reports as
+ * lint cost — at the fastest threading. This is the headline the dashboard
+ * sells (eslint vs the measured lint pass), not the whole check sidecar.
+ */
+function fastestLintPass(
+  m: BenchmarkProject["measurements"],
+): { ms: number; threading: BenchmarkThreading } | undefined {
+  for (const threading of TTSC_CANDIDATES) {
+    for (const op of ["noEmit", "build"] as BenchmarkOp[]) {
+      const cell = findMeasurement(m, {
+        branch: "ttsc-lint",
+        tool: "ttsc+@ttsc/lint",
+        op,
+        threading,
+      });
+      if (cell) {
+        const ms = lintPluginMs(cell);
+        if (ms > 0) return { ms, threading };
+      }
+    }
+  }
+  return undefined;
+}
+
+function fastestFormat(
+  m: BenchmarkProject["measurements"],
+): { ms: number; threading: BenchmarkThreading } | undefined {
+  // The format cell's tool value ("ttsc-format") is outside the typed
+  // BenchmarkTool union, so match on branch + op + threading like the dashboard.
+  for (const threading of ["multi", "single"] as BenchmarkThreading[]) {
+    const cell = findMeasurement(m, {
+      branch: "ttsc-lint",
+      op: "format",
+      threading,
+    });
+    if (cell && measurementMs(cell) > 0)
+      return { ms: measurementMs(cell), threading };
+  }
+  return undefined;
 }
 
 function buildHeadlines(project: BenchmarkProject): HeadlineStat[] {
@@ -55,78 +142,145 @@ function buildHeadlines(project: BenchmarkProject): HeadlineStat[] {
     op: "build",
     threading: "multi",
   });
+  const fastBuild = fastestTtsc(m, "build");
+  if (legacyBuild && fastBuild && measurementMs(legacyBuild) > 0) {
+    const baselineMs = measurementMs(legacyBuild);
+    stats.push({
+      op: "Build",
+      baselineLabel: "tsc",
+      fastLabel: "ttsc",
+      baselineMs,
+      fastMs: fastBuild.ms,
+      factor: baselineMs / fastBuild.ms,
+      note: `ttsc ${flagLabel(fastBuild.threading)} vs tsc`
+        .replace(/\s+/g, " ")
+        .trim(),
+    });
+  }
+
   const legacyNoEmit = findMeasurement(m, {
     branch: "legacy",
     tool: "tsc",
     op: "noEmit",
     threading: "multi",
   });
-
-  // Pick the fastest ttsc threading for each op (checkers8, then checkers4, …)
-  const threadingCandidates = [
-    "checkers8",
-    "checkers4",
-    "checkers2",
-    "single",
-  ] as const;
-
-  for (const threading of threadingCandidates) {
-    const fast = findMeasurement(m, {
-      branch: "ttsc",
-      tool: "ttsc",
-      op: "build",
-      threading,
+  const fastNoEmit = fastestTtsc(m, "noEmit");
+  if (legacyNoEmit && fastNoEmit && measurementMs(legacyNoEmit) > 0) {
+    const baselineMs = measurementMs(legacyNoEmit);
+    stats.push({
+      op: "Type-check",
+      baselineLabel: "tsc --noEmit",
+      fastLabel: "ttsc --noEmit",
+      baselineMs,
+      fastMs: fastNoEmit.ms,
+      factor: baselineMs / fastNoEmit.ms,
+      note: `ttsc ${flagLabel(fastNoEmit.threading)} vs tsc`
+        .replace(/\s+/g, " ")
+        .trim(),
     });
-    if (legacyBuild && fast) {
-      const baselineMs = measurementMs(legacyBuild);
-      const fastMs = measurementMs(fast);
-      if (baselineMs > 0 && fastMs > 0) {
-        stats.push({
-          op: "Build",
-          baselineMs,
-          fastMs,
-          factor: baselineMs / fastMs,
-          threading: `--checkers ${threading.replace("checkers", "")}`,
-        });
-        break;
-      }
-    }
   }
 
-  for (const threading of threadingCandidates) {
-    const fast = findMeasurement(m, {
-      branch: "ttsc",
-      tool: "ttsc",
-      op: "noEmit",
-      threading,
+  const eslint =
+    findMeasurement(m, {
+      branch: "legacy",
+      tool: "eslint",
+      op: "eslint",
+      threading: "multi",
+    }) ??
+    findMeasurement(m, {
+      branch: "legacy",
+      tool: "eslint",
+      threading: "multi",
     });
-    if (legacyNoEmit && fast) {
-      const baselineMs = measurementMs(legacyNoEmit);
-      const fastMs = measurementMs(fast);
-      if (baselineMs > 0 && fastMs > 0) {
-        stats.push({
-          op: "Type-check",
-          baselineMs,
-          fastMs,
-          factor: baselineMs / fastMs,
-          threading: `--checkers ${threading.replace("checkers", "")}`,
-        });
-        break;
-      }
-    }
+  const fastLint = fastestLintPass(m);
+  if (eslint && fastLint && measurementMs(eslint) > 0) {
+    const baselineMs = measurementMs(eslint);
+    stats.push({
+      op: "Lint",
+      baselineLabel: "eslint",
+      fastLabel: "@ttsc/lint",
+      baselineMs,
+      fastMs: fastLint.ms,
+      factor: baselineMs / fastLint.ms,
+      note: "@ttsc/lint pass vs eslint",
+    });
+  }
+
+  const prettier = findMeasurement(m, {
+    branch: "legacy",
+    tool: "prettier",
+    op: "format",
+    threading: "multi",
+  });
+  const fastFormat = fastestFormat(m);
+  if (prettier && fastFormat && measurementMs(prettier) > 0) {
+    const baselineMs = measurementMs(prettier);
+    stats.push({
+      op: "Format",
+      baselineLabel: "prettier",
+      fastLabel: "ttsc format",
+      baselineMs,
+      fastMs: fastFormat.ms,
+      factor: baselineMs / fastFormat.ms,
+      note:
+        fastFormat.threading === "single"
+          ? "ttsc format --singleThreaded vs prettier"
+          : "ttsc format vs prettier",
+    });
   }
 
   return stats;
 }
 
 // ---------------------------------------------------------------------------
-// SpeedupRow — one operation as a pair of duration bars
+// SpeedupRow — one operation as a full-width pair of duration bars
 // ---------------------------------------------------------------------------
 
-function SpeedupRow({ stat }: { stat: HeadlineStat }) {
+function Bar({
+  label,
+  ms,
+  pct,
+  accent,
+}: {
+  label: string;
+  ms: number;
+  pct: number;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <code
+        className={`w-24 shrink-0 truncate text-right font-mono text-[10px] ${
+          accent ? "font-bold" : "text-neutral-500"
+        }`}
+        style={accent ? { color: ACCENT } : undefined}
+        title={label}
+      >
+        {label}
+      </code>
+      <div className="relative h-5 flex-1 overflow-hidden rounded bg-[#161b24] ring-1 ring-inset ring-white/[0.04]">
+        <div
+          className="h-full rounded"
+          style={{
+            width: `${pct}%`,
+            background: accent
+              ? `linear-gradient(90deg, ${ACCENT}, #19b6c9)`
+              : "#4b5563",
+            boxShadow: accent ? `0 0 8px ${ACCENT}44` : undefined,
+          }}
+        />
+      </div>
+      <span className="w-16 shrink-0 text-right font-mono text-[10px] tabular-nums text-neutral-300">
+        {formatDuration(ms)}
+      </span>
+    </div>
+  );
+}
+
+function SpeedupRow({ stat, files }: { stat: HeadlineStat; files: number }) {
   const fastPct = Math.min(
     100,
-    Math.max(4, (stat.fastMs / stat.baselineMs) * 100),
+    Math.max(3, (stat.fastMs / stat.baselineMs) * 100),
   );
 
   return (
@@ -144,49 +298,12 @@ function SpeedupRow({ stat }: { stat: HeadlineStat }) {
       </div>
 
       <div className="space-y-1.5">
-        {/* Baseline bar */}
-        <div className="flex items-center gap-3">
-          <code className="w-16 shrink-0 text-right font-mono text-[10px] text-neutral-500">
-            tsc
-          </code>
-          <div className="relative h-5 flex-1 overflow-hidden rounded bg-[#161b24]">
-            <div
-              className="flex h-full items-center justify-end rounded px-2 bg-neutral-600"
-              style={{ width: "100%" }}
-            >
-              <span className="font-mono text-[10px] text-neutral-200">
-                {formatDuration(stat.baselineMs)}
-              </span>
-            </div>
-          </div>
-        </div>
-        {/* Fast bar */}
-        <div className="flex items-center gap-3">
-          <code
-            className="w-16 shrink-0 text-right font-mono text-[10px] font-bold"
-            style={{ color: ACCENT }}
-          >
-            ttsc
-          </code>
-          <div className="relative h-5 flex-1 overflow-hidden rounded bg-[#161b24]">
-            <div
-              className="flex h-full items-center justify-end rounded px-2"
-              style={{
-                width: `${fastPct}%`,
-                background: `linear-gradient(90deg, ${ACCENT}, #19b6c9)`,
-                boxShadow: `0 0 8px ${ACCENT}44`,
-              }}
-            >
-              <span className="font-mono text-[10px] font-semibold text-cyan-950">
-                {formatDuration(stat.fastMs)}
-              </span>
-            </div>
-          </div>
-        </div>
+        <Bar label={stat.baselineLabel} ms={stat.baselineMs} pct={100} />
+        <Bar label={stat.fastLabel} ms={stat.fastMs} pct={fastPct} accent />
       </div>
 
       <p className="font-mono text-[10px] text-neutral-500">
-        ttsc {stat.threading} vs tsc · vscode · 6,093 files
+        {stat.note} · vscode · {files.toLocaleString()} files
       </p>
     </div>
   );
@@ -235,7 +352,8 @@ export default function PerformanceSummary() {
   if (!report) return <Notice>Loading performance benchmark results…</Notice>;
 
   const vscode = report.projects.find((p) => p.name === "vscode");
-  if (!vscode) return <Notice>vscode project not found in benchmark data.</Notice>;
+  if (!vscode)
+    return <Notice>vscode project not found in benchmark data.</Notice>;
 
   const stats = buildHeadlines(vscode);
   if (stats.length === 0)
@@ -260,12 +378,12 @@ export default function PerformanceSummary() {
               vscode — 6,093 TypeScript files
             </h2>
             <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-neutral-400">
-              Build and type-check wall-clock time: legacy tsc versus ttsc
-              backed by TypeScript-Go. Bars show minimum across{" "}
-              {report.runs ?? 5} runs.
+              Build, type-check, lint and format wall-clock time: the legacy tsc
+              / eslint / prettier toolchain versus ttsc backed by TypeScript-Go.
+              Bars show the minimum across {report.runs ?? 5} runs.
             </p>
           </div>
-          <div className="shrink-0 flex flex-col items-end gap-1">
+          <div className="flex shrink-0 flex-col items-end gap-1">
             <span
               className="font-mono text-[28px] font-black leading-none tabular-nums"
               style={{ color: ACCENT }}
@@ -278,10 +396,10 @@ export default function PerformanceSummary() {
           </div>
         </div>
 
-        {/* Bars */}
-        <div className="grid gap-3 p-4 sm:grid-cols-2">
+        {/* Bars — one operation per row */}
+        <div className="space-y-3 p-4">
           {stats.map((stat) => (
-            <SpeedupRow key={stat.op} stat={stat} />
+            <SpeedupRow key={stat.op} stat={stat} files={vscode.files} />
           ))}
         </div>
       </section>

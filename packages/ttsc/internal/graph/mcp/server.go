@@ -1,8 +1,10 @@
 // Package mcp serves the checker-resolved code graph to coding agents over the
 // Model Context Protocol (JSON-RPC 2.0 on stdio). The server holds one resident
-// Program: it builds the graph once at startup and answers every tool call from
-// that warm handle, so a query is a method call on an already-built checker, not
-// a fresh compile and not an external language-server round-trip.
+// Program and answers every tool call from that warm handle, so a query is a
+// method call on an already-built checker, not an external language-server
+// round-trip. Before answering, it folds in any on-disk edits incrementally
+// (UpdateProgram re-checks only changed files), so the graph follows the source
+// instead of freezing at startup, without paying a full recompile per call.
 //
 // Guidance is delivered only in the `initialize` response (serverInstructions);
 // the server never writes into the user's CLAUDE.md / AGENTS.md, so install is
@@ -13,8 +15,11 @@ import (
   _ "embed"
   "encoding/json"
   "fmt"
+  "os"
+  "path/filepath"
   "strings"
   "sync"
+  "time"
 
   "github.com/samchon/ttsc/packages/ttsc/driver"
   "github.com/samchon/ttsc/packages/ttsc/internal/graph"
@@ -61,13 +66,31 @@ type Server struct {
   tsconfig string
   options  driver.LoadProgramOptions
   ready    chan struct{}
-  prog     *driver.Program
-  graph    *graph.Graph
-  degree   map[string]int
+  // session keeps the program resident over an overlay FS so an on-disk edit is
+  // folded in with an incremental UpdateProgram (re-checking only the changed
+  // files) instead of a full recompile. nil for an in-process Program supplied
+  // to NewServer, which does not track on-disk staleness.
+  session *driver.Session
+  prog    *driver.Program
+  graph   *graph.Graph
+  degree  map[string]int
   // reverseAdj maps a node to the nodes that depend on it (the reverse of every
   // edge), so the blast-radius walk is O(V+E) instead of rescanning all edges
   // per step.
   reverseAdj map[string][]string
+  // forwardCallAdj maps a node to the nodes it calls (the forward of every
+  // value-call edge), so a flow query can walk the downstream call path in one
+  // pass instead of the agent re-querying each hop.
+  forwardCallAdj map[string][]string
+  // reverseValueAdj maps a value target to declarations that read/call it. Flow
+  // uses this to surface relevant consumers, e.g. a state store to the summary
+  // method that later consumes it.
+  reverseValueAdj map[string][]string
+  // implementorsAdj maps an interface or base to the declarations that implement
+  // or extend it (the reverse of every heritage edge), so the call path can cross
+  // the dynamic-dispatch seam from an interface method to its concrete body,
+  // which value-call edges stop at.
+  implementorsAdj map[string][]string
   // tscDiags is the compiler's own diagnostics, computed once with the graph
   // (the Program is read-only after build). diags is the fused set — tscDiags
   // plus every provider's current output — and diagsByNode attributes each to the
@@ -87,6 +110,19 @@ type Server struct {
   // host. Set once at construction, read only inside setProgram.
   diagProviders []DiagnosticProvider
   loadErr       error
+  // srcFiles are the project's own on-disk source paths (compiler libs and
+  // node_modules excluded), captured at each build; srcMTime is the newest
+  // modification time among them at that build. A tool call re-stats srcFiles
+  // and rebuilds when anything is newer, so the graph follows source edits
+  // instead of serving a snapshot frozen at startup. Only the lazy (cwd/tsconfig)
+  // construction can reload; an in-process Program leaves both empty.
+  srcFiles []string
+  srcMTime time.Time
+  // ignored is the set of graph source files git ignores (generated output like
+  // a Prisma client or other codegen emitted as .ts). The matcher de-surfaces
+  // them so they do not dominate ranking; they stay reachable as edge targets
+  // and by exact name. Recomputed with the graph on each (re)build.
+  ignored map[string]bool
   // mu serializes tool calls so one Server can back many daemon connections
   // safely (the graph is read-only after build, but the checker behind
   // graph_diagnostics is not concurrency-safe).
@@ -118,16 +154,17 @@ func NewLazyServer(cwd, tsconfig string, options driver.LoadProgramOptions, prov
 
 func (s *Server) load() {
   defer close(s.ready)
-  prog, _, err := driver.LoadProgram(s.cwd, s.tsconfig, s.options)
+  session, _, err := driver.NewSession(s.cwd, s.tsconfig, s.options)
   if err != nil {
     s.loadErr = err
     return
   }
-  if prog == nil {
+  if session == nil || session.Program() == nil {
     s.loadErr = fmt.Errorf("could not load project %q", s.tsconfig)
     return
   }
-  s.setProgram(prog)
+  s.session = session
+  s.setProgram(session.Program())
 }
 
 // ensureLoaded blocks until the resident graph is built, returning any load error.
@@ -143,14 +180,130 @@ func (s *Server) setProgram(prog *driver.Program) {
   s.graph = graph.Build(prog)
   s.degree = make(map[string]int, len(s.graph.Nodes))
   s.reverseAdj = make(map[string][]string, len(s.graph.Nodes))
+  s.forwardCallAdj = make(map[string][]string)
+  s.reverseValueAdj = make(map[string][]string)
+  s.implementorsAdj = make(map[string][]string)
   for _, edge := range s.graph.Edges {
     s.degree[edge.From]++
     s.degree[edge.To]++
     s.reverseAdj[edge.To] = append(s.reverseAdj[edge.To], edge.From)
+    switch edge.Kind {
+    case graph.EdgeValueCall, graph.EdgeValueAccess:
+      s.forwardCallAdj[edge.From] = append(s.forwardCallAdj[edge.From], edge.To)
+      s.reverseValueAdj[edge.To] = append(s.reverseValueAdj[edge.To], edge.From)
+    case graph.EdgeHeritage:
+      s.implementorsAdj[edge.To] = append(s.implementorsAdj[edge.To], edge.From)
+    }
   }
   s.tscDiags = prog.Diagnostics()
   s.nodeLineRanges = computeNodeLineRanges(prog, s.graph)
   s.refreshDiagnostics()
+  s.srcFiles = s.projectSourceFiles()
+  s.srcMTime, _ = newestMTime(s.srcFiles)
+  // De-surface git-ignored generated code (a Prisma client, other codegen
+  // emitted as .ts) so it does not dominate ranking. graph.GitIgnoredFiles is
+  // the shared detector the full-graph dump uses too. They stay in the program
+  // for type resolution and remain reachable as edge targets and by exact name.
+  s.ignored = graph.GitIgnoredFiles(s.cwd, s.graph)
+}
+
+// projectSourceFiles returns the absolute on-disk paths of the project's own
+// source files referenced by the graph, skipping the compiler's bundled libs
+// and dependency files (node_modules). It returns nil for an in-process Program
+// with no cwd, where on-disk staleness tracking does not apply.
+func (s *Server) projectSourceFiles() []string {
+  if s.cwd == "" {
+    return nil
+  }
+  seen := make(map[string]bool)
+  var files []string
+  for _, node := range s.graph.Nodes {
+    f := node.File
+    if f == "" || strings.HasPrefix(f, "bundled:///") || strings.Contains(f, "node_modules") {
+      continue
+    }
+    if !filepath.IsAbs(f) {
+      f = filepath.Join(s.cwd, f)
+    }
+    if seen[f] {
+      continue
+    }
+    seen[f] = true
+    files = append(files, f)
+  }
+  return files
+}
+
+// newestMTime returns the newest modification time among files and whether any
+// is missing (a deletion, which also counts as a change).
+func newestMTime(files []string) (time.Time, bool) {
+  var newest time.Time
+  missing := false
+  for _, f := range files {
+    info, err := os.Stat(f)
+    if err != nil {
+      missing = true
+      continue
+    }
+    if mt := info.ModTime(); mt.After(newest) {
+      newest = mt
+    }
+  }
+  return newest, missing
+}
+
+// refreshIfStale brings the resident graph up to date with on-disk edits before
+// a tool call answers, so the graph follows the source instead of serving a
+// snapshot frozen at startup. A cheap stat of the known source files gates the
+// work: when nothing changed the cached graph is served untouched. When files
+// changed it re-feeds only those through the incremental Session (UpdateProgram
+// reuses the unchanged ASTs and checker, re-checking just the edited files) and
+// rebuilds the graph from the updated program. A structural change a content
+// edit cannot express (a deleted file) falls back to a fresh Session. A
+// transient failure keeps the last good graph. The caller must hold s.mu; an
+// in-process Program with no Session is left as is.
+func (s *Server) refreshIfStale() {
+  if s.session == nil || len(s.srcFiles) == 0 {
+    return
+  }
+  changed := s.changedFiles()
+  if len(changed) == 0 {
+    return
+  }
+  rebuilt := false
+  for _, f := range changed {
+    content, err := os.ReadFile(f)
+    if err != nil {
+      rebuilt = true // a deletion reshapes the project beyond a content edit
+      break
+    }
+    s.session.Apply(f, string(content))
+  }
+  if rebuilt {
+    session, _, err := driver.NewSession(s.cwd, s.tsconfig, s.options)
+    if err != nil || session == nil || session.Program() == nil {
+      return
+    }
+    s.session = session
+  }
+  s.setProgram(s.session.Program())
+}
+
+// changedFiles re-stats the known project source files and returns those whose
+// modification time is newer than the last build, or that have gone missing.
+func (s *Server) changedFiles() []string {
+  var changed []string
+  for _, f := range s.srcFiles {
+    info, err := os.Stat(f)
+    if err != nil {
+      changed = append(changed, f)
+      continue
+    }
+    if info.ModTime().After(s.srcMTime) {
+      changed = append(changed, f)
+    }
+  }
+  return changed
 }
 
 // refreshDiagnostics recomputes the fused diagnostic set and re-attributes it

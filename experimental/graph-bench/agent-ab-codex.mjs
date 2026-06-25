@@ -12,7 +12,7 @@
 //
 // codex --json has no cost field, so this reports tokens + tool calls + wall
 // time (not dollars). A "tool call" is a codex command_execution (shell read or
-// grep) or an mcp_tool_call (graph_explore / graph_diagnostics); "graph" counts
+// grep) or an mcp_tool_call (query_nodes / query_diagnostics); "graph" counts
 // only the latter.
 //
 // Spends real codex credits; non-deterministic; not wired into CI. Requires
@@ -31,57 +31,81 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..");
 const ttscDir = path.join(repoRoot, "packages", "ttsc");
+// The shared structural question, kept as a markdown task spec so both harnesses
+// pose an identical prompt. It aims for the middle: a real call-path briefing that
+// reaches past the public facade to the real work (so a shallow answer does not
+// pass), built by inference from symbol names and relationships the way a
+// developer reads code (so it does not force re-reading every file). It is
+// tool-neutral, naming no output shape, so neither grep nor the graph is handed
+// the format and the token comparison stays honest.
+// Per-repo question in codegraph's agent-eval style; see agent-ab.mjs. Prefer an
+// explicit override, then questions/<repo>.md, then the generic fallback.
+const ARCHITECTURE_QUESTION = fs
+  .readFileSync(path.join(here, "questions", "architecture-callpath.md"), "utf8")
+  .trim();
+function resolveQuestion(repoKey) {
+  if (process.env.TTSC_BENCH_QUESTION_FILE)
+    return fs.readFileSync(process.env.TTSC_BENCH_QUESTION_FILE, "utf8").trim();
+  const perRepo = path.join(here, "questions", `${repoKey}.md`);
+  if (fs.existsSync(perRepo)) return fs.readFileSync(perRepo, "utf8").trim();
+  return ARCHITECTURE_QUESTION;
+}
+
+const CODEX_GRAPH_ARM_PROMPT = [
+  "A ttsc-graph MCP server is configured for this graph arm.",
+  "Use query_path when the task gives exact start/end symbols or an ordered call chain.",
+  "Use query_exports for orientation or uncertain entrypoints, and query_nodes for relationship discovery when endpoints are unknown.",
+  "Use expand_nodes only for handles that need source context. Use shell search/read only when the graph does not fit.",
+].join("\n");
 
 // TypeScript benchmark repos and their medium-difficulty questions.
 const REPOS = {
   excalidraw: {
     url: "https://github.com/excalidraw/excalidraw",
     tsconfig: "tsconfig.json",
-    question: "Which code path schedules a scene redraw after an element is changed?",
+    question: ARCHITECTURE_QUESTION,
   },
   vscode: {
     url: "https://github.com/microsoft/vscode",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-vscode.git",
     tsconfig: "src/tsconfig.json",
-    question:
-      "Where does an extension host message get forwarded toward the main process?",
+    question: ARCHITECTURE_QUESTION,
   },
   nestjs: {
     url: "https://github.com/nestjs/nest",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-nestjs.git",
-    tsconfig: "tsconfig.graph.json",
-    question: "Which code invokes the selected controller method for an HTTP route?",
+    tsconfig: "tsconfig.json",
+    question: ARCHITECTURE_QUESTION,
   },
   vue: {
     url: "https://github.com/vuejs/core",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-vue.git",
-    tsconfig: "tsconfig.graph.json",
-    question: "Which code schedules a component update after a ref value changes?",
+    tsconfig: "tsconfig.json",
+    question: ARCHITECTURE_QUESTION,
   },
   zod: {
     url: "https://github.com/colinhacks/zod",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-zod.git",
-    tsconfig: "tsconfig.graph.json",
-    question: "Which internal parse method does a Zod schema's parse() call?",
+    tsconfig: "tsconfig.json",
+    question: ARCHITECTURE_QUESTION,
   },
   typeorm: {
     url: "https://github.com/typeorm/typeorm",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-typeorm.git",
-    tsconfig: "tsconfig.graph.json",
-    question:
-      "How are relation options applied when repository.find() builds its query?",
+    tsconfig: "tsconfig.json",
+    question: ARCHITECTURE_QUESTION,
   },
   rxjs: {
     url: "https://github.com/ReactiveX/rxjs",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-rxjs.git",
-    tsconfig: "tsconfig.graph.json",
-    question: "Which code creates the Subscriber used by Observable.subscribe?",
+    tsconfig: "tsconfig.json",
+    question: ARCHITECTURE_QUESTION,
   },
   "shopping-backend": {
     url: "https://github.com/samchon/shopping-backend",
     fixtureUrl: "https://github.com/samchon/shopping-backend.git",
     tsconfig: "tsconfig.json",
-    question: "Which code builds the order creation request before persistence?",
+    question: ARCHITECTURE_QUESTION,
   },
 };
 
@@ -96,7 +120,8 @@ const runs = Number(args.runs ?? 2);
 const model = args.model ?? "gpt-5.5";
 const effort = "high";
 const tsconfig = args.tsconfig ?? spec.tsconfig;
-const question = spec.question;
+const question = args.question ?? resolveQuestion(repoKey);
+const promptFamily = args["prompt-family"] ?? (args.question ? "custom" : "project-specific");
 if (!question) throw new Error(`repo ${repoKey} has no benchmark question`);
 
 const fixtureBranch = args["fixture-branch"];
@@ -118,12 +143,6 @@ const repoDir = args["repo-dir"]
   ? path.resolve(args["repo-dir"])
   : path.join(corpus, cloneKey);
 
-// --guidance=1 adds a fairness arm: a neutral project instruction (CLAUDE.md +
-// AGENTS.md) telling the agent to prefer the code-graph MCP over grep. It names no
-// tool and leaks no answer, and the same text is used for @ttsc/graph and
-// codegraph. codex ignores an MCP server's own instructions but honors a project
-// AGENTS.md, so this measures the tool with and without that nudge.
-const guidance = args.guidance === "1" || args.guidance === "true";
 const toolSetupMs =
   args["tool-setup-ms"] === undefined
     ? undefined
@@ -131,34 +150,6 @@ const toolSetupMs =
 // --cg points the graph arm at codegraph instead of @ttsc/graph (repo must be
 // indexed with `codegraph init`), for an apples-to-apples comparison on codex.
 const cg = args.cg === "1" || args.cg === "true";
-const GUIDANCE = `# Code navigation
-
-For code-flow questions, call the code-graph MCP before grep/read/shell.
-Ask one broad natural-language query: owner + action + nouns, e.g. "repository find manager query builder".
-Do not split symbols across calls or use grep/read/shell to trace or confirm returned source. Read files only for no match, signatures, or non-TS files.
-`;
-// The guided arm models how a normal user actually works: they keep an AGENTS.md
-// and tell the agent, in the prompt, to follow it. That elevates the project file
-// to the authority of the user's own words — the channel codex honors most — so it
-// is prepended to the question ONLY in the guided arm.
-const GUIDED_PREFIX =
-  "Follow this project's AGENTS.md instructions when answering.\n\n";
-let guidanceSnapshot = null;
-function snapshotGuidanceFiles() {
-  return ["CLAUDE.md", "AGENTS.md"].map((name) => {
-    const file = path.join(repoDir, name);
-    if (!fs.existsSync(file)) return { file, existed: false };
-    return { file, existed: true, content: fs.readFileSync(file, "utf8") };
-  });
-}
-function setGuidance(on) {
-  guidanceSnapshot ??= snapshotGuidanceFiles();
-  for (const entry of guidanceSnapshot) {
-    if (on) fs.writeFileSync(entry.file, GUIDANCE);
-    else if (entry.existed) fs.writeFileSync(entry.file, entry.content);
-    else fs.rmSync(entry.file, { force: true });
-  }
-}
 
 const goRoot = path.join(os.homedir(), "go-sdk", "go", "bin");
 const goEnv = {
@@ -200,6 +191,9 @@ if (!args["repo-dir"] && !fs.existsSync(repoDir)) {
     corpus,
     process.env,
   );
+}
+if (!cg && !fs.existsSync(path.join(repoDir, tsconfig))) {
+  throw new Error(`missing tsconfig: ${path.join(repoDir, tsconfig)}`);
 }
 
 // 3. Default runs stay single-process so setup/build cost remains part of the
@@ -249,40 +243,73 @@ const withHome = makeCodexHome("with", mcpArgs);
 const withoutHome = makeCodexHome("without", null);
 
 const arms = [
-  { name: "baseline", home: withoutHome, guide: false },
-  { name: "graph", home: withHome, guide: false },
+  { name: "baseline", home: withoutHome },
+  { name: "graph", home: withHome },
 ];
-if (guidance) arms.push({ name: "guided", home: withHome, guide: true });
 
 console.log(
   `\ncodegraph A/B on ${repoKey} via codex — model ${model} (effort ${effort}), ${runs} run(s) x ${arms.length} arms` +
-    (fixtureBranch ? `, fixture ${fixtureBranch}` : "") +
-    (guidance ? " (+guided = graph with a project instruction to use it)" : ""),
+    (fixtureBranch ? `, fixture ${fixtureBranch}` : ""),
 );
 console.log(`Q: ${question}\n`);
 
+const reportName = "agent-ab-codex-report.json";
+const reportPath = args.report
+  ? path.resolve(args.report)
+  : path.join(here, reportName);
+const traceDir = args["trace-dir"]
+  ? path.resolve(args["trace-dir"])
+  : path.join(
+      path.dirname(reportPath),
+      `${path.basename(reportPath, path.extname(reportPath))}.traces`,
+    );
+fs.mkdirSync(traceDir, { recursive: true });
+
+const MAX_RUN_RETRIES = 4;
 const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
-try {
-  for (const arm of arms) {
-    setGuidance(arm.guide);
-    const prompt = arm.guide ? GUIDED_PREFIX + question : question;
-    for (let r = 0; r < runs; r++) {
-      const m = runCodex(prompt, arm.home);
-      samples[arm.name].push(m);
-      console.log(
-        `  ${arm.name.padEnd(8)} run ${r + 1}: ${m.tokens} tok, ${m.tools} tools ` +
-          `(shell ${m.shell}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
-          (m.ok ? "" : "  [FAILED]"),
+// Launch arms x runs concurrently, capped at TTSC_BENCH_CONCURRENCY (default
+// unlimited). A high cap is fastest for experiment iteration; a low cap keeps the
+// host quiet enough that per-run timings and token counts settle. Each invocation
+// is its own codex process with its own CODEX_HOME and trace file.
+const concurrency = Number(process.env.TTSC_BENCH_CONCURRENCY) || Infinity;
+const thunks = arms.flatMap((arm) =>
+  Array.from({ length: runs }, (_, r) => async () => {
+    // A failed run (rate limit or an incomplete turn) carries no usable sample, so
+    // retry it in place rather than letting it thin the median. The trace file is
+    // keyed by run number, so a retry overwrites the attempt.
+    let m;
+    for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
+      m = await runCodex(
+        arm.name === "graph" ? `${CODEX_GRAPH_ARM_PROMPT}\n\n${question}` : question,
+        arm.home,
+        arm.name,
+        r + 1,
       );
-      if (r === 0 && arm.guide) {
-        console.log(`    item types: ${JSON.stringify(m.types)}`);
-      }
+      if (m.ok) break;
+      if (attempt < MAX_RUN_RETRIES)
+        console.log(
+          `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED] retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
+        );
     }
-  }
-} finally {
-  // Always strip the guidance files, even on a mid-run throw, so a later
-  // no-guidance run cannot inherit them and taint its baseline/graph arms.
-  setGuidance(false);
+    samples[arm.name].push(m);
+    console.log(
+      `  ${arm.name.padEnd(8)} run ${r + 1}: ${m.tokens} tok, ${m.tools} tools ` +
+        `(shell ${m.shell}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
+        (m.ok ? "" : "  [FAILED]"),
+    );
+  }),
+);
+await runWithConcurrency(thunks, concurrency);
+
+// runWithConcurrency runs thunks with at most `limit` in flight at once, draining a
+// shared cursor so a slow run never blocks a free worker.
+async function runWithConcurrency(work, limit) {
+  let next = 0;
+  const worker = async () => {
+    while (next < work.length) await work[next++]();
+  };
+  const lanes = Math.max(1, Math.min(limit, work.length));
+  await Promise.all(Array.from({ length: lanes }, worker));
 }
 
 const med = (arm, k) =>
@@ -290,9 +317,7 @@ const med = (arm, k) =>
 const pct = (g, b) => (b === 0 ? 0 : Math.round((1 - g / b) * 100));
 const line = (label, k, fmt = (x) => x) => {
   const b = med("baseline", k);
-  let s = `  ${label.padEnd(12)} baseline ${fmt(b)}  ->  graph ${fmt(med("graph", k))} (${pct(med("graph", k), b)}%)`;
-  if (guidance)
-    s += `  ->  guided ${fmt(med("guided", k))} (${pct(med("guided", k), b)}%)`;
+  const s = `  ${label.padEnd(12)} baseline ${fmt(b)}  ->  graph ${fmt(med("graph", k))} (${pct(med("graph", k), b)}%)`;
   console.log(s);
 };
 
@@ -303,10 +328,10 @@ line("tokens", "tokens");
 line("tool calls", "tools");
 line("wall time", "durMs", (x) => `${(x / 1000).toFixed(0)}s`);
 
-const reportName = `agent-ab-codex-report${guidance ? "-guided" : ""}.json`;
+fs.mkdirSync(path.dirname(reportPath), { recursive: true });
 fs.writeFileSync(
-  path.join(here, reportName),
-  `${JSON.stringify({ tool: cg ? "codegraph" : "ttsc-graph", ...(toolSetupMs !== undefined ? { toolSetupMs } : {}), repo: repoKey, fixtureBranch, repoDir, model, effort, daemon: useDaemon, runs, guidance, question, samples }, null, 2)}\n`,
+  reportPath,
+  `${JSON.stringify({ tool: cg ? "codegraph" : "ttsc-graph", ...(toolSetupMs !== undefined ? { toolSetupMs } : {}), repo: repoKey, fixtureBranch, repoDir, model, effort, promptFamily, daemon: useDaemon, runs, question, traceDir, samples }, null, 2)}\n`,
 );
 if (daemon) daemon.kill();
 cleanup([binary, withHome, withoutHome]);
@@ -346,9 +371,9 @@ function codegraphServerArgs(targetRepoDir) {
     : args;
 }
 
-function runCodex(question, codexHome) {
+async function runCodex(question, codexHome, armName, runNumber) {
   const start = Date.now();
-  const result = cp.spawnSync(
+  const result = await spawnAsync(
     "codex",
     [
       "exec",
@@ -361,16 +386,40 @@ function runCodex(question, codexHome) {
     ],
     {
       input: question,
-      encoding: "utf8",
       windowsHide: true,
       shell: true,
       env: { ...process.env, CODEX_HOME: codexHome },
-      maxBuffer: 256 * 1024 * 1024,
       timeout: 1_200_000,
     },
   );
   if (result.error) throw result.error;
-  return parseStream(result.stdout ?? "", Date.now() - start);
+  const stdout = result.stdout ?? "";
+  const stderr = result.stderr ?? "";
+  const base = `${armName}-run-${runNumber}`;
+  fs.writeFileSync(path.join(traceDir, `${base}.stream.jsonl`), stdout);
+  if (stderr) fs.writeFileSync(path.join(traceDir, `${base}.stderr.log`), stderr);
+  return parseStream(stdout, Date.now() - start);
+}
+
+// spawnAsync runs a child to completion and resolves its captured stdout/stderr,
+// so many runs can be in flight at once via Promise.all instead of blocking the
+// loop the way spawnSync would.
+function spawnAsync(command, commandArgs, { input, ...spawnOpts }) {
+  return new Promise((resolve) => {
+    const child = cp.spawn(command, commandArgs, spawnOpts);
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (d) => (stdout += d));
+    child.stderr?.on("data", (d) => (stderr += d));
+    child.on("error", (error) => resolve({ error, stdout, stderr }));
+    child.on("close", () => resolve({ stdout, stderr }));
+    if (input) {
+      child.stdin?.write(input);
+      child.stdin?.end();
+    }
+  });
 }
 
 // parseStream sums per-turn usage (input + output) across turn.completed events,
@@ -452,7 +501,7 @@ function warmDaemon(bin, addr) {
     jsonrpc: "2.0",
     id: 2,
     method: "tools/call",
-    params: { name: "graph_explore", arguments: { query: "main" } },
+    params: { name: "query_nodes", arguments: { query: "main" } },
   });
   const result = cp.spawnSync(bin, ["--connect", addr], {
     input: `${init}\n${call}\n`,

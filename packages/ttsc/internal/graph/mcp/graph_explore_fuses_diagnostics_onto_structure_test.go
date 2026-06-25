@@ -1,12 +1,12 @@
 package mcp_test
 
 import (
-  "path/filepath"
-  "strings"
-  "testing"
+	"path/filepath"
+	"strings"
+	"testing"
 
-  "github.com/samchon/ttsc/packages/ttsc/driver"
-  "github.com/samchon/ttsc/packages/ttsc/internal/graph/mcp"
+	"github.com/samchon/ttsc/packages/ttsc/driver"
+	"github.com/samchon/ttsc/packages/ttsc/internal/graph/mcp"
 )
 
 // TestGraphExploreFusesDiagnosticsOntoStructure verifies the graph fuses the
@@ -21,8 +21,8 @@ import (
 //
 // Fixture: leaf() <- mid() <- top(), where mid also has a TS2322.
 func TestGraphExploreFusesDiagnosticsOntoStructure(t *testing.T) {
-  root := t.TempDir()
-  writeFile(t, filepath.Join(root, "tsconfig.json"), `{
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "tsconfig.json"), `{
   "compilerOptions": {
     "target": "ES2022",
     "module": "commonjs",
@@ -33,40 +33,40 @@ func TestGraphExploreFusesDiagnosticsOntoStructure(t *testing.T) {
   "files": ["src/top.ts"]
 }
 `)
-  writeFile(t, filepath.Join(root, "src", "leaf.ts"), `export function leaf(): number {
+	writeFile(t, filepath.Join(root, "src", "leaf.ts"), `export function leaf(): number {
   return 1;
 }
 `)
-  writeFile(t, filepath.Join(root, "src", "mid.ts"), `import { leaf } from "./leaf";
+	writeFile(t, filepath.Join(root, "src", "mid.ts"), `import { leaf } from "./leaf";
 export function mid(): number {
   const broken: number = "not a number";
   return leaf() + broken;
 }
 `)
-  writeFile(t, filepath.Join(root, "src", "top.ts"), `import { mid } from "./mid";
+	writeFile(t, filepath.Join(root, "src", "top.ts"), `import { mid } from "./mid";
 export function top(): number {
   return mid();
 }
 `)
 
-  prog, _, err := driver.LoadProgram(root, "tsconfig.json", driver.LoadProgramOptions{})
-  if err != nil {
-    t.Fatal(err)
-  }
-  defer func() { _ = prog.Close() }()
+	prog, _, err := driver.LoadProgram(root, "tsconfig.json", driver.LoadProgramOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = prog.Close() }()
 
-  server := mcp.NewServer(prog)
+	server := mcp.NewServer(prog)
 
-  // Forward: mid is broken, so its own diagnostic surfaces on its node.
-  midText := toolText(t, server, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"graph_explore","arguments":{"query":"mid"}}}`)
-  if !strings.Contains(midText, "diagnostics here") || !strings.Contains(midText, "TS2322") {
-    t.Fatalf("graph_explore did not surface mid's own diagnostic:\n%s", midText)
-  }
+	// Forward: mid is broken, so its own diagnostic count surfaces on its node.
+	midText := toolText(t, server, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"query_nodes","arguments":{"query":"mid"}}}`)
+	if !strings.Contains(midText, `"errors": 1`) || !strings.Contains(midText, `"total": 1`) {
+		t.Fatalf("query_nodes did not count mid's own diagnostic:\n%s", midText)
+	}
 
-  // Reverse: leaf is fine, but its blast radius reaches the broken mid — the
-  // fix-safety signal read before editing leaf.
-  leafText := toolText(t, server, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"graph_explore","arguments":{"query":"leaf"}}}`)
-  if !strings.Contains(leafText, "with current errors") {
-    t.Fatalf("graph_explore did not report broken dependents in leaf's blast radius:\n%s", leafText)
-  }
+	// Reverse: leaf is fine, but its blast radius reaches the broken mid — the
+	// fix-safety signal read before editing leaf.
+	leafText := toolText(t, server, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"query_nodes","arguments":{"query":"leaf"}}}`)
+	if !strings.Contains(leafText, `"dependentsWithErrors": 1`) {
+		t.Fatalf("query_nodes did not report broken dependents in leaf's blast radius:\n%s", leafText)
+	}
 }

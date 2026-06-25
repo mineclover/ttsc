@@ -56,6 +56,8 @@ func run(args []string) int {
     case "-v", "--version", "version":
       printVersion(stdout)
       return 0
+    case "dump":
+      return runDump(args[1:])
     }
   }
   return runServe(args)
@@ -143,6 +145,7 @@ ttscgraph — checker-resolved code graph + diagnostics over MCP for ttsc.
 
 Usage:
   ttscgraph --stdio
+  ttscgraph dump [--tsconfig <path>] > graph.json
   ttscgraph --version
   ttscgraph --help
 
@@ -150,6 +153,13 @@ Options:
   --stdio              Serve MCP over stdin/stdout (the default transport).
   --cwd <dir>          Project root (defaults to the process working directory).
   --tsconfig <path>    Project tsconfig path (default: tsconfig.json).
+
+Dump (one-shot, no server):
+  dump                 Build the whole graph and print it as JSON to stdout, then
+                       exit. Every node and edge, none of the MCP response caps.
+                       Pipe it into a file to feed the 3D viewer or other tooling:
+                       ttscgraph dump --tsconfig tsconfig.json > graph.json
+  --pretty             dump: indent the JSON output.
 
 Large-repository daemon (advanced):
   --daemon               Build the Program once and serve many connections over a

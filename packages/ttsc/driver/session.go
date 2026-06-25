@@ -59,6 +59,13 @@ func (s *Session) Apply(absPath, content string) bool {
   return reused
 }
 
+// Program returns the resident program, reflecting every Apply so far. The
+// handle changes when an edit reshapes the import graph, so callers should read
+// it after Apply rather than caching it across edits.
+func (s *Session) Program() *Program {
+  return s.prog
+}
+
 // SourceText returns the source text the resident program currently holds for
 // absPath, or ("", false) when the program has no such file.
 func (s *Session) SourceText(absPath string) (string, bool) {

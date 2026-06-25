@@ -1,0 +1,1 @@
+`flow` starts from the exact nodes and expands downstream value-call/value-access path nodes; prefer it for call-path, relation-flow, lifecycle, dispatch, or "how does X reach Y" questions. `source` returns exact declaration bodies without replaying relationship edges; use it for a specific body, not as the default follow-up to a flow answer.

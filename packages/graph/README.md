@@ -4,53 +4,33 @@
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/samchon/ttsc/blob/master/LICENSE) [![NPM Version](https://img.shields.io/npm/v/@ttsc/graph.svg)](https://www.npmjs.com/package/@ttsc/graph) [![NPM Downloads](https://img.shields.io/npm/dm/@ttsc/graph.svg)](https://www.npmjs.com/package/@ttsc/graph) [![Build Status](https://github.com/samchon/ttsc/workflows/test/badge.svg)](https://github.com/samchon/ttsc/actions?query=workflow%3Atest) [![Guide Documents](https://img.shields.io/badge/Guide-Documents-forestgreen)](https://ttsc.dev/docs/graph) [![Discord Badge](https://img.shields.io/badge/discord-samchon-d91965?style=flat&labelColor=5866f2&logo=discord&logoColor=white&link=https://discord.gg/E94XhzrUCZ)](https://discord.gg/E94XhzrUCZ)
 
-Gives your AI coding assistant a **map of your codebase**. It can answer "how does this work?" without opening file after file.
+Gives your AI coding agent a **map of your TypeScript codebase**, over MCP, so it answers "how does this work?" without opening file after file.
 
-When you ask an AI agent (Claude Code, Codex, and the like) about your project, it pokes around. It opens a file, follows an import, opens another, and on and on.
+Ask an agent like Claude Code or Codex about your project and it works file by file: open one, follow an import, open the next, until it has pieced the picture together by hand. Slow, token-hungry, and every relationship is a guess from reading text.
 
-`@ttsc/graph` hands it the map up front: what calls what, what depends on what, and where each thing lives.
+`@ttsc/graph` hands it the map up front: what calls what, what depends on what, where each piece lives. Drawn by the real TypeScript compiler, so it is exact, not skimmed.
 
-The map comes from the real TypeScript compiler. So it is exact — not a guess from skimming text.
+On a public benchmark, an agent answered while reading **zero files**, cutting tokens by **77% to 86%** and tool calls by **94% to 95%** (see the [benchmark](https://ttsc.dev/docs/benchmark/graph)).
 
-## What your agent gets
+You can also browse the whole map. This is TypeORM in 3D, colored by kind ([live viewer](https://ttsc.dev/docs/graph/viewer)):
 
-Say you ask: _"how does the editor draw a shape?"_
+[![The TypeORM code graph rendered in 3D](https://ttsc.dev/graph/typeorm.png)](https://ttsc.dev/docs/graph/viewer)
 
-Your agent looks it up once instead of reading a dozen files, and gets back something like this:
+## Setup
 
-```
-ShapeRenderer — src/render/shape.ts (line 18)
-  → calls    rasterize(), new Canvas()
-  ← used by  Editor
-  change it and 9 other things are affected
-  18  export class ShapeRenderer {
-  19    constructor(private canvas: Canvas) {}
-  ...
-```
-
-One step shows what this thing calls, what uses it, and its source.
-
-The answer comes from the compiler, so it is precise. When one file just re-exports something from another, the map still points at the file that really defines it.
-
-Anything from `node_modules` is left out, because that is not your code.
-
-On a public benchmark, a Claude agent answered reading zero files, cutting its token use by **77% to 86%** and its tool calls by **94% to 95%**.
-
-See the [benchmark](https://ttsc.dev/docs/benchmark/graph) for the full numbers.
-
-## Install
+### Install
 
 ```bash
 npm install -D ttsc @ttsc/graph typescript@rc
 ```
 
-Install `ttsc` alongside it. `@ttsc/graph` runs through `ttsc`, so the two go together — the same pair as `@ttsc/lint`.
+`@ttsc/graph` reads the map from the program `ttsc` already type-checked, so install the two together.
 
-There is nothing else to set up: no separate compiler, no Go.
+### Connect your agent
 
-## Connect it to your agent
+Add the server to your agent's MCP config, once.
 
-Add this to your AI tool's config once. For Claude Code, that is a `.mcp.json` file in your project:
+For Claude Code, that is a `.mcp.json` in your project root:
 
 ```json
 {
@@ -63,35 +43,26 @@ Add this to your AI tool's config once. For Claude Code, that is a `.mcp.json` f
 }
 ```
 
-Start your agent from your project folder so it finds your `tsconfig.json`.
+Start your agent from your project root so the server finds your `tsconfig.json`. The agent queries the map on its own; you never call it by hand.
 
-Your agent now has two new abilities:
+### Browse it in 3D
 
-| Ability | What it does |
-| --- | --- |
-| `graph_explore` | Look up a name or a file. Get back what it connects to — what it calls, what uses it, its types — and its source code. |
-| `graph_diagnostics` | Get the errors in one file: TypeScript type errors, plus your project's `@ttsc/lint` and plugin findings, as `ttsc` reports them. |
+Run this in your own project to open that 3D map in your browser, served from a local port:
 
-You never call these yourself. Your agent uses them when it needs to.
+```bash
+npx @ttsc/graph view
+```
 
-Claude Code does this on its own. Codex is more cautious with third-party MCP tools and often explores with the shell instead, so tell it directly — add a line to your `AGENTS.md` asking it to call `graph_explore` first. See the [setup guide](https://ttsc.dev/docs/setup#codex-and-other-tool-conservative-agents).
+## Sponsors
 
-## How it works
+[![Sponsors](https://raw.githubusercontent.com/samchon/sponsor-images/refs/heads/master/public/circle.svg)](https://github.com/sponsors/samchon)
 
-`ttsc` already type-checks your project with the real TypeScript compiler and keeps the result in memory.
+Thanks for your support.
 
-`@ttsc/graph` reads the map straight out of that. Every connection it shows is the compiler's own answer, not a guess.
-
-That is why it is exact, and why it is fast: nothing is recompiled to answer a question.
+Your [donation](https://github.com/sponsors/samchon) encourages `ttsc` development.
 
 ## References
 
-`@ttsc/graph` is inspired by [codegraph](https://github.com/colbymchenry/codegraph), which gives agents a code graph over MCP. The [benchmark](https://ttsc.dev/docs/benchmark/graph) here is a faithful port of codegraph's.
+`@ttsc/graph` is inspired by [codegraph](https://github.com/colbymchenry/codegraph), which first put a code graph in front of an agent over MCP. The [benchmark](https://ttsc.dev/docs/benchmark/graph) here is a faithful port of codegraph's.
 
-The difference is how the map is built.
-
-codegraph reads your code with tree-sitter, across many languages, and saves the result in a database it keeps in sync as files change. Its edges are a best guess from the syntax.
-
-`@ttsc/graph` is TypeScript-only and keeps no database. It reads the graph live from the program `ttsc` already type-checked in memory.
-
-So every edge is the compiler's own answer: a re-export is followed to the file that really defines the symbol, an external library is left out, and nothing is guessed.
+The difference is where the map comes from. codegraph parses the shape of your code and infers how the pieces connect, while `@ttsc/graph` asks the real TypeScript compiler, which has already resolved every import and reference, so the map is exact rather than inferred.

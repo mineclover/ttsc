@@ -1,14 +1,14 @@
 package mcp_test
 
 import (
-  "fmt"
-  "os"
-  "path/filepath"
-  "strings"
-  "testing"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
 
-  "github.com/samchon/ttsc/packages/ttsc/driver"
-  "github.com/samchon/ttsc/packages/ttsc/internal/graph/mcp"
+	"github.com/samchon/ttsc/packages/ttsc/driver"
+	"github.com/samchon/ttsc/packages/ttsc/internal/graph/mcp"
 )
 
 // TestLineBasedDiagnosticsFuseOntoNestedMembers pins the two fixes the plugin
@@ -24,8 +24,8 @@ import (
 //
 // It also confirms a plugin code (>= 9000) renders without the "TS" prefix.
 func TestLineBasedDiagnosticsFuseOntoNestedMembers(t *testing.T) {
-  root := t.TempDir()
-  writeFile(t, filepath.Join(root, "tsconfig.json"), `{
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "tsconfig.json"), `{
   "compilerOptions": {
     "target": "ES2022",
     "module": "commonjs",
@@ -36,7 +36,7 @@ func TestLineBasedDiagnosticsFuseOntoNestedMembers(t *testing.T) {
   "files": ["src/main.ts"]
 }
 `)
-  writeFile(t, filepath.Join(root, "src", "main.ts"), `export class Service {
+	writeFile(t, filepath.Join(root, "src", "main.ts"), `export class Service {
   handle(): number {
     return 1;
   }
@@ -47,50 +47,54 @@ export function caller(): number {
 }
 `)
 
-  prog, _, err := driver.LoadProgram(root, "tsconfig.json", driver.LoadProgramOptions{})
-  if err != nil {
-    t.Fatal(err)
-  }
-  defer func() { _ = prog.Close() }()
+	prog, _, err := driver.LoadProgram(root, "tsconfig.json", driver.LoadProgramOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = prog.Close() }()
 
-  // The line of `return 1`, inside Service.handle — a lint finding's location.
-  var file string
-  line := 0
-  for _, f := range prog.SourceFiles() {
-    if strings.HasSuffix(f.FileName(), "main.ts") {
-      file = f.FileName()
-      text := f.Text()
-      idx := strings.Index(text, "return 1")
-      if idx >= 0 {
-        line = 1 + strings.Count(text[:idx], "\n")
-      }
-      break
-    }
-  }
-  if file == "" || line == 0 {
-    t.Fatal("could not locate the method body line in the fixture")
-  }
+	// The line of `return 1`, inside Service.handle — a lint finding's location.
+	var file string
+	line := 0
+	for _, f := range prog.SourceFiles() {
+		if strings.HasSuffix(f.FileName(), "main.ts") {
+			file = f.FileName()
+			text := f.Text()
+			idx := strings.Index(text, "return 1")
+			if idx >= 0 {
+				line = 1 + strings.Count(text[:idx], "\n")
+			}
+			break
+		}
+	}
+	if file == "" || line == 0 {
+		t.Fatal("could not locate the method body line in the fixture")
+	}
 
-  // A line-only finding (start: null) with a plugin code (>= 9000), exactly the
-  // shape the launcher writes for an @ttsc/lint violation.
-  diagPath := filepath.Join(root, "diagnostics.json")
-  diagJSON := fmt.Sprintf(
-    `[{"file":%q,"start":null,"line":%d,"column":5,"code":9123,"message":"no-explicit-any: avoid any here"}]`,
-    file, line,
-  )
-  if err := os.WriteFile(diagPath, []byte(diagJSON), 0o644); err != nil {
-    t.Fatal(err)
-  }
+	// A line-only finding (start: null) with a plugin code (>= 9000), exactly the
+	// shape the launcher writes for an @ttsc/lint violation.
+	diagPath := filepath.Join(root, "diagnostics.json")
+	diagJSON := fmt.Sprintf(
+		`[{"file":%q,"start":null,"line":%d,"column":5,"code":9123,"message":"no-explicit-any: avoid any here"}]`,
+		file, line,
+	)
+	if err := os.WriteFile(diagPath, []byte(diagJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
-  server := mcp.NewServer(prog, mcp.InjectedDiagnosticsProvider(diagPath))
+	server := mcp.NewServer(prog, mcp.InjectedDiagnosticsProvider(diagPath))
 
-  // Exploring the CLASS surfaces the finding that lands on its method (roll-up),
-  // even though the finding has no byte offset (line-based attribution).
-  text := toolText(t, server, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"graph_explore","arguments":{"query":"Service"}}}`)
-  if !strings.Contains(text, "no-explicit-any") {
-    t.Fatalf("graph_explore on the class did not surface the line-attributed finding on its method:\n%s", text)
-  }
-  if strings.Contains(text, "TS9123") {
-    t.Fatalf("plugin-coded finding rendered with a TS prefix:\n%s", text)
-  }
+	// Exploring the CLASS surfaces the finding that lands on its method (roll-up),
+	// even though the finding has no byte offset (line-based attribution).
+	text := toolText(t, server, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"query_nodes","arguments":{"query":"Service"}}}`)
+	if !strings.Contains(text, `"errors": 1`) {
+		t.Fatalf("query_nodes on the class did not surface the line-attributed finding on its method:\n%s", text)
+	}
+	diagnostics := toolText(t, server, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"query_diagnostics","arguments":{}}}`)
+	if !strings.Contains(diagnostics, "no-explicit-any") {
+		t.Fatalf("query_diagnostics did not include the line-attributed finding:\n%s", diagnostics)
+	}
+	if strings.Contains(diagnostics, "TS9123") {
+		t.Fatalf("plugin-coded finding rendered with a TS prefix:\n%s", text)
+	}
 }

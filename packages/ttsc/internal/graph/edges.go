@@ -25,12 +25,16 @@ func (g *Graph) addEdges(prog *driver.Program) {
 // caller that invokes the same function several times yields one edge, not one
 // per call site. The dedup is an O(1) set lookup, so building N edges is O(N).
 func (g *Graph) addEdge(from, to string, kind EdgeKind) {
+  g.addEdgeAt(from, to, kind, -1, -1)
+}
+
+func (g *Graph) addEdgeAt(from, to string, kind EdgeKind, pos, end int) {
   key := from + "\x00" + to + "\x00" + string(kind)
   if _, exists := g.seen[key]; exists {
     return
   }
   g.seen[key] = struct{}{}
-  g.Edges = append(g.Edges, &Edge{From: from, To: to, Kind: kind})
+  g.Edges = append(g.Edges, &Edge{From: from, To: to, Kind: kind, Pos: pos, End: end})
 }
 
 // collectHeritage adds a heritage edge for every base of every class and
@@ -90,7 +94,7 @@ func (g *Graph) heritageEdges(checker *shimchecker.Checker, path string, node *s
       if to == "" {
         continue
       }
-      g.addEdge(from, to, EdgeHeritage)
+      g.addEdgeAt(from, to, EdgeHeritage, base.Expression.Pos(), base.Expression.End())
     }
   }
 }
@@ -162,9 +166,11 @@ func topLevelID(path string, statement *shimast.Node, kind NodeKind) string {
   return nodeID(path, qualifiedName(symbol), kind)
 }
 
-// forEachMember attributes a class/interface's method members to their method
-// node and its remaining members to the type node, then attributes the
-// declaration's own class-level references to the type node.
+// forEachMember attributes a class/interface's callable members to their method
+// node. Property members are additive: their initializer/type subtree is walked
+// once for the property node, and once for the owner type node, so precise member
+// queries can land on `Class.prop` without making coarse class/interface queries
+// lose dependency edges they historically owned.
 func forEachMember(path string, statement *shimast.Node, kind NodeKind, fn func(string, *shimast.Node)) {
   containerID := topLevelID(path, statement, kind)
   for _, member := range classMembers(statement) {
@@ -172,6 +178,11 @@ func forEachMember(path string, statement *shimast.Node, kind NodeKind, fn func(
       if name := methodName(member.Symbol()); name != "" {
         fn(nodeID(path, name, NodeMethod), member)
         continue
+      }
+    }
+    if isPropertyMember(member.Kind) {
+      if name := methodName(member.Symbol()); name != "" {
+        fn(nodeID(path, name, NodeVariable), member)
       }
     }
     if containerID != "" {
@@ -236,9 +247,9 @@ func forEachVariable(path string, statement *shimast.Node, fn func(string, *shim
   }
 }
 
-// callsWithin walks node's subtree and records a value-call edge from `from` to
-// the resolved target of every runtime use it finds: a call, a `new` expression,
-// a tagged template, or a JSX element's component.
+// callsWithin walks node's subtree and records runtime value-use edges from
+// `from` to the resolved target: calls/new/tagged templates/JSX components as
+// value-call edges, and property or element access as value-access edges.
 func (g *Graph) callsWithin(checker *shimchecker.Checker, from string, node *shimast.Node) {
   node.ForEachChild(func(child *shimast.Node) bool {
     switch child.Kind {
@@ -254,6 +265,20 @@ func (g *Graph) callsWithin(checker *shimchecker.Checker, from string, node *shi
       // A tagged template (styled`…`, gql`…`) is a call to its tag function.
       if tagged := child.AsTaggedTemplateExpression(); tagged != nil && tagged.Tag != nil {
         g.callEdge(checker, from, tagged.Tag)
+      }
+    case shimast.KindPropertyAccessExpression:
+      // Accessor/property reads are runtime uses too. Without this edge the
+      // graph shows the constructor or method call but not the state or lazy
+      // property resolution that agents then reopen files to inspect.
+      if !isInvokedAccess(child) {
+        g.accessEdge(checker, from, child)
+      }
+    case shimast.KindElementAccessExpression:
+      // String-literal bracket access (`this["metadata"]`) can resolve to the
+      // same property/accessor symbol as dotted access. Dynamic indexes resolve
+      // to nothing or to external library members and are filtered below.
+      if !isInvokedAccess(child) {
+        g.accessEdge(checker, from, child)
       }
     case shimast.KindJsxSelfClosingElement:
       // `<Component />` is a use of the component; an intrinsic tag (`<div />`)
@@ -271,10 +296,43 @@ func (g *Graph) callsWithin(checker *shimchecker.Checker, from string, node *shi
   })
 }
 
+func isInvokedAccess(access *shimast.Node) bool {
+  parent := access.Parent
+  if parent == nil {
+    return false
+  }
+  switch parent.Kind {
+  case shimast.KindCallExpression:
+    call := parent.AsCallExpression()
+    return call != nil && call.Expression == access
+  case shimast.KindNewExpression:
+    newExpr := parent.AsNewExpression()
+    return newExpr != nil && newExpr.Expression == access
+  case shimast.KindTaggedTemplateExpression:
+    tagged := parent.AsTaggedTemplateExpression()
+    return tagged != nil && tagged.Tag == access
+  default:
+    return false
+  }
+}
+
 // callEdge resolves a callee expression to its declaration and records a
 // value-call edge, skipping an unresolved callee and a self-call.
 func (g *Graph) callEdge(checker *shimchecker.Checker, from string, callee *shimast.Node) {
-  target := Resolve(checker, callee)
+  g.valueUseEdge(checker, from, callee, EdgeValueCall)
+}
+
+// accessEdge resolves a property or element access to its declaration and
+// records a value-access edge, skipping unresolved/external/self targets.
+func (g *Graph) accessEdge(checker *shimchecker.Checker, from string, access *shimast.Node) {
+  g.valueUseEdge(checker, from, access, EdgeValueAccess)
+}
+
+func (g *Graph) valueUseEdge(checker *shimchecker.Checker, from string, targetExpr *shimast.Node, kind EdgeKind) {
+  if targetExpr == nil {
+    return
+  }
+  target := Resolve(checker, targetExpr)
   if target == nil || target.Symbol == nil {
     return
   }
@@ -282,7 +340,7 @@ func (g *Graph) callEdge(checker *shimchecker.Checker, from string, callee *shim
   if to == "" || to == from {
     return
   }
-  g.addEdge(from, to, EdgeValueCall)
+  g.addEdgeAt(from, to, kind, targetExpr.Pos(), targetExpr.End())
 }
 
 // collectTypeRefs records a type-ref edge from each top-level function, class,
@@ -331,6 +389,9 @@ func (g *Graph) typeRefsWithin(checker *shimchecker.Checker, from string, node *
 // typeRefEdge resolves a type name to its declaration and records a type-ref
 // edge, skipping an unresolved name and a self-reference.
 func (g *Graph) typeRefEdge(checker *shimchecker.Checker, from string, typeName *shimast.Node) {
+  if typeName == nil {
+    return
+  }
   target := Resolve(checker, typeName)
   if target == nil || target.Symbol == nil {
     return
@@ -339,7 +400,7 @@ func (g *Graph) typeRefEdge(checker *shimchecker.Checker, from string, typeName 
   if to == "" || to == from {
     return
   }
-  g.addEdge(from, to, EdgeTypeRef)
+  g.addEdgeAt(from, to, EdgeTypeRef, typeName.Pos(), typeName.End())
 }
 
 // ensureTargetNode returns the node id for a resolved edge target, creating the
@@ -372,6 +433,9 @@ func (g *Graph) ensureTargetNode(target *Target) string {
     }
     return ""
   }
+  if kind == NodeVariable && target.External && target.Symbol.Flags&shimast.SymbolFlagsProperty != 0 {
+    return ""
+  }
   name := qualifiedName(target.Symbol)
   id := nodeID(target.File, name, kind)
   if _, exists := g.Nodes[id]; exists {
@@ -398,9 +462,32 @@ func (g *Graph) ensureTargetNode(target *Target) string {
   return id
 }
 
-// symbolNodeKind maps a resolved symbol's flags to a NodeKind, or "" when the
-// symbol is not a kind the graph records as a node.
+// symbolNodeKind maps a resolved symbol's declarations/flags to a NodeKind, or
+// "" when the symbol is not a kind the graph records as a node. Declaration kind
+// wins over flags because property-like accessor symbols can otherwise be
+// resolved as NodeVariable even though Build recorded the getter/setter as a
+// NodeMethod.
 func symbolNodeKind(symbol *shimast.Symbol) NodeKind {
+  for _, declaration := range symbol.Declarations {
+    switch declaration.Kind {
+    case shimast.KindClassDeclaration:
+      return NodeClass
+    case shimast.KindInterfaceDeclaration:
+      return NodeInterface
+    case shimast.KindTypeAliasDeclaration:
+      return NodeTypeAlias
+    case shimast.KindEnumDeclaration:
+      return NodeEnum
+    case shimast.KindFunctionDeclaration:
+      return NodeFunction
+    case shimast.KindMethodDeclaration, shimast.KindMethodSignature,
+      shimast.KindConstructor, shimast.KindGetAccessor, shimast.KindSetAccessor:
+      return NodeMethod
+    case shimast.KindPropertyDeclaration, shimast.KindPropertySignature,
+      shimast.KindVariableDeclaration:
+      return NodeVariable
+    }
+  }
   switch {
   case symbol.Flags&shimast.SymbolFlagsClass != 0:
     return NodeClass
@@ -414,6 +501,8 @@ func symbolNodeKind(symbol *shimast.Symbol) NodeKind {
     return NodeFunction
   case symbol.Flags&(shimast.SymbolFlagsMethod|shimast.SymbolFlagsConstructor|shimast.SymbolFlagsGetAccessor|shimast.SymbolFlagsSetAccessor) != 0:
     return NodeMethod
+  case symbol.Flags&shimast.SymbolFlagsProperty != 0:
+    return NodeVariable
   case symbol.Flags&shimast.SymbolFlagsVariable != 0:
     return NodeVariable
   default:

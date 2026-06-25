@@ -14,7 +14,11 @@ import (
 // is workspace source: External is false. External boundary leaves enter the
 // graph only as the resolved target of an edge (see Resolve).
 func Build(prog *driver.Program) *Graph {
-  g := &Graph{Nodes: map[string]*Node{}, seen: map[string]struct{}{}}
+  g := &Graph{
+    Nodes:     map[string]*Node{},
+    bodyNodes: map[string]bool{},
+    seen:      map[string]struct{}{},
+  }
   for _, file := range prog.SourceFiles() {
     collectDeclarations(g, file)
   }
@@ -46,10 +50,10 @@ func collectStatements(g *Graph, path string, statements []*shimast.Node) {
       addNode(g, path, statement, NodeFunction)
     case shimast.KindClassDeclaration:
       addNode(g, path, statement, NodeClass)
-      collectMethods(g, path, statement)
+      collectMembers(g, path, statement)
     case shimast.KindInterfaceDeclaration:
       addNode(g, path, statement, NodeInterface)
-      collectMethods(g, path, statement)
+      collectMembers(g, path, statement)
     case shimast.KindTypeAliasDeclaration:
       addNode(g, path, statement, NodeTypeAlias)
     case shimast.KindEnumDeclaration:
@@ -83,52 +87,61 @@ func collectVariables(g *Graph, path string, statement *shimast.Node) {
 
 // addNode records a node for the symbol declared by node under its
 // position-invariant id. A declaration the checker did not bind to a single
-// named symbol (a destructuring pattern) is skipped, and a redeclaration (a
-// merged interface, an overload set) keeps the first node.
+// named symbol (a destructuring pattern) is skipped. Redeclarations keep the
+// first node except callable overload sets, where the implementation body
+// replaces earlier signature-only declarations so graph answers show executable
+// code instead of just the overload header.
 func addNode(g *Graph, path string, node *shimast.Node, kind NodeKind) {
   symbol := node.Symbol()
   if symbol == nil || symbol.Name == "" {
     return
   }
-  name := qualifiedName(symbol)
+  putDeclaredNode(g, path, qualifiedName(symbol), kind, node)
+}
+
+// collectMembers records callable members (method, constructor, accessor) and
+// property members of a class or interface declaration, keyed by their
+// class-qualified names so resolved member references land on the same node.
+func collectMembers(g *Graph, path string, statement *shimast.Node) {
+  for _, member := range classMembers(statement) {
+    name := methodName(member.Symbol())
+    if name == "" {
+      continue
+    }
+    switch {
+    case isMethodMember(member.Kind):
+      putDeclaredNode(g, path, name, NodeMethod, member)
+    case isPropertyMember(member.Kind):
+      putDeclaredNode(g, path, name, NodeVariable, member)
+    }
+  }
+}
+
+func putDeclaredNode(g *Graph, path, name string, kind NodeKind, declaration *shimast.Node) {
   id := nodeID(path, name, kind)
+  hasBody := declarationHasImplementation(declaration, kind)
   if _, exists := g.Nodes[id]; exists {
-    return
+    if !hasBody || g.bodyNodes[id] {
+      return
+    }
   }
   g.Nodes[id] = &Node{
     ID:   id,
     Name: name,
     Kind: kind,
     File: path,
-    Pos:  node.Pos(),
-    End:  node.End(),
+    Pos:  declaration.Pos(),
+    End:  declaration.End(),
   }
+  g.bodyNodes[id] = hasBody
 }
 
-// collectMethods records a method node for each callable member (method,
-// constructor, accessor) of a class or interface declaration, keyed by its
-// class-qualified name so a resolved method call lands on the same node.
-func collectMethods(g *Graph, path string, statement *shimast.Node) {
-  for _, member := range classMembers(statement) {
-    if !isMethodMember(member.Kind) {
-      continue
-    }
-    name := methodName(member.Symbol())
-    if name == "" {
-      continue
-    }
-    id := nodeID(path, name, NodeMethod)
-    if _, exists := g.Nodes[id]; exists {
-      continue
-    }
-    g.Nodes[id] = &Node{
-      ID:   id,
-      Name: name,
-      Kind: NodeMethod,
-      File: path,
-      Pos:  member.Pos(),
-      End:  member.End(),
-    }
+func declarationHasImplementation(declaration *shimast.Node, kind NodeKind) bool {
+  switch kind {
+  case NodeFunction, NodeMethod:
+    return declaration.Body() != nil
+  default:
+    return false
   }
 }
 
@@ -154,6 +167,15 @@ func isMethodMember(kind shimast.Kind) bool {
   switch kind {
   case shimast.KindMethodDeclaration, shimast.KindMethodSignature,
     shimast.KindConstructor, shimast.KindGetAccessor, shimast.KindSetAccessor:
+    return true
+  default:
+    return false
+  }
+}
+
+func isPropertyMember(kind shimast.Kind) bool {
+  switch kind {
+  case shimast.KindPropertyDeclaration, shimast.KindPropertySignature:
     return true
   default:
     return false

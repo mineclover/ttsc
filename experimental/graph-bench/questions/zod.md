@@ -1,0 +1,1 @@
+In Zod, what ordered call path takes `z.object({...}).parse(data)` from the public `parse` method to object-shape validation and error throwing? Include the steps through `core._parse`, the schema's `_zod.run`, the object `_zod.parse` key loop, issue collection, and the `$ZodError` throw.

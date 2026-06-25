@@ -51,6 +51,10 @@ const (
   // a tagged-template tag. Uses of a dependency's method are not modeled (the
   // boundary stops at the external type).
   EdgeValueCall EdgeKind = "value-call"
+  // EdgeValueAccess is a runtime property/accessor read or write. It is kept
+  // separate from calls so architecture flows can follow lazy getter/property
+  // behavior without pretending those reads invoke a function.
+  EdgeValueAccess EdgeKind = "value-access"
   // EdgeTypeRef is a type-position reference from one declaration to a named
   // type it mentions (a parameter, return, property, or alias type). It is not a
   // runtime call, so an impact query can filter value edges from type edges.
@@ -58,11 +62,15 @@ const (
 )
 
 // Edge is a directed, checker-resolved relationship from one node to another,
-// both referenced by Node.ID.
+// both referenced by Node.ID. Pos and End bound the source expression in the
+// From node's file that produced the edge. They are evidence, not identity; a
+// duplicate relationship keeps the first source-order span.
 type Edge struct {
   From string
   To   string
   Kind EdgeKind
+  Pos  int
+  End  int
 }
 
 // Graph is the in-memory adjacency the MCP tools query. Edges are added by the
@@ -70,6 +78,10 @@ type Edge struct {
 type Graph struct {
   Nodes map[string]*Node
   Edges []*Edge
+  // bodyNodes tracks whether a callable node's display span is the overload
+  // implementation rather than an overload signature. It is build-only metadata
+  // and intentionally stays out of JSON dumps.
+  bodyNodes map[string]bool
   // seen deduplicates edges in O(1) during construction, so building a graph
   // with N edges is O(N), not O(N²). Keyed by from\x00to\x00kind.
   seen map[string]struct{}

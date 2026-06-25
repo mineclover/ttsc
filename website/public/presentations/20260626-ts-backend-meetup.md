@@ -320,7 +320,7 @@ Compiler plugins lived inside the old compiler shape.
 - Emit pipeline hooks
 
 <!--
-Say: transformer users were not only compiling. They were extending the compiler.
+Say: transformer users were extending the compiler, not just compiling source.
 -->
 
 ---
@@ -390,6 +390,8 @@ Common backend uses:
 - OpenAPI generation
 
 - SDK generation
+
+- SDK call signatures
 
 <!--
 Say: typia and nestia are concrete examples, not edge cases.
@@ -470,25 +472,68 @@ Say: this is not reflection. It is ahead-of-time compilation.
 
 # 1.3. Transformer
 
-### Nestia: route generator
+### Nestia: backend controller
 
 ```typescript
-import { TypedBody, TypedRoute } from "@nestia/core";
+import { TypedBody, TypedParam, TypedRoute } from "@nestia/core";
 import { Controller } from "@nestjs/common";
 
-@Controller()
-export class ShoppingSaleController {
+@Controller("bbs/:section/articles")
+export class BbsArticlesController {
   @TypedRoute.Post()
-  public async create(
-    @TypedBody() body: IShoppingSale.ICreate,
-  ): Promise<IShoppingSale> {
-    // business logic
+  async create(
+    @TypedParam("section") section: string,
+    @TypedBody() input: IBbsArticle.ICreate,
+  ): Promise<IBbsArticle> {
+    return this.service.create(section, input);
   }
 }
 ```
 
 <!--
-Say: controller code becomes route metadata, validation, and SDK material.
+Say: backend code is still normal NestJS. The important part is the TypeScript type on input and output.
+-->
+
+---
+
+# 1.3. Transformer
+
+### Nestia: frontend SDK
+
+```typescript
+import api from "@my/api";
+
+const connection: api.IConnection = {
+  host: "http://localhost:3000",
+};
+
+const article: IBbsArticle =
+  await api.functional.bbs.articles.create(connection, "general", {
+    title: "Hello World",
+    body: "My first article",
+  } satisfies IBbsArticle.ICreate);
+```
+
+<!--
+Say: the frontend receives a generated function with the same route path, parameter order, request type, and response type.
+-->
+
+---
+
+# 1.3. Transformer
+
+Backend type became frontend function.
+
+- Controller path -> SDK namespace
+
+- Route method -> SDK function
+
+- `@TypedBody()` -> request type
+
+- `Promise<IBbsArticle>` -> response type
+
+<!--
+Say: this is the nestia transformer story. Backend TypeScript becomes frontend API surface.
 -->
 
 ---

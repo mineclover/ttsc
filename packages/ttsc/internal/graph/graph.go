@@ -32,6 +32,11 @@ type Node struct {
   Kind     NodeKind
   File     string
   External bool
+  // Exported marks a node that is part of its module's export surface, resolved
+  // through the checker's export table so a re-export (`export { Foo } from`) or
+  // a barrel (`export *`) counts, not only an inline `export` modifier. It is
+  // the signal a public-API projection filters on.
+  Exported bool
   // Pos and End bound the declaration in its source file (byte offsets). They
   // are for display, never identity, so an edit that shifts them does not re-key
   // the node.

@@ -15,6 +15,7 @@ import (
 func (g *Graph) addEdges(prog *driver.Program) {
   checker := prog.Checker
   for _, file := range prog.SourceFiles() {
+    g.markExports(checker, file)
     g.collectHeritage(checker, file)
     g.collectCalls(checker, file)
     g.collectTypeRefs(checker, file)

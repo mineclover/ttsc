@@ -108,22 +108,46 @@ export interface Plan {
   defer func() { _ = prog.Close() }()
 
   server := mcp.NewServer(prog)
-  cases := []string{
-    "How does Gateway.fetch pass a requested plan into pipeline steps? Trace the call path from the public fetch method to where steps are built and execute.",
-    "Gateway fetch Coordinator fetch Pipeline setPlan applyPlan buildSteps Worker execute plan steps",
+  cases := []struct {
+    query    string
+    nodes    []string
+    evidence []string
+  }{
+    {
+      query: "How does Gateway.fetch pass a requested plan into pipeline steps? Trace the call path from the public fetch method to where steps are built and execute.",
+      nodes: []string{
+        "method Gateway.fetch",
+        "method Coordinator.fetch",
+        "method Pipeline.buildSteps",
+      },
+      evidence: []string{
+        "Coordinator.fetch -> Pipeline.setPlan",
+        "Coordinator.fetch -> Pipeline.applyPlan",
+        "Coordinator.fetch -> Worker.execute",
+      },
+    },
+    {
+      query: "Gateway fetch Coordinator fetch Pipeline setPlan applyPlan buildSteps Worker execute plan steps",
+      nodes: []string{
+        "method Gateway.fetch",
+        "method Coordinator.fetch",
+        "method Pipeline.setPlan",
+        "method Pipeline.applyPlan",
+        "method Pipeline.buildSteps",
+        "method Worker.execute",
+      },
+    },
   }
-  for _, query := range cases {
-    text := toolText(t, server, fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"query_nodes","arguments":{"query":%q}}}`, query))
-    for _, want := range []string{
-      "method Gateway.fetch",
-      "method Coordinator.fetch",
-      "method Pipeline.setPlan",
-      "method Pipeline.applyPlan",
-      "method Pipeline.buildSteps",
-      "method Worker.execute",
-    } {
+  for _, c := range cases {
+    text := toolText(t, server, fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"query_nodes","arguments":{"query":%q}}}`, c.query))
+    for _, want := range c.nodes {
       if !strings.Contains(text, want) {
-        t.Fatalf("query_nodes did not include %s for query %q in the expanded path:\n%s", want, query, text)
+        t.Fatalf("query_nodes did not include %s for query %q in the expanded path:\n%s", want, c.query, text)
+      }
+    }
+    for _, want := range c.evidence {
+      if !strings.Contains(text, want) {
+        t.Fatalf("query_nodes did not include evidence %s for query %q:\n%s", want, c.query, text)
       }
     }
   }

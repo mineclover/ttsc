@@ -569,6 +569,9 @@ func (s *Server) withCallPath(seeds []*graph.Node, max int, query string) []*gra
   const maxDepth = 5
   tokens := queryTokens(query)
   words := queryWords(query)
+  if anchored := s.withAnchoredCallPath(seeds, max, query, tokens, words); len(anchored) > 0 {
+    return anchored
+  }
   inSet := make(map[string]bool, len(seeds))
   depth := make(map[string]int, len(seeds))
   priority := make(map[string]int, len(seeds))
@@ -621,6 +624,148 @@ func (s *Server) withCallPath(seeds []*graph.Node, max int, query string) []*gra
       sortPathQueue(queue, priority)
     }
   }
+  return out
+}
+
+func (s *Server) withAnchoredCallPath(seeds []*graph.Node, max int, query string, tokens []string, words map[string]bool) []*graph.Node {
+  anchors := flowAnchors(query, seeds, words)
+  if len(anchors) < 2 {
+    return nil
+  }
+  out := make([]*graph.Node, 0, max)
+  seen := map[string]bool{}
+  add := func(id string) {
+    if len(out) >= max || seen[id] {
+      return
+    }
+    node := s.graph.Nodes[id]
+    if node == nil || !flowNodeEligible(node) || node.External || s.ignored[node.File] {
+      return
+    }
+    seen[id] = true
+    out = append(out, node)
+  }
+  add(anchors[0].ID)
+  for i := 1; i < len(anchors) && len(out) < max; i++ {
+    path := s.shortestFlowPath(anchors[i-1].ID, anchors[i].ID, tokens, words)
+    if len(path) == 0 {
+      add(anchors[i].ID)
+      continue
+    }
+    for _, id := range path[1:] {
+      add(id)
+    }
+  }
+  if len(out) < 2 {
+    return nil
+  }
+  return out
+}
+
+type flowAnchor struct {
+  *graph.Node
+  pos   int
+  order int
+}
+
+func flowAnchors(query string, seeds []*graph.Node, words map[string]bool) []flowAnchor {
+  whole := strings.ToLower(query)
+  anchors := make([]flowAnchor, 0, len(seeds))
+  seen := map[string]bool{}
+  for order, node := range seeds {
+    if node == nil || seen[node.ID] {
+      continue
+    }
+    name := strings.ToLower(node.Name)
+    pos := strings.Index(whole, name)
+    if pos < 0 {
+      member := strings.ToLower(memberName(node.Name))
+      if member == name || !words[member] {
+        continue
+      }
+      pos = strings.Index(whole, member)
+      if pos < 0 {
+        continue
+      }
+    }
+    seen[node.ID] = true
+    anchors = append(anchors, flowAnchor{Node: node, pos: pos, order: order})
+  }
+  sort.SliceStable(anchors, func(i, j int) bool {
+    if anchors[i].pos != anchors[j].pos {
+      return anchors[i].pos < anchors[j].pos
+    }
+    return anchors[i].order < anchors[j].order
+  })
+  return anchors
+}
+
+func (s *Server) shortestFlowPath(fromID, toID string, tokens []string, words map[string]bool) []string {
+  const maxDepth = 8
+  if fromID == toID {
+    return []string{fromID}
+  }
+  type step struct {
+    id   string
+    path []string
+  }
+  queue := []step{{id: fromID, path: []string{fromID}}}
+  seen := map[string]bool{fromID: true}
+  for len(queue) > 0 {
+    cur := queue[0]
+    queue = queue[1:]
+    if len(cur.path) > maxDepth {
+      continue
+    }
+    next := s.allFlowTargets(cur.id, toID, tokens, words)
+    for _, id := range next {
+      if seen[id] {
+        continue
+      }
+      node := s.graph.Nodes[id]
+      if node == nil || node.External || s.ignored[node.File] || !flowNodeEligible(node) {
+        continue
+      }
+      path := append(append([]string(nil), cur.path...), id)
+      if id == toID {
+        return path
+      }
+      seen[id] = true
+      queue = append(queue, step{id: id, path: path})
+    }
+  }
+  return nil
+}
+
+func (s *Server) allFlowTargets(cur string, target string, tokens []string, words map[string]bool) []string {
+  seen := map[string]bool{}
+  out := make([]string, 0, len(s.forwardCallAdj[cur])+len(s.implementorsAdj[cur]))
+  for _, id := range s.forwardCallAdj[cur] {
+    if !seen[id] {
+      seen[id] = true
+      out = append(out, id)
+    }
+  }
+  for _, id := range s.implementorsAdj[cur] {
+    if !seen[id] {
+      seen[id] = true
+      out = append(out, id)
+    }
+  }
+  sort.SliceStable(out, func(i, j int) bool {
+    if out[i] == target {
+      return true
+    }
+    if out[j] == target {
+      return false
+    }
+    left := s.pathTargetScoreFrom(cur, out[i], tokens, words)
+    right := s.pathTargetScoreFrom(cur, out[j], tokens, words)
+    if left != right {
+      return left > right
+    }
+    return out[i] < out[j]
+  })
   return out
 }
 

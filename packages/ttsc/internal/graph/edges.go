@@ -269,6 +269,15 @@ func (g *Graph) callsWithin(checker *shimchecker.Checker, from string, node *shi
   node.ForEachChild(func(child *shimast.Node) bool {
     switch child.Kind {
     case shimast.KindCallExpression:
+      // A decorator's own factory call (`@Column()`, `@Entity()`) is metadata,
+      // not a runtime call: the decoration is already a fact on the node's
+      // decorators. Emitting a calls edge to the decorator function instead
+      // makes ubiquitous decorators (every entity field is `@Column`) the
+      // busiest nodes in the graph and buries the real architecture, so skip
+      // the factory call itself while still walking its arguments below.
+      if child.Parent != nil && child.Parent.Kind == shimast.KindDecorator {
+        break
+      }
       if call := child.AsCallExpression(); call != nil && call.Expression != nil {
         g.callEdge(checker, from, call.Expression, "call")
       }

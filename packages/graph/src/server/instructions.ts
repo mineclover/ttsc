@@ -18,7 +18,9 @@ Pick the entry tool by what you know:
   do not list files or open the entry module to orient.
 - graph_query: find symbols or clusters from a natural query when you do not know
   the exact name. Mix code and plain words; it ranks by name, subword, path, and
-  centrality and returns handles.
+  centrality and returns handles. The graph holds every symbol declared in this
+  workspace — a class, a method, even a single field name — so query it to locate
+  one; do not grep node_modules or the file tree for the project's own code.
 - graph_trace: follow flow from a symbol — forward to what it uses, reverse to
   what uses it, or impact to the public API and tests a change would reach.
 - graph_expand: read the source of the handles a tool returned, and their direct
@@ -26,7 +28,9 @@ Pick the entry tool by what you know:
   pass every handle you need in one call instead of opening files.
 
 Every relationship is resolved by the compiler, so treat the graph as fact. The
-graph mirrors the current program; after an edit, query again. Fall back to grep
-or read only when the graph cannot answer: a non-TypeScript file, generated
-output, or a literal text search.
+graph mirrors the current program; after an edit, query again. It covers the
+whole workspace, so grep and read are for what the graph cannot hold — a
+non-TypeScript file, generated output, a dependency's internals under
+node_modules, or a literal text search — never for a symbol the graph can
+locate.
 `.trim();

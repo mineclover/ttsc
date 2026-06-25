@@ -1,18 +1,16 @@
 # ttsc-graph
 
-Use this graph as a TypeScript code index before grep/read. If the task gives an exact start/end or ordered call chain, call `query_path`. If orientation or entrypoint is unclear, call `query_exports`. If relationships are needed but endpoints are unknown, call `query_nodes`. Use `expand_nodes` only after a handle. Use grep/read only for non-TypeScript, literal search, or no graph match.
+A compiler-resolved index of this TypeScript program: every declaration with its file and line, and the call and type relationships between them. Query it before grep or read. It has already located the symbols and connected them, so answer from its results: when a result names a declaration you need to read, expand that handle for the body instead of opening the file. Re-reading or grepping a file the graph has already mapped repeats work it did for you.
 
-The graph mirrors the current program. Query again after edits instead of reusing an old result.
+Pick the entry tool by what you already know:
 
-## Tool Choice
+- `query_exports`: orient. The exported public surface, for onboarding or an unclear entry point.
+- `query_path`: an exact path, when you know the start and end symbols, or an ordered chain. It returns the ordered nodes, the runtime edges between them, and the off-path helpers each step calls, all with handles.
+- `query_nodes`: discover. The relationships around a symbol, owner, or action when you do not yet know the endpoints.
+- `expand_nodes`: the source of handles a graph tool returned. This is how you read code; pass every handle you need in one call.
+- `query_files`: a roster of declarations and adjacent files for known paths.
+- `query_diagnostics`: current compiler and lint diagnostics.
 
-- `query_path`: exact A-to-B runtime path through value calls and value access. Pass `from`, `to`, and `via` when the prompt gives intermediate symbols.
-- `query_exports`: public surface orientation. It returns exported declarations and public members with names, kinds, files, lines, handles, and aliases.
-- `query_nodes`: relationship discovery when exact endpoints are not known. Use one focused query with the relevant symbol, owner, action, or domain terms.
-- `expand_nodes`: exact source follow-up for handles returned by graph tools. Use it only when node coordinates are not enough and source context is required, and pass every handle you need in one call instead of one per call.
-- `query_files`: file roster. Use it for declarations and adjacent files around known paths.
-- `query_diagnostics`: current project diagnostics, optionally filtered by file and severity.
+The graph mirrors the current program; after an edit, query again rather than reuse an old result.
 
-## Fallbacks
-
-Use ordinary grep/read when the graph cannot answer: no matching node, non-TypeScript files, generated output, docs, JSON, or literal occurrence search.
+Fall back to grep or read only when the graph cannot answer: no matching node, non-TypeScript files, generated output, or a literal text search.

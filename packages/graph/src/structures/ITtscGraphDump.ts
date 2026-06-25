@@ -1,6 +1,6 @@
-import { IGraphDiagnostic } from "./IGraphDiagnostic";
-import { IGraphEdge } from "./IGraphEdge";
-import { IGraphNode } from "./IGraphNode";
+import { ITtscGraphDiagnostic } from "./ITtscGraphDiagnostic";
+import { ITtscGraphEdge } from "./ITtscGraphEdge";
+import { ITtscGraphNode } from "./ITtscGraphNode";
 
 /**
  * The whole-graph export `ttscgraph dump` writes and the MCP server loads — the
@@ -15,7 +15,7 @@ import { IGraphNode } from "./IGraphNode";
  * edges, and diagnostics are project-relative. `schemaVersion` is bumped on any
  * breaking shape change so a consumer can refuse a dump it cannot read.
  */
-export interface IGraphDump {
+export interface ITtscGraphDump {
   /** The dump shape version; bumped on any breaking change. */
   schemaVersion: number;
 
@@ -26,20 +26,20 @@ export interface IGraphDump {
   tsconfig: string;
 
   /** Every node the build recorded. */
-  nodes: IGraphNode[];
+  nodes: ITtscGraphNode[];
 
   /** Every edge the build resolved. */
-  edges: IGraphEdge[];
+  edges: ITtscGraphEdge[];
 
   /**
    * Fused compiler and plugin diagnostics, when diagnostics were collected.
    * Absent when the dump was built without a diagnostics pass.
    */
-  diagnostics?: IGraphDiagnostic[];
+  diagnostics?: ITtscGraphDiagnostic[];
 }
 
 /**
- * The current {@link IGraphDump.schemaVersion}. Bump this in lockstep with the
- * Go `dump.go` writer whenever the dump shape changes in a breaking way.
+ * The current {@link ITtscGraphDump.schemaVersion}. Bump this in lockstep with
+ * the Go `dump.go` writer whenever the dump shape changes in a breaking way.
  */
-export const GRAPH_SCHEMA_VERSION = 2;
+export const TTSC_GRAPH_SCHEMA_VERSION = 2;

@@ -1,5 +1,5 @@
 /**
- * The relationship a directed edge encodes between two {@link IGraphNode}s.
+ * The relationship a directed edge encodes between two {@link ITtscGraphNode}s.
  *
  * Structural edges (`contains`, `exports`, `imports`) come from the declaration
  * pass. Value and type edges (`calls`, `accesses`, `instantiates`, `type_ref`,
@@ -8,11 +8,11 @@
  * `handles_route`, and `tests` are higher-level relationships a framework or
  * convention pass adds.
  *
- * Every edge is tagged with a {@link Provenance} and {@link Confidence}, so a
- * consumer can separate checker-resolved fact from framework or heuristic
- * inference regardless of kind.
+ * Every edge is tagged with a {@link TtscGraphProvenance} and
+ * {@link TtscGraphConfidence}, so a consumer can separate checker-resolved fact
+ * from framework or heuristic inference regardless of kind.
  */
-export type EdgeKind =
+export type TtscGraphEdgeKind =
   | "contains"
   | "exports"
   | "imports"

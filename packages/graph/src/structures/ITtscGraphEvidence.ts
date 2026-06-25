@@ -3,12 +3,12 @@
  * span for a node, or the expression that produced an edge.
  *
  * Evidence is display and provenance only; it is never identity. A node's id is
- * position-invariant (see {@link IGraphNode}), so an edit that shifts a span
+ * position-invariant (see {@link ITtscGraphNode}), so an edit that shifts a span
  * does not re-key anything. `startLine`/`startCol` are 1-based. `text` is an
  * optional short excerpt the producer may include so a consumer can show the
  * evidence without a file read.
  */
-export interface IEvidence {
+export interface ITtscGraphEvidence {
   /** Project-relative path of the file the span lives in. */
   file: string;
 

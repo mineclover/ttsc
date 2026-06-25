@@ -8,9 +8,9 @@
  * leaf the workspace references but does not declare — the graph keeps it as a
  * named endpoint without expanding the dependency's internals.
  *
- * Used as the `kind` discriminant on {@link IGraphNode}.
+ * Used as the `kind` discriminant on {@link ITtscGraphNode}.
  */
-export type NodeKind =
+export type TtscGraphNodeKind =
   | "file"
   | "package"
   | "namespace"

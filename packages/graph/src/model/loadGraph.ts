@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 
 import { resolveGraphBinary } from "../index";
-import { IGraphDump } from "../schema";
-import { GraphModel } from "./GraphModel";
+import { ITtscGraphDump } from "../structures/ITtscGraphDump";
+import { TtscGraphMemory } from "./TtscGraphMemory";
 
 /** Where and how to build the graph for a project. */
 export interface LoadGraphOptions {
@@ -24,7 +24,7 @@ export interface LoadGraphOptions {
 const MAX_DUMP_BYTES = 512 * 1024 * 1024;
 
 /**
- * Build the resident {@link GraphModel} for a project by running `ttscgraph
+ * Build the resident {@link TtscGraphMemory} for a project by running `ttscgraph
  * dump` once and loading its JSON. This is the cold path the MCP server takes
  * at startup: one type-check in Go produces the checker-resolved fact graph,
  * then every tool call is answered from the in-memory model.
@@ -33,7 +33,7 @@ const MAX_DUMP_BYTES = 512 * 1024 * 1024;
  * output is not a readable graph — the server surfaces the failure rather than
  * answering from an empty graph.
  */
-export function loadGraph(options: LoadGraphOptions = {}): GraphModel {
+export function loadGraph(options: LoadGraphOptions = {}): TtscGraphMemory {
   const cwd = options.cwd ?? process.cwd();
   const tsconfig = options.tsconfig ?? "tsconfig.json";
   const binary = options.binary ?? resolveGraphBinary();
@@ -61,7 +61,7 @@ export function loadGraph(options: LoadGraphOptions = {}): GraphModel {
     );
   }
 
-  return GraphModel.from(parseDump(result.stdout));
+  return TtscGraphMemory.from(parseDump(result.stdout));
 }
 
 /**
@@ -69,7 +69,7 @@ export function loadGraph(options: LoadGraphOptions = {}): GraphModel {
  * here — the Go writer is the trusted producer; the server layer adds a typia
  * assertion once the dump shape is a typed contract there.
  */
-export function parseDump(json: string): IGraphDump {
+export function parseDump(json: string): ITtscGraphDump {
   let value: unknown;
   try {
     value = JSON.parse(json);
@@ -90,5 +90,5 @@ export function parseDump(json: string): IGraphDump {
       "@ttsc/graph: dump output is missing its nodes/edges arrays",
     );
   }
-  return value as IGraphDump;
+  return value as ITtscGraphDump;
 }

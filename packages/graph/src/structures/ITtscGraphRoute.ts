@@ -1,5 +1,5 @@
 /**
- * The framework-level facts of a `route` virtual {@link IGraphNode}.
+ * The framework-level facts of a `route` virtual {@link ITtscGraphNode}.
  *
  * A route node has no declaring symbol; it is synthesized by the framework pass
  * from decorator or file-routing conventions and tagged `framework-derived`.
@@ -7,7 +7,7 @@
  * not a source position, so the resolved `path` here survives controller/module
  * prefix composition.
  */
-export interface IRouteMetadata {
+export interface ITtscGraphRoute {
   /**
    * Transport category: `http`, `graphql`, `websocket`, `microservice`, or
    * `page` for a file-based page/layout route. Left open for frameworks that

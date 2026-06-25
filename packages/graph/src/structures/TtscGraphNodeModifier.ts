@@ -1,10 +1,10 @@
 /**
- * A declaration modifier carried on a symbol {@link IGraphNode}, when the
+ * A declaration modifier carried on a symbol {@link ITtscGraphNode}, when the
  * declaration pass records it. Used by projections that reason about visibility
  * and shape — e.g. a public-API overview filters on `export`, a class outline
  * separates `static` members.
  */
-export type NodeModifier =
+export type TtscGraphNodeModifier =
   | "export"
   | "default"
   | "declare"

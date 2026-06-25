@@ -1,70 +1,6 @@
-import { GraphModel } from "../model/GraphModel";
-import { IGraphNode } from "../schema";
-
-/** Trace how execution and dependency flow to or from a symbol or route. */
-export interface ITraceProps {
-  /**
-   * Where to start: a node id from another tool, or a symbol/route name. An
-   * ambiguous name returns its candidates instead of a trace.
-   */
-  from: string;
-
-  /**
-   * `forward` follows what the start uses (callees, instantiations, renders);
-   * `reverse` follows what uses the start (callers); `impact` is a reverse
-   * trace that flags the public API, routes, and tests a change would reach.
-   *
-   * @default "forward"
-   */
-  direction?: "forward" | "reverse" | "impact";
-
-  /**
-   * How many hops deep to follow.
-   *
-   * @default 6
-   */
-  maxDepth?: number;
-
-  /**
-   * Cap on reached nodes; the trace stops and marks itself truncated past it.
-   *
-   * @default 60
-   */
-  maxNodes?: number;
-}
-
-export interface ITraceResult {
-  /** The resolved start node, or undefined when `from` matched nothing. */
-  start?: ITraceNode;
-  direction: string;
-  /** Edges traversed, in breadth-first order. */
-  hops: ITraceHop[];
-  /** Unique nodes reached (excluding the start), each with its depth and roles. */
-  reached: ITraceNode[];
-  /** True when the trace hit maxNodes or maxDepth and more flow exists. */
-  truncated: boolean;
-  /** When `from` was an ambiguous name, the matches to disambiguate with. */
-  candidates?: ITraceNode[];
-}
-
-export interface ITraceHop {
-  from: string;
-  to: string;
-  kind: string;
-  /** Hops from the start (1 = direct). */
-  depth: number;
-}
-
-export interface ITraceNode {
-  id: string;
-  name: string;
-  kind: string;
-  file: string;
-  /** Hops from the start, on a reached node. */
-  depth?: number;
-  /** Why this node matters to an impact trace: `exported`, `route`, `test`. */
-  roles?: string[];
-}
+import { TtscGraphMemory } from "../model/TtscGraphMemory";
+import { ITtscGraphNode } from "../structures/ITtscGraphNode";
+import { ITtscGraphTrace } from "../structures/ITtscGraphTrace";
 
 const DEFAULT_DEPTH = 6;
 const DEFAULT_MAX_NODES = 60;
@@ -76,7 +12,10 @@ const DEFAULT_MAX_NODES = 60;
  * Impact additionally tags each reached node's role so the blast radius on the
  * public surface is legible.
  */
-export function runTrace(graph: GraphModel, props: ITraceProps): ITraceResult {
+export function runTrace(
+  graph: TtscGraphMemory,
+  props: ITtscGraphTrace.IProps,
+): ITtscGraphTrace {
   const direction = props.direction ?? "forward";
   const maxDepth = props.maxDepth ?? DEFAULT_DEPTH;
   const maxNodes = props.maxNodes ?? DEFAULT_MAX_NODES;
@@ -96,8 +35,8 @@ export function runTrace(graph: GraphModel, props: ITraceProps): ITraceResult {
     return { direction, hops: [], reached: [], truncated: false };
   }
 
-  const hops: ITraceHop[] = [];
-  const reached = new Map<string, ITraceNode>();
+  const hops: ITtscGraphTrace.IHop[] = [];
+  const reached = new Map<string, ITtscGraphTrace.INode>();
   const visited = new Set<string>([start.node.id]);
   let queue: Array<{ id: string; depth: number }> = [
     { id: start.node.id, depth: 0 },
@@ -147,9 +86,9 @@ export function runTrace(graph: GraphModel, props: ITraceProps): ITraceResult {
 
 /** Resolve `from` to a single node, or report ambiguous-name candidates. */
 function resolveStart(
-  graph: GraphModel,
+  graph: TtscGraphMemory,
   from: string,
-): { node?: IGraphNode; candidates?: IGraphNode[] } {
+): { node?: ITtscGraphNode; candidates?: ITtscGraphNode[] } {
   const byId = graph.node(from);
   if (byId !== undefined) return { node: byId };
   const named = graph.named(from).filter((n) => n.kind !== "file");
@@ -159,12 +98,12 @@ function resolveStart(
 }
 
 /** A node summary; roles are attached when present so impact reads at a glance. */
-function summary(node: IGraphNode, depth?: number): ITraceNode {
+function summary(node: ITtscGraphNode, depth?: number): ITtscGraphTrace.INode {
   const roles: string[] = [];
   if (node.exported) roles.push("exported");
   if (node.kind === "route") roles.push("route");
   if (isTestFile(node.file)) roles.push("test");
-  const out: ITraceNode = {
+  const out: ITtscGraphTrace.INode = {
     id: node.id,
     name: node.qualifiedName ?? node.name,
     kind: node.kind,

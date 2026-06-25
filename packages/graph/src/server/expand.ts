@@ -1,54 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { GraphModel } from "../model/GraphModel";
-import { IGraphEdge, IGraphNode } from "../schema";
-
-/** Read the source and neighbors of nodes a previous tool returned as handles. */
-export interface IExpandProps {
-  /**
-   * Node ids to expand, exactly as another tool returned them. Pass every
-   * handle you need in one call.
-   */
-  handles: string[];
-
-  /**
-   * Also list each node's direct dependencies and dependents (the symbols it
-   * uses and the symbols that use it).
-   *
-   * @default false
-   */
-  neighbors?: boolean;
-}
-
-export interface IExpandResult {
-  nodes: IExpandedNode[];
-  /** Handles that resolved to no node. */
-  unknown: string[];
-}
-
-export interface IExpandedNode {
-  id: string;
-  name: string;
-  kind: string;
-  file: string;
-  /** The declaration source, sliced from the node's evidence span. */
-  source?: string;
-  /** True when `source` was cut at the line cap. */
-  truncated?: boolean;
-  /** Symbols this node uses (outgoing dependency edges). */
-  dependsOn?: IExpandRef[];
-  /** Symbols that use this node (incoming dependency edges). */
-  dependedOnBy?: IExpandRef[];
-}
-
-export interface IExpandRef {
-  id: string;
-  name: string;
-  kind: string;
-  /** The edge kind connecting the two (`calls`, `type_ref`, …). */
-  relation: string;
-}
+import { TtscGraphMemory } from "../model/TtscGraphMemory";
+import { ITtscGraphEdge } from "../structures/ITtscGraphEdge";
+import { ITtscGraphExpand } from "../structures/ITtscGraphExpand";
+import { ITtscGraphNode } from "../structures/ITtscGraphNode";
 
 // A declaration body can be large; cap each expansion so one call cannot flood
 // the response, and flag the cut so the caller knows to narrow.
@@ -64,10 +20,10 @@ const STRUCTURAL_KINDS = new Set<string>(["contains", "exports", "imports"]);
  * graph located the symbol, expand opens it — no grep, no full-file read.
  */
 export function runExpand(
-  graph: GraphModel,
-  props: IExpandProps,
-): IExpandResult {
-  const nodes: IExpandedNode[] = [];
+  graph: TtscGraphMemory,
+  props: ITtscGraphExpand.IProps,
+): ITtscGraphExpand {
+  const nodes: ITtscGraphExpand.INode[] = [];
   const unknown: string[] = [];
   for (const handle of props.handles) {
     const node = graph.node(handle);
@@ -75,7 +31,7 @@ export function runExpand(
       unknown.push(handle);
       continue;
     }
-    const expanded: IExpandedNode = {
+    const expanded: ITtscGraphExpand.INode = {
       id: node.id,
       name: node.qualifiedName ?? node.name,
       kind: node.kind,
@@ -97,11 +53,11 @@ export function runExpand(
 
 /** Map dependency edges to references on their far endpoint, dropping structure. */
 function refs(
-  graph: GraphModel,
-  edges: readonly IGraphEdge[],
+  graph: TtscGraphMemory,
+  edges: readonly ITtscGraphEdge[],
   end: "to" | "from",
-): IExpandRef[] {
-  const out: IExpandRef[] = [];
+): ITtscGraphExpand.IReference[] {
+  const out: ITtscGraphExpand.IReference[] = [];
   for (const edge of edges) {
     if (STRUCTURAL_KINDS.has(edge.kind)) continue;
     const other = graph.node(end === "to" ? edge.to : edge.from);
@@ -120,7 +76,7 @@ function refs(
 /** Slice a node's declaration source from disk, capped at MAX_LINES. */
 function readSource(
   project: string,
-  node: IGraphNode,
+  node: ITtscGraphNode,
 ): { text: string; truncated: boolean } | undefined {
   const evidence = node.evidence;
   if (evidence === undefined || node.file === "") return undefined;

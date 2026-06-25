@@ -1,9 +1,7 @@
-import {
-  IDecoratorFact,
-  IGraphEdge,
-  IGraphNode,
-  IRouteMetadata,
-} from "../../schema";
+import { ITtscGraphDecorator } from "../../structures/ITtscGraphDecorator";
+import { ITtscGraphEdge } from "../../structures/ITtscGraphEdge";
+import { ITtscGraphNode } from "../../structures/ITtscGraphNode";
+import { ITtscGraphRoute } from "../../structures/ITtscGraphRoute";
 
 // The HTTP verbs NestJS exposes as method decorators. The decorator name is
 // matched on its last segment, so both `@Get` and the ttsc-ecosystem
@@ -32,11 +30,11 @@ const HTTP_METHODS = new Set([
  * inventing routes for look-alike decorators.
  */
 export function synthesizeNestRoutes(
-  nodes: readonly IGraphNode[],
-  ownerOf: (node: IGraphNode) => IGraphNode | undefined,
-): { nodes: IGraphNode[]; edges: IGraphEdge[] } {
-  const routeNodes: IGraphNode[] = [];
-  const edges: IGraphEdge[] = [];
+  nodes: readonly ITtscGraphNode[],
+  ownerOf: (node: ITtscGraphNode) => ITtscGraphNode | undefined,
+): { nodes: ITtscGraphNode[]; edges: ITtscGraphEdge[] } {
+  const routeNodes: ITtscGraphNode[] = [];
+  const edges: ITtscGraphEdge[] = [];
   const seen = new Set<string>();
 
   for (const node of nodes) {
@@ -52,7 +50,7 @@ export function synthesizeNestRoutes(
     const id = `route:http:${verb.method}:${path}`;
     if (!seen.has(id)) {
       seen.add(id);
-      const route: IRouteMetadata = {
+      const route: ITtscGraphRoute = {
         protocol: "http",
         framework: "nest",
         method: verb.method,
@@ -83,7 +81,7 @@ export function synthesizeNestRoutes(
 
 /** The HTTP verb and path of a method's route decorator, or undefined. */
 function routeVerb(
-  decorators: IDecoratorFact[] | undefined,
+  decorators: ITtscGraphDecorator[] | undefined,
 ): { method: string; path: string } | undefined {
   if (decorators === undefined) return undefined;
   for (const decorator of decorators) {
@@ -100,7 +98,7 @@ function routeVerb(
 
 /** The `@Controller(prefix)` prefix, "" for a bare `@Controller`, or undefined. */
 function controllerPrefix(
-  decorators: IDecoratorFact[] | undefined,
+  decorators: ITtscGraphDecorator[] | undefined,
 ): string | undefined {
   if (decorators === undefined) return undefined;
   for (const decorator of decorators) {
@@ -119,7 +117,7 @@ function lastSegment(name: string): string {
 
 /** The first string-literal argument value, or undefined. */
 function firstStringLiteral(
-  args: IDecoratorFact["arguments"],
+  args: ITtscGraphDecorator["arguments"],
 ): string | undefined {
   for (const arg of args) {
     if (typeof arg.literal === "string") return arg.literal;

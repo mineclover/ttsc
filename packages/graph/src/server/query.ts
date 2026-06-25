@@ -1,38 +1,6 @@
-import { GraphModel } from "../model/GraphModel";
-import { IGraphNode } from "../schema";
-
-/** Find the symbols and clusters most relevant to a natural code query. */
-export interface IQueryProps {
-  /**
-   * What to find, in natural language and code vocabulary mixed freely — a
-   * symbol name, a dotted member (`OrderService.create`), or a phrase
-   * (`shopping order create`, `repository find relations`). Exact names are not
-   * required; subword and CamelCase matches rank too.
-   */
-  query: string;
-
-  /**
-   * Maximum hits to return.
-   *
-   * @default 12
-   */
-  limit?: number;
-}
-
-export interface IQueryResult {
-  hits: IQueryHit[];
-}
-
-export interface IQueryHit {
-  id: string;
-  name: string;
-  kind: string;
-  file: string;
-  /** 1-based declaration line, when known. */
-  line?: number;
-  /** Relative relevance; higher is a better match. */
-  score: number;
-}
+import { TtscGraphMemory } from "../model/TtscGraphMemory";
+import { ITtscGraphNode } from "../structures/ITtscGraphNode";
+import { ITtscGraphQuery } from "../structures/ITtscGraphQuery";
 
 // One file should not crowd out the rest of the ranking, so cap hits per file.
 const PER_FILE = 3;
@@ -45,12 +13,15 @@ const DEFAULT_LIMIT = 12;
  * nodes and caps per file so the result is a diverse, relevant shortlist rather
  * than one file's roster.
  */
-export function runQuery(graph: GraphModel, props: IQueryProps): IQueryResult {
+export function runQuery(
+  graph: TtscGraphMemory,
+  props: ITtscGraphQuery.IProps,
+): ITtscGraphQuery {
   const terms = subwords(props.query);
   const queryLc = props.query.trim().toLowerCase();
   if (terms.length === 0) return { hits: [] };
 
-  const scored: IQueryHit[] = [];
+  const scored: ITtscGraphQuery.IHit[] = [];
   for (const node of graph.nodes) {
     if (node.kind === "file") continue;
     const score = scoreNode(graph, node, queryLc, terms);
@@ -70,7 +41,7 @@ export function runQuery(graph: GraphModel, props: IQueryProps): IQueryResult {
   // Diversity: keep at most PER_FILE hits per file while filling up to the limit.
   const limit = props.limit ?? DEFAULT_LIMIT;
   const perFile = new Map<string, number>();
-  const hits: IQueryHit[] = [];
+  const hits: ITtscGraphQuery.IHit[] = [];
   for (const hit of scored) {
     const used = perFile.get(hit.file) ?? 0;
     if (used >= PER_FILE) continue;
@@ -83,8 +54,8 @@ export function runQuery(graph: GraphModel, props: IQueryProps): IQueryResult {
 
 /** Score one node against the query; 0 means no match. */
 function scoreNode(
-  graph: GraphModel,
-  node: IGraphNode,
+  graph: TtscGraphMemory,
+  node: ITtscGraphNode,
   queryLc: string,
   terms: string[],
 ): number {
@@ -130,7 +101,7 @@ function scoreNode(
 }
 
 /** Non-structural in+out degree (code dependency, not nesting). */
-function degree(graph: GraphModel, id: string): number {
+function degree(graph: TtscGraphMemory, id: string): number {
   let n = 0;
   for (const edge of graph.outgoing(id)) if (!isStructural(edge.kind)) n++;
   for (const edge of graph.incoming(id)) if (!isStructural(edge.kind)) n++;

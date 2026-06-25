@@ -5,13 +5,14 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import typia from "typia";
 
-import { GraphModel } from "../model/GraphModel";
-import { GraphController } from "./GraphController";
+import { TtscGraphApplication } from "../TtscGraphApplication";
+import { TtscGraphMemory } from "../model/TtscGraphMemory";
+import { ITtscGraphApplication } from "../structures/ITtscGraphApplication";
 import { instructions } from "./instructions";
 
 /**
- * Build the MCP server for a graph. `typia.llm.controller` turns the
- * {@link GraphController} class into a validated tool application — every tool's
+ * Build the MCP server for a graph. `typia.llm.controller` reflects
+ * {@link ITtscGraphApplication} into a validated tool application — every tool's
  * JSON schema and argument validator is generated from the method's TypeScript
  * types and JSDoc, so there is no hand-written schema. The list/call handlers
  * below are the minimal standalone registration: list the generated functions,
@@ -23,10 +24,13 @@ import { instructions } from "./instructions";
  * wider typia ecosystem; the shape it relies on is `typia.llm.controller`'s
  * public output.
  */
-export function createServer(graph: GraphModel, version: string): McpServer {
-  const controller = typia.llm.controller<GraphController>(
+export function createServer(
+  graph: TtscGraphMemory,
+  version: string,
+): McpServer {
+  const controller = typia.llm.controller<ITtscGraphApplication>(
     "graph",
-    new GraphController(graph),
+    new TtscGraphApplication(graph),
   );
   const functions = controller.application.functions;
   const execute = controller.execute as unknown as Record<

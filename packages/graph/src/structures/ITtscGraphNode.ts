@@ -1,9 +1,9 @@
-import { IComponentMetadata } from "./IComponentMetadata";
-import { IDecoratorFact } from "./IDecoratorFact";
-import { IEvidence } from "./IEvidence";
-import { IRouteMetadata } from "./IRouteMetadata";
-import { NodeKind } from "./NodeKind";
-import { NodeModifier } from "./NodeModifier";
+import { ITtscGraphComponent } from "./ITtscGraphComponent";
+import { ITtscGraphDecorator } from "./ITtscGraphDecorator";
+import { ITtscGraphEvidence } from "./ITtscGraphEvidence";
+import { ITtscGraphRoute } from "./ITtscGraphRoute";
+import { TtscGraphNodeKind } from "./TtscGraphNodeKind";
+import { TtscGraphNodeModifier } from "./TtscGraphNodeModifier";
 
 /**
  * One node in the graph: a declared symbol, a structural container (file,
@@ -15,12 +15,12 @@ import { NodeModifier } from "./NodeModifier";
  * key (e.g. `route:http:GET:/users/:id`, `component:src/App.tsx#App`). Line and
  * span live in `evidence` and are never part of identity.
  */
-export interface IGraphNode {
+export interface ITtscGraphNode {
   /** Position-invariant identity (see the interface doc for the id grammar). */
   id: string;
 
   /** What this node represents. */
-  kind: NodeKind;
+  kind: TtscGraphNodeKind;
 
   /** The simple, unqualified declared name (`create`, `OrderService`, `App`). */
   name: string;
@@ -56,21 +56,21 @@ export interface IGraphNode {
   exported?: boolean;
 
   /** Declaration modifiers, when the declaration pass recorded any. */
-  modifiers?: NodeModifier[];
+  modifiers?: TtscGraphNodeModifier[];
 
   /**
    * The decorators written on this declaration, in source order, when it has
    * any. A framework pass reads these to synthesize routes (`@Controller`,
    * `@Get`) without re-parsing source.
    */
-  decorators?: IDecoratorFact[];
+  decorators?: ITtscGraphDecorator[];
 
   /** The declaration span, for display and source expansion. */
-  evidence?: IEvidence;
+  evidence?: ITtscGraphEvidence;
 
   /** Route facts; present iff `kind === "route"`. */
-  route?: IRouteMetadata;
+  route?: ITtscGraphRoute;
 
   /** Component facts; present iff `kind === "component"`. */
-  component?: IComponentMetadata;
+  component?: ITtscGraphComponent;
 }

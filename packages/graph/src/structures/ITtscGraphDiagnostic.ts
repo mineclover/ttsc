@@ -7,7 +7,7 @@
  * `plugin`/`lint` findings whose `code` is a string. `node` is set when the
  * finding's position was attributed to a graph node.
  */
-export interface IGraphDiagnostic {
+export interface ITtscGraphDiagnostic {
   /** Project-relative path of the file the diagnostic is reported in. */
   file: string;
 

@@ -1,4 +1,6 @@
-import { IGraphEdge, IGraphNode, IRouteMetadata } from "../../schema";
+import { ITtscGraphEdge } from "../../structures/ITtscGraphEdge";
+import { ITtscGraphNode } from "../../structures/ITtscGraphNode";
+import { ITtscGraphRoute } from "../../structures/ITtscGraphRoute";
 
 /**
  * Synthesize Next.js page routes from file paths. A `page` file under `app/` or
@@ -12,21 +14,21 @@ import { IGraphEdge, IGraphNode, IRouteMetadata } from "../../schema";
  * This is file-convention inference, tagged framework-derived. Non-page files
  * (`layout`, `_app`, `api/*`) yield no route.
  */
-export function synthesizeNextRoutes(nodes: readonly IGraphNode[]): {
-  nodes: IGraphNode[];
-  edges: IGraphEdge[];
+export function synthesizeNextRoutes(nodes: readonly ITtscGraphNode[]): {
+  nodes: ITtscGraphNode[];
+  edges: ITtscGraphEdge[];
 } {
   // The first exported symbol declared in each file is taken as its page
   // component — the default export a page module is required to have.
-  const pageExport = new Map<string, IGraphNode>();
+  const pageExport = new Map<string, ITtscGraphNode>();
   for (const node of nodes) {
     if (node.external || node.kind === "file") continue;
     if (!node.exported) continue;
     if (!pageExport.has(node.file)) pageExport.set(node.file, node);
   }
 
-  const routeNodes: IGraphNode[] = [];
-  const edges: IGraphEdge[] = [];
+  const routeNodes: ITtscGraphNode[] = [];
+  const edges: ITtscGraphEdge[] = [];
   const seen = new Set<string>();
 
   for (const file of pageExport.keys()) {
@@ -36,7 +38,7 @@ export function synthesizeNextRoutes(nodes: readonly IGraphNode[]): {
     const handler = pageExport.get(file);
     if (!seen.has(id)) {
       seen.add(id);
-      const route: IRouteMetadata = {
+      const route: ITtscGraphRoute = {
         protocol: "page",
         framework: "next",
         path,

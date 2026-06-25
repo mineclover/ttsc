@@ -11,4 +11,7 @@
  * - `heuristic`: an opt-in best-effort inference (a callback or event bridge).
  *   Never part of a default trace; always visibly marked.
  */
-export type Provenance = "checker-resolved" | "framework-derived" | "heuristic";
+export type TtscGraphProvenance =
+  | "checker-resolved"
+  | "framework-derived"
+  | "heuristic";

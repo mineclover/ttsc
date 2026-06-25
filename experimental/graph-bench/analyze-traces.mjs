@@ -43,9 +43,19 @@ if (!fs.existsSync(traceDir)) {
 
 const outPath = arg("out");
 
-// A shell command that is really a text search or file read — the graph arm
-// reaching for one is the same miss as a Grep, just laundered through Bash.
-const SHELL_SEARCH = /\b(grep|rg|ag|find|cat|head|tail|sed|awk|ls)\b/;
+// A TS source file is exactly what the graph indexes, so reading or searching
+// one by hand is a real miss. A non-TS file (package.json, README, a .d.ts of a
+// dependency) is outside the graph, so reading it is a legitimate fallback the
+// instructions allow, not misuse — the analysis keeps the two apart so the
+// misuse count stays actionable.
+const TS_SOURCE = /\.(ts|tsx|mts|cts)$/i;
+const isTsSource = (p) => TS_SOURCE.test(p ?? "");
+
+// A shell command that reads or searches source the graph already holds: a
+// grep/find/sed over the tree, or a cat/head/tail of a TS file. A bare `ls` is
+// orientation, not a text search, so it is not counted as misuse.
+const SHELL_SEARCH = /\b(grep|rg|ag|find|sed|awk)\b/;
+const SHELL_READ_TS = /\b(cat|head|tail)\b[^|]*\.[cm]?tsx?\b/i;
 
 /** Classify a tool_use into the lane the analysis groups by. */
 function laneOf(name) {
@@ -108,15 +118,22 @@ function misuseOf(calls) {
   const lanes = calls.map((c) => laneOf(c.name));
   const graphCalls = calls.filter((_, k) => lanes[k] === "graph");
   const issues = [];
+  const fallbacks = [];
 
   for (const c of calls) {
     const lane = laneOf(c.name);
-    if (lane === "read")
-      issues.push({ kind: "fell back to Read", detail: targetOf(c) });
-    else if (lane === "search")
-      issues.push({ kind: "fell back to Grep/Glob", detail: targetOf(c) });
-    else if (lane === "shell" && SHELL_SEARCH.test(c.input.command ?? ""))
-      issues.push({ kind: "text search via shell", detail: targetOf(c) });
+    const cmd = c.input.command ?? "";
+    if (lane === "read") {
+      if (isTsSource(c.input.file_path))
+        issues.push({ kind: "read TS source by hand", detail: targetOf(c) });
+      else fallbacks.push({ kind: "read non-TS file", detail: targetOf(c) });
+    } else if (lane === "search") {
+      issues.push({ kind: "searched with Grep/Glob", detail: targetOf(c) });
+    } else if (lane === "shell") {
+      if (SHELL_SEARCH.test(cmd) || SHELL_READ_TS.test(cmd))
+        issues.push({ kind: "read/searched source via shell", detail: targetOf(c) });
+      else fallbacks.push({ kind: "shell", detail: targetOf(c) });
+    }
   }
 
   const expands = graphCalls.filter((c) => /graph_expand/i.test(c.name));
@@ -136,7 +153,7 @@ function misuseOf(calls) {
   if (graphCalls.length === 0)
     issues.push({ kind: "answered without the graph", detail: "0 graph calls" });
 
-  return issues;
+  return { issues, fallbacks };
 }
 
 const files = fs
@@ -153,7 +170,9 @@ for (const file of files) {
   );
   const counts = { graph: 0, read: 0, search: 0, shell: 0, other: 0 };
   for (const c of calls) counts[laneOf(c.name)]++;
-  const issues = arm === "graph" ? misuseOf(calls) : [];
+  const { issues, fallbacks } = arm === "graph"
+    ? misuseOf(calls)
+    : { issues: [], fallbacks: [] };
   (byArm[arm] ??= []).push({
     run: Number(run),
     tokens,
@@ -161,6 +180,7 @@ for (const file of files) {
     counts,
     sequence: calls.map((c) => `${c.name}(${targetOf(c)})`),
     issues,
+    fallbacks,
   });
 }
 
@@ -183,12 +203,14 @@ for (const [arm, runs] of Object.entries(byArm)) {
   const allIssues = runs.flatMap((r) => r.issues);
   const issueTally = {};
   for (const i of allIssues) issueTally[i.kind] = (issueTally[i.kind] ?? 0) + 1;
+  const runsWithMisuse = runs.filter((r) => r.issues.length).length;
   summary[arm] = {
     runs: runs.length,
     medianTokens: medTokens,
     medianTools: medTools,
     medianByLane: medLanes,
     misuseTally: issueTally,
+    cleanRuns: runs.length - runsWithMisuse,
   };
   console.log(`[${arm}]  ${runs.length} run(s)`);
   console.log(
@@ -196,18 +218,19 @@ for (const [arm, runs] of Object.entries(byArm)) {
       `   (graph ${medLanes.graph}, read ${medLanes.read}, search ${medLanes.search}, shell ${medLanes.shell})`,
   );
   if (arm === "graph") {
-    if (allIssues.length === 0) {
-      console.log("  tool usage: clean — every navigation went through the graph");
-    } else {
+    console.log(
+      `  tool discipline: ${runs.length - runsWithMisuse}/${runs.length} runs clean (no source touched outside the graph)`,
+    );
+    if (allIssues.length) {
       console.log("  misuse:");
       for (const [kind, n] of Object.entries(issueTally))
         console.log(`    ${n}x ${kind}`);
-      for (const r of runs) {
-        if (!r.issues.length) continue;
-        console.log(`    run ${r.run}:`);
-        for (const i of r.issues)
-          console.log(`      - ${i.kind}${i.detail ? `: ${i.detail}` : ""}`);
-      }
+    }
+    for (const r of runs) {
+      if (!r.issues.length) continue;
+      console.log(`    run ${r.run}:`);
+      for (const i of r.issues)
+        console.log(`      - ${i.kind}${i.detail ? `: ${i.detail}` : ""}`);
     }
   }
   console.log("");

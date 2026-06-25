@@ -110,7 +110,7 @@ export const bad: number = "not a number";
 	nodesSchema := nodes["inputSchema"].(map[string]any)
 	nodesProperties := nodesSchema["properties"].(map[string]any)
 	queryProperty := nodesProperties["query"].(map[string]any)
-	if desc, _ := queryProperty["description"].(string); !strings.Contains(desc, "broad search, not one symbol") {
+	if desc, _ := queryProperty["description"].(string); !strings.Contains(desc, "ordered call chain") {
 		t.Fatalf("query_nodes query did not use the embedded description: %v", desc)
 	}
 	modeProperty := nodesProperties["mode"].(map[string]any)

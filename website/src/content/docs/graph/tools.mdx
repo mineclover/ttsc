@@ -100,7 +100,7 @@ interface QueryExportSymbol {
 
 ```ts
 /**
- * Find graph nodes and their adjacent graph relationships.
+ * Find graph nodes, adjacent graph details, and compact flow evidence.
  */
 declare function query_nodes(args: QueryNodesArguments): QueryNodesResult;
 
@@ -114,7 +114,8 @@ interface QueryNodesArguments {
   query: string;
 
   /**
-   * Query view. `search` returns adjacent graph data; `flow` adds runtime-flow evidence.
+   * Query view. Use `search` for broad discovery and adjacent graph details.
+   * Use `flow` for ordered call-chain questions in a single call.
    */
   mode?: "auto" | "search" | "flow";
 
@@ -139,12 +140,12 @@ interface QueryNodesResult {
   message?: string;
 
   /**
-   * Matched graph nodes as index records, not source bodies.
+   * Matched graph nodes as compact index records, not source bodies.
    */
   nodes: QueryGraphNode[];
 
   /**
-   * Runtime-flow evidence when the selected view includes flow data.
+   * Compact runtime-flow evidence when the selected view includes flow data.
    */
   flow?: QueryFlow;
 }
@@ -190,23 +191,23 @@ interface QueryNodeRef {
 }
 
 /**
- * Matched node with adjacent graph index data.
+ * Matched node with optional adjacent graph index data.
  */
 interface QueryGraphNode extends QueryNodeRef {
   /**
-   * Adjacent graph relationships.
+   * Adjacent graph relationships in search mode only.
    */
-  edges: QueryNodeEdges;
+  edges?: QueryNodeEdges;
 
   /**
-   * Diagnostic counts attached to this declaration.
+   * Diagnostic counts attached to this declaration in search mode only.
    */
-  diagnostics: QueryDiagnosticsSummary;
+  diagnostics?: QueryDiagnosticsSummary;
 
   /**
-   * Reverse dependency count for change-risk orientation.
+   * Reverse dependency count for change-risk orientation in search mode only.
    */
-  blastRadius: QueryBlastRadius;
+  blastRadius?: QueryBlastRadius;
 }
 
 /**
@@ -310,38 +311,33 @@ interface QueryBlastRadius {
 }
 
 /**
- * Runtime-flow index.
+ * Compact runtime-flow index.
  */
 interface QueryFlow {
   /**
-   * Value edges that support the flow view.
+   * Selected value-flow edges between returned node handles.
    */
   evidence: QueryFlowEdge[];
 }
 
 /**
- * One runtime-flow edge.
+ * One compact runtime-flow edge.
  */
 interface QueryFlowEdge {
   /**
-   * Source declaration.
+   * Source node handle from `nodes`.
    */
-  from: QueryNodeRef;
+  fromHandle: string;
 
   /**
-   * Target declaration.
+   * Target node handle from `nodes`.
    */
-  to: QueryNodeRef;
+  toHandle: string;
 
   /**
    * Runtime edge kind.
    */
   kind: QueryRuntimeEdgeKind;
-
-  /**
-   * Whether the edge is on the selected flow path.
-   */
-  onPath: boolean;
 
   /**
    * Source use location when known.
@@ -679,9 +675,9 @@ type DiagnosticSeverity = "error" | "warning";
 
 ## Edge Kinds
 
-| Kind | Meaning |
-| --- | --- |
-| `heritage` | Class/interface inheritance or implementation. |
-| `value-call` | Runtime call or construction edge. |
-| `value-access` | Runtime property/accessor read or write. |
-| `type-ref` | Type-position reference. |
+| Kind           | Meaning                                        |
+| -------------- | ---------------------------------------------- |
+| `heritage`     | Class/interface inheritance or implementation. |
+| `value-call`   | Runtime call or construction edge.             |
+| `value-access` | Runtime property/accessor read or write.       |
+| `type-ref`     | Type-position reference.                       |

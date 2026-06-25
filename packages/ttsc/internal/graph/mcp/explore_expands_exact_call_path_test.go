@@ -109,9 +109,8 @@ export interface Plan {
 
 	server := mcp.NewServer(prog)
 	cases := []struct {
-		query    string
-		nodes    []string
-		evidence []string
+		query string
+		nodes []string
 	}{
 		{
 			query: "How does Gateway.fetch pass a requested plan into pipeline steps? Trace the call path from the public fetch method to where steps are built and execute.",
@@ -119,11 +118,6 @@ export interface Plan {
 				"Gateway.fetch",
 				"Coordinator.fetch",
 				"Pipeline.buildSteps",
-			},
-			evidence: []string{
-				"Pipeline.setPlan",
-				"Pipeline.applyPlan",
-				"Worker.execute",
 			},
 		},
 		{
@@ -145,10 +139,42 @@ export interface Plan {
 				t.Fatalf("query_nodes did not include %s for query %q in the expanded path:\n%s", want, c.query, text)
 			}
 		}
-		for _, want := range c.evidence {
-			if !strings.Contains(text, want) {
-				t.Fatalf("query_nodes did not include evidence %s for query %q:\n%s", want, c.query, text)
-			}
+	}
+
+	flow := toolStructured(t, server, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"query_nodes","arguments":{"query":"Gateway.fetch Coordinator.fetch Pipeline.setPlan applyPlan buildSteps Worker.execute","mode":"flow"}}}`)
+	nodes, ok := flow["nodes"].([]any)
+	if !ok || len(nodes) == 0 {
+		t.Fatalf("query_nodes flow returned no nodes: %v", flow)
+	}
+	firstNode, ok := nodes[0].(map[string]any)
+	if !ok {
+		t.Fatalf("query_nodes flow node is not an object: %v", nodes[0])
+	}
+	for _, forbidden := range []string{"edges", "diagnostics", "blastRadius"} {
+		if _, ok := firstNode[forbidden]; ok {
+			t.Fatalf("query_nodes flow node repeated search-only %s: %v", forbidden, firstNode)
+		}
+	}
+	flowBlock, ok := flow["flow"].(map[string]any)
+	if !ok {
+		t.Fatalf("query_nodes flow result omitted flow block: %v", flow)
+	}
+	evidence, ok := flowBlock["evidence"].([]any)
+	if !ok || len(evidence) == 0 {
+		t.Fatalf("query_nodes flow result omitted evidence: %v", flowBlock)
+	}
+	firstEdge, ok := evidence[0].(map[string]any)
+	if !ok {
+		t.Fatalf("query_nodes flow edge is not an object: %v", evidence[0])
+	}
+	for _, required := range []string{"fromHandle", "toHandle", "kind"} {
+		if _, ok := firstEdge[required]; !ok {
+			t.Fatalf("query_nodes flow edge missing %s: %v", required, firstEdge)
+		}
+	}
+	for _, forbidden := range []string{"from", "to", "onPath"} {
+		if _, ok := firstEdge[forbidden]; ok {
+			t.Fatalf("query_nodes flow edge repeated %s instead of compact handles: %v", forbidden, firstEdge)
 		}
 	}
 }

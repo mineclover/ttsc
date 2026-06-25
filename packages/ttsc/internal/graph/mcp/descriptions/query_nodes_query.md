@@ -1,1 +1,1 @@
-The whole flow in one broad search, not one symbol: owner/action/nouns together, e.g. "controller dispatch service cache".
+For an ordered call chain, put the named symbols in order in one query, e.g. "Gateway.fetch Coordinator.fetch Pipeline.setPlan applyPlan buildSteps", and use `mode: "flow"`. Use a broad owner/action/noun query, e.g. "controller dispatch service cache", only when the chain is not already named.

@@ -3,7 +3,7 @@
 A compiler-resolved graph of TypeScript relationships: calls, callers, types, ownership, blast radius. It mirrors the code; after an edit, query again, not from an old result.
 
 - **Onboarding, exported API, or uncertain entry point?** `query_exports` first: exported symbols, aliases, files, lines, and handles.
-- **Prompt already names exact symbols or a call chain?** start with `query_nodes`: one broad query (owner + action + nouns), before grep.
+- **Prompt already names exact symbols or a call chain?** start with `query_nodes` in `flow` mode using the named chain in one query, before grep.
 - **Need more source for a printed TypeScript node?** `expand_nodes` with its `handle:n:...`.
 - **What is in a file, what is near it?** `query_files` with the paths: a roster of its declarations and adjacent files.
 - **A file's errors, or the whole project's?** `query_diagnostics`.
@@ -19,7 +19,8 @@ Omit `query` on the first pass. Use `query` only to filter the exported surface 
 
 **Default to `query_nodes` for any relationship or code-flow question that already names symbols, files, or a call chain; do not fall into grep-first habits.** Repeated grep/read probes burn tokens reconstructing relationships the graph already resolved.
 
-- One broad query (owner + action + domain nouns, e.g. `controller dispatch service cache`) returns matched declaration coordinates, adjacent graph edges, diagnostic counts, and blast radius.
+- Ordered call chain already named? Use one `query_nodes` call with `mode: "flow"` and the symbols in order, e.g. `Gateway.fetch Coordinator.fetch Pipeline.setPlan applyPlan buildSteps`.
+- No ordered chain yet? Use one broad query (owner + action + domain nouns, e.g. `controller dispatch service cache`) to return matched declaration coordinates, adjacent graph edges, diagnostic counts, and blast radius.
 - The fuzzy match is the batch: a broad multi-noun query returns the whole cluster in one call, so you do not query one symbol at a time, and an edge target shown in the result is part of the answer, not a reason to re-query or grep.
 - If a result shows the right TypeScript node and you need source, copy its `handle:n:...` into `expand_nodes`.
 - grep/read cannot assemble that, because the answer depends on resolved relationships, not on where a keyword appears.
@@ -59,7 +60,7 @@ The one trap is reusing an earlier result: it predates any edit you made after i
 ## Final checklist
 
 - Onboarding, exported API, or uncertain entry point? `query_exports` with no arguments first.
-- Relationship or flow question with named symbols or a call chain? `query_nodes` with one broad owner + action + noun query, before any grep.
+- Relationship or flow question with named symbols or a call chain? `query_nodes` with `mode: "flow"` and the chain in one query, before any grep.
 - Need a file's roster? `query_files` with its path: its declarations, handles, and adjacent files.
 - Need source for a listed/omitted TypeScript declaration? `expand_nodes` with its handle.
 - A file's errors, or the whole project's? `query_diagnostics` with paths, or none for everything.

@@ -252,10 +252,10 @@ func graphIndexDefs() map[string]any {
 			"file":        schemaString("Project-relative file."),
 			"line":        schemaInteger("Declaration line."),
 			"external":    map[string]any{"type": "boolean", "description": "Whether this symbol is outside the project program."},
-			"edges":       schemaRef("Adjacent graph relationships.", "#/$defs/QueryNodeEdges"),
-			"diagnostics": schemaRef("Diagnostic counts attached to this declaration.", "#/$defs/QueryDiagnosticsSummary"),
-			"blastRadius": schemaRef("Reverse dependency count for change-risk orientation.", "#/$defs/QueryBlastRadius"),
-		}, []any{"handle", "kind", "name", "file", "line", "external", "edges", "diagnostics", "blastRadius"}),
+			"edges":       schemaRef("Adjacent graph relationships in search mode.", "#/$defs/QueryNodeEdges"),
+			"diagnostics": schemaRef("Diagnostic counts attached to this declaration in search mode.", "#/$defs/QueryDiagnosticsSummary"),
+			"blastRadius": schemaRef("Reverse dependency count for change-risk orientation in search mode.", "#/$defs/QueryBlastRadius"),
+		}, []any{"handle", "kind", "name", "file", "line", "external"}),
 		"QueryNodeEdges": objectOutputSchema(map[string]any{
 			"outgoing":        schemaArrayRef("Edges from this node to dependencies.", "#/$defs/QueryEdgeRef"),
 			"incoming":        schemaArrayRef("Edges from dependents into this node.", "#/$defs/QueryEdgeRef"),
@@ -281,15 +281,14 @@ func graphIndexDefs() map[string]any {
 			"dependentsWithErrors": schemaInteger("Transitive dependents that currently have diagnostics."),
 		}, []any{"dependents", "dependentsWithErrors"}),
 		"QueryFlow": objectOutputSchema(map[string]any{
-			"evidence": schemaArrayRef("Value edges that support the flow view.", "#/$defs/QueryFlowEdge"),
+			"evidence": schemaArrayRef("Selected value-flow edges between returned node handles.", "#/$defs/QueryFlowEdge"),
 		}, []any{"evidence"}),
 		"QueryFlowEdge": objectOutputSchema(map[string]any{
-			"from":   schemaRef("Source declaration.", "#/$defs/QueryNodeRef"),
-			"to":     schemaRef("Target declaration.", "#/$defs/QueryNodeRef"),
-			"kind":   schemaRuntimeEdgeKind("Runtime edge kind."),
-			"onPath": map[string]any{"type": "boolean", "description": "Whether the edge is on the selected flow path."},
-			"use":    schemaRef("Source use location when known.", "#/$defs/QueryLocation"),
-		}, []any{"from", "to", "kind", "onPath"}),
+			"fromHandle": schemaString("Source node handle from the returned nodes."),
+			"toHandle":   schemaString("Target node handle from the returned nodes."),
+			"kind":       schemaRuntimeEdgeKind("Runtime edge kind."),
+			"use":        schemaRef("Source use location when known.", "#/$defs/QueryLocation"),
+		}, []any{"fromHandle", "toHandle", "kind"}),
 	}
 }
 
@@ -569,17 +568,16 @@ type blastRadiusResult struct {
 
 type graphNodeResult struct {
 	nodeRefResult
-	Edges       nodeEdgesResult          `json:"edges"`
-	Diagnostics diagnosticsSummaryResult `json:"diagnostics"`
-	BlastRadius blastRadiusResult        `json:"blastRadius"`
+	Edges       *nodeEdgesResult          `json:"edges,omitempty"`
+	Diagnostics *diagnosticsSummaryResult `json:"diagnostics,omitempty"`
+	BlastRadius *blastRadiusResult        `json:"blastRadius,omitempty"`
 }
 
 type flowEdgeResult struct {
-	From   nodeRefResult   `json:"from"`
-	To     nodeRefResult   `json:"to"`
-	Kind   graph.EdgeKind  `json:"kind"`
-	OnPath bool            `json:"onPath"`
-	Use    *locationResult `json:"use,omitempty"`
+	FromHandle string          `json:"fromHandle"`
+	ToHandle   string          `json:"toHandle"`
+	Kind       graph.EdgeKind  `json:"kind"`
+	Use        *locationResult `json:"use,omitempty"`
 }
 
 type flowResult struct {
@@ -710,9 +708,10 @@ func exportedAliases(entry exportEntry) []string {
 }
 
 func (s *Server) queryNodesResult(query string, resolvedMode queryNodeMode, matches []*graph.Node, nodes []*graph.Node) queryNodesResult {
+	includeGraphDetails := resolvedMode != queryNodeModeFlow
 	out := queryNodesResult{
 		TotalMatches: len(matches),
-		Nodes:        s.graphNodeResults(nodes),
+		Nodes:        s.graphNodeResults(nodes, includeGraphDetails),
 	}
 	if resolvedMode == queryNodeModeFlow {
 		out.Flow = s.flowResult(nodes, query)
@@ -720,21 +719,27 @@ func (s *Server) queryNodesResult(query string, resolvedMode queryNodeMode, matc
 	return out
 }
 
-func (s *Server) graphNodeResults(nodes []*graph.Node) []graphNodeResult {
+func (s *Server) graphNodeResults(nodes []*graph.Node, includeGraphDetails bool) []graphNodeResult {
 	out := make([]graphNodeResult, 0, len(nodes))
 	for _, node := range nodes {
-		out = append(out, s.graphNodeResult(node))
+		out = append(out, s.graphNodeResult(node, includeGraphDetails))
 	}
 	return out
 }
 
-func (s *Server) graphNodeResult(node *graph.Node) graphNodeResult {
-	return graphNodeResult{
+func (s *Server) graphNodeResult(node *graph.Node, includeGraphDetails bool) graphNodeResult {
+	result := graphNodeResult{
 		nodeRefResult: s.nodeRef(node),
-		Edges:         s.nodeEdges(node),
-		Diagnostics:   diagnosticsSummary(s.nodeDiagnostics(node)),
-		BlastRadius:   s.blastRadius(node),
 	}
+	if includeGraphDetails {
+		edges := s.nodeEdges(node)
+		diagnostics := diagnosticsSummary(s.nodeDiagnostics(node))
+		blastRadius := s.blastRadius(node)
+		result.Edges = &edges
+		result.Diagnostics = &diagnostics
+		result.BlastRadius = &blastRadius
+	}
+	return result
 }
 
 func (s *Server) expandedNodeResults(nodes []*graph.Node, sourceLines int) []expandedNodeResult {
@@ -890,19 +895,17 @@ func (s *Server) blastRadius(node *graph.Node) blastRadiusResult {
 
 func (s *Server) flowResult(nodes []*graph.Node, query string) *flowResult {
 	included := make(map[string]bool, len(nodes))
-	for _, node := range nodes {
+	order := make(map[string]int, len(nodes))
+	for i, node := range nodes {
 		if node == nil {
 			continue
 		}
 		included[node.ID] = true
+		order[node.ID] = i
 	}
-	tokens := queryTokens(query)
-	words := queryWords(query)
 	type rankedEdge struct {
-		edge   *graph.Edge
-		score  int
-		line   int
-		onPath bool
+		edge *graph.Edge
+		line int
 	}
 	ranked := make([]rankedEdge, 0)
 	for _, node := range nodes {
@@ -916,20 +919,22 @@ func (s *Server) flowResult(nodes []*graph.Node, query string) *flowResult {
 			if s.graph.Nodes[edge.To] == nil {
 				continue
 			}
-			onPath := included[edge.To]
-			score := s.pathTargetScoreFrom(edge.From, edge.To, tokens, words)
-			if !onPath && score <= 0 {
+			if !included[edge.To] {
 				continue
 			}
-			if onPath {
-				score += 1000
-			}
-			ranked = append(ranked, rankedEdge{edge: edge, score: score, line: s.edgeUseLine(edge), onPath: onPath})
+			ranked = append(ranked, rankedEdge{edge: edge, line: s.edgeUseLine(edge)})
 		}
 	}
 	sort.SliceStable(ranked, func(i, j int) bool {
-		if ranked[i].score != ranked[j].score {
-			return ranked[i].score > ranked[j].score
+		leftFrom := order[ranked[i].edge.From]
+		rightFrom := order[ranked[j].edge.From]
+		if leftFrom != rightFrom {
+			return leftFrom < rightFrom
+		}
+		leftTo := order[ranked[i].edge.To]
+		rightTo := order[ranked[j].edge.To]
+		if leftTo != rightTo {
+			return leftTo < rightTo
 		}
 		if ranked[i].line != ranked[j].line {
 			return ranked[i].line < ranked[j].line
@@ -951,11 +956,10 @@ func (s *Server) flowResult(nodes []*graph.Node, query string) *flowResult {
 			continue
 		}
 		evidence = append(evidence, flowEdgeResult{
-			From:   s.nodeRef(from),
-			To:     s.nodeRef(to),
-			Kind:   edge.Kind,
-			OnPath: item.onPath,
-			Use:    s.edgeUseLocation(edge),
+			FromHandle: nodeHandle(from.ID),
+			ToHandle:   nodeHandle(to.ID),
+			Kind:       edge.Kind,
+			Use:        s.edgeUseLocation(edge),
 		})
 		if len(evidence) >= maxFlowEvidenceEdges {
 			break

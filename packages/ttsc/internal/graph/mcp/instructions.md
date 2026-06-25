@@ -1,68 +1,18 @@
 # ttsc-graph
 
-A compiler-resolved graph of TypeScript relationships: calls, callers, types, ownership, blast radius. It mirrors the code; after an edit, query again, not from an old result.
+Use this graph as a TypeScript code index before grep/read. If the task gives an exact start/end or ordered call chain, call `query_path`. If orientation or entrypoint is unclear, call `query_exports`. If relationships are needed but endpoints are unknown, call `query_nodes`. Use `expand_nodes` only after a handle. Use grep/read only for non-TypeScript, literal search, or no graph match.
 
-- **Onboarding, exported API, or uncertain entry point?** `query_exports` first: exported symbols, aliases, files, lines, and handles.
-- **Prompt already names exact symbols or a call chain?** start with `query_nodes` in `flow` mode using the named chain in one query, before grep.
-- **Need more source for a printed TypeScript node?** `expand_nodes` with its `handle:n:...`.
-- **What is in a file, what is near it?** `query_files` with the paths: a roster of its declarations and adjacent files.
-- **A file's errors, or the whole project's?** `query_diagnostics`.
-- **No match, non-TypeScript, or literal occurrence search?** grep/read.
+The graph mirrors the current program. Query again after edits instead of reusing an old result.
 
-## Start with exports for orientation
+## Tool Choice
 
-**Call `query_exports` when you need orientation.** It is the public-surface index: exported declarations and public members of exported classes/interfaces, with name, kind, file:line, handle, and aliases. Use the exact names and handles from it for focused `query_nodes` or `expand_nodes` calls.
+- `query_path`: exact A-to-B runtime path through value calls and value access. Pass `from`, `to`, and `via` when the prompt gives intermediate symbols.
+- `query_exports`: public surface orientation. It returns exported declarations and public members with names, kinds, files, lines, handles, and aliases.
+- `query_nodes`: relationship discovery when exact endpoints are not known. Use one focused query with the relevant symbol, owner, action, or domain terms.
+- `expand_nodes`: exact follow-up for handles returned by graph tools. Use it only when node coordinates are not enough and source context is required.
+- `query_files`: file roster. Use it for declarations and adjacent files around known paths.
+- `query_diagnostics`: current project diagnostics, optionally filtered by file and severity.
 
-Omit `query` on the first pass. Use `query` only to filter the exported surface by name, alias, or file, and `page` only when `page.totalPages` is greater than 1. Git-ignored generated files are omitted from this orientation index.
+## Fallbacks
 
-## Reach for `query_nodes` before grep
-
-**Default to `query_nodes` for any relationship or code-flow question that already names symbols, files, or a call chain; do not fall into grep-first habits.** Repeated grep/read probes burn tokens reconstructing relationships the graph already resolved.
-
-- Ordered call chain already named? Use one `query_nodes` call with `mode: "flow"` and the symbols in order, e.g. `Gateway.fetch Coordinator.fetch Pipeline.setPlan applyPlan buildSteps`.
-- No ordered chain yet? Use one broad query (owner + action + domain nouns, e.g. `controller dispatch service cache`) to return matched declaration coordinates, adjacent graph edges, diagnostic counts, and blast radius.
-- The fuzzy match is the batch: a broad multi-noun query returns the whole cluster in one call, so you do not query one symbol at a time, and an edge target shown in the result is part of the answer, not a reason to re-query or grep.
-- If a result shows the right TypeScript node and you need source, copy its `handle:n:...` into `expand_nodes`.
-- grep/read cannot assemble that, because the answer depends on resolved relationships, not on where a keyword appears.
-
-## Expand exact nodes with `expand_nodes`
-
-**Use `expand_nodes` when `query_nodes` or `query_files` printed the right TypeScript declaration handle but not enough body.** It is deterministic: no fuzzy ranking, no file search, just the graph node(s) you named. For call-path, relation-flow, lifecycle, dispatch, or "how does X reach Y" questions, prefer `mode: "flow"` from the printed handle(s); it stays on downstream value-call/value-access path evidence. Use `mode: "source"` when you need a wider body window for one specific declaration.
-
-## Roster a file with `query_files`
-
-**Pass file paths to `query_files` for a cheap roster of each**: the declarations inside it (kind, name, line, handle) and its adjacent files (what it reaches and is reached by), one block per file. Use it to find your way around a file, then `expand_nodes` the handle you care about for relationships and source. Use `query_nodes` instead when you need fuzzy relationship discovery.
-
-## Check errors with `query_diagnostics`
-
-**Pass `files` for specific files, or omit it for every current error across the project.** Each finding carries its tsc/lint code and location. `severity` keeps only errors or only warnings. Use the whole-project form after an edit to see what is now broken.
-
-## Fall back to grep/read when the graph cannot answer
-
-**Switch to ordinary search and file reads only when the graph does not fit:**
-
-- No node matches the symbol.
-- Non-TypeScript context: config, generated output, docs, JSON, other languages.
-- You need every literal occurrence of a string.
-
-`ttsc-graph` is a relationship graph, not a text index. Keyword counting and full-file dumps belong to grep and read.
-
-## Re-query freely
-
-**Re-query freely; never ration calls to a fixed number.** Do it when:
-
-- a better entry node appears in the result,
-- a needed symbol was missing,
-- you have edited a file since the last query.
-
-The one trap is reusing an earlier result: it predates any edit you made after it, so query again instead of trusting what is already in your context.
-
-## Final checklist
-
-- Onboarding, exported API, or uncertain entry point? `query_exports` with no arguments first.
-- Relationship or flow question with named symbols or a call chain? `query_nodes` with `mode: "flow"` and the chain in one query, before any grep.
-- Need a file's roster? `query_files` with its path: its declarations, handles, and adjacent files.
-- Need source for a listed/omitted TypeScript declaration? `expand_nodes` with its handle.
-- A file's errors, or the whole project's? `query_diagnostics` with paths, or none for everything.
-- No match, non-TypeScript, or literal text search? grep/read.
-- Edited a file since exploring? Query again; the result re-checks your edit.
+Use ordinary grep/read when the graph cannot answer: no matching node, non-TypeScript files, generated output, docs, JSON, or literal occurrence search.

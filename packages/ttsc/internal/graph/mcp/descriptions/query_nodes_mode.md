@@ -1,1 +1,1 @@
-`auto` lets the server infer search versus flow; `search` returns ranked matches with adjacent graph relationships; `flow` returns a compact value-call/value-access path index for ordered call-chain, lifecycle, dispatch, or relation-flow questions.
+`auto` lets the server infer search versus flow. `search` returns ranked matches with adjacent relationships. `flow` returns compact value-call/value-access context when the path shape still needs inference.

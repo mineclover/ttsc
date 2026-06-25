@@ -1,12 +1,14 @@
 # Tools
 
-`@ttsc/graph` tools return graph indexes: symbol coordinates, file rosters, relationships, diagnostics, and exact follow-up handles. They do not return AST dumps. Each tool returns its typed result in `structuredContent`; the MCP `content` block contains only a short status summary.
+`@ttsc/graph` tools return graph indexes: symbol coordinates, file rosters, relationships, diagnostics, and exact follow-up handles. They do not return AST dumps. The TypeScript return types below describe each tool's `structuredContent` object. The MCP `content` block is only a short status summary.
 
 ## query_exports
 
 ```ts
 /**
- * List exported declarations and public members of exported classes/interfaces.
+ * Project-wide exported TypeScript symbol index. Use this for onboarding, exported API overview, or an uncertain entry point before focused relationship queries.
+ *
+ * Returns exported classes, interfaces, types, enums, functions, variables, and public members of exported classes/interfaces known to the compiler, with name, kind, file:line, handle, and export aliases. Git-ignored generated files are omitted from this orientation index.
  */
 declare function query_exports(args?: QueryExportsArguments): QueryExportsResult;
 
@@ -15,17 +17,17 @@ declare function query_exports(args?: QueryExportsArguments): QueryExportsResult
  */
 interface QueryExportsArguments {
   /**
-   * Optional filter over exported symbol names, aliases, and file paths.
+   * Optional filter over exported symbol names and file paths. Omit it for the first project-wide orientation pass.
    */
   query?: string;
 
   /**
-   * Records per page. Defaults to 100. Minimum 0, maximum 10000.
+   * Maximum exported symbols to return. Defaults to a compact first page. Set 0 when you only need `page.totalRecords` and `page.totalPages`, or raise it when you need a larger page. Minimum 0, maximum 10000.
    */
   limit?: number;
 
   /**
-   * One-based page number. Defaults to 1.
+   * One-based page number for exported symbols. Defaults to 1. Use with `limit` when `page.totalPages` is greater than 1.
    */
   page?: number;
 }
@@ -35,7 +37,7 @@ interface QueryExportsArguments {
  */
 interface QueryExportsResult {
   /**
-   * Page metadata with no derived duplicates.
+   * Compact page metadata with no derived duplicates.
    */
   page: QueryExportsPage;
 
@@ -100,7 +102,11 @@ interface QueryExportSymbol {
 
 ```ts
 /**
- * Find graph nodes, adjacent graph details, and compact flow evidence.
+ * Compiler-resolved TypeScript relationship discovery. Use this when exact path endpoints are unknown.
+ *
+ * It returns matched declaration coordinates, adjacent graph edges, diagnostic counts, blast radius, and handles. Use query_path instead when the task gives exact start/end symbols or an ordered chain.
+ *
+ * If source context is required, call expand_nodes with a returned handle. After editing, query again rather than reusing an old result.
  */
 declare function query_nodes(args: QueryNodesArguments): QueryNodesResult;
 
@@ -109,13 +115,12 @@ declare function query_nodes(args: QueryNodesArguments): QueryNodesResult;
  */
 interface QueryNodesArguments {
   /**
-   * Symbol name, handle, file path, or concise relationship query.
+   * Focused relationship query using relevant symbol names, owners, actions, files, or domain terms. Use query_path instead when exact path endpoints are known.
    */
   query: string;
 
   /**
-   * Query view. Use `search` for broad discovery and adjacent graph details.
-   * Use `flow` for ordered call-chain questions in a single call.
+   * `auto` lets the server infer search versus flow. `search` returns ranked matches with adjacent relationships. `flow` returns compact value-call/value-access context when the path shape still needs inference.
    */
   mode?: "auto" | "search" | "flow";
 
@@ -145,7 +150,7 @@ interface QueryNodesResult {
   nodes: QueryGraphNode[];
 
   /**
-   * Compact runtime-flow evidence when the selected view includes flow data.
+   * Runtime-flow evidence when mode is flow.
    */
   flow?: QueryFlow;
 }
@@ -325,12 +330,12 @@ interface QueryFlow {
  */
 interface QueryFlowEdge {
   /**
-   * Source node handle from `nodes`.
+   * Source node handle from the returned nodes.
    */
   fromHandle: string;
 
   /**
-   * Target node handle from `nodes`.
+   * Target node handle from the returned nodes.
    */
   toHandle: string;
 
@@ -351,11 +356,119 @@ interface QueryFlowEdge {
 type QueryRuntimeEdgeKind = "value-call" | "value-access";
 ```
 
+## query_path
+
+```ts
+/**
+ * Exact runtime path index between named TypeScript symbols. Use this when the task gives a start and end symbol, or an ordered call chain.
+ *
+ * It resolves anchors to compiler-known graph nodes and searches the resident in-memory value-call/value-access graph. It returns path node coordinates plus selected edge evidence. Use query_nodes first when the endpoints are unknown.
+ */
+declare function query_path(args: QueryPathArguments): QueryPathResult;
+
+/**
+ * Arguments for an exact runtime path lookup.
+ */
+interface QueryPathArguments {
+  /**
+   * Start symbol name or `handle:n:...` value. Dotted names are preferred when available.
+   */
+  from: string;
+
+  /**
+   * End symbol name or `handle:n:...` value. Use the final symbol the path should reach.
+   */
+  to: string;
+
+  /**
+   * Ordered intermediate symbols or handles. Each entry is treated as an anchor the path should pass through in order.
+   */
+  via?: string[];
+}
+
+/**
+ * Exact runtime path result.
+ */
+interface QueryPathResult {
+  /**
+   * Optional status when no path or partial handling needs explanation.
+   */
+  message?: string;
+
+  /**
+   * Path nodes in order.
+   */
+  nodes: QueryPathNode[];
+
+  /**
+   * Selected runtime edges between consecutive path nodes.
+   */
+  edges: QueryPathEdge[];
+}
+
+/**
+ * One node in an exact runtime path.
+ */
+interface QueryPathNode {
+  /**
+   * Stable handle for exact follow-up tools.
+   */
+  handle: string;
+
+  /**
+   * Declaration kind.
+   */
+  kind: QueryNodeKind;
+
+  /**
+   * Symbol name.
+   */
+  name: string;
+
+  /**
+   * Project-relative file.
+   */
+  file: string;
+
+  /**
+   * Declaration line.
+   */
+  line: number;
+}
+
+/**
+ * One runtime edge between consecutive path nodes.
+ */
+interface QueryPathEdge {
+  /**
+   * Source node handle from nodes.
+   */
+  fromHandle: string;
+
+  /**
+   * Target node handle from nodes.
+   */
+  toHandle: string;
+
+  /**
+   * Runtime edge kind.
+   */
+  kind: QueryRuntimeEdgeKind;
+
+  /**
+   * Source use location when known.
+   */
+  use?: QueryLocation;
+}
+```
+
 ## expand_nodes
 
 ```ts
 /**
- * Expand exact node handles into source or flow details.
+ * Exact source expansion for handles printed by `query_nodes` or `query_files`. Use this when a graph result shows the right TypeScript declaration without enough body.
+ *
+ * For call-path, relation-flow, lifecycle, dispatch, or "how does X reach Y" questions, prefer `mode: "flow"` on the printed handle(s): it keeps following value-call/value-access edges. Use `mode: "source"` only when you need a wider body window for a specific declaration, for example to edit or quote the implementation. Do not grep/read a printed TypeScript path just to reopen it.
  */
 declare function expand_nodes(args: ExpandNodesArguments): ExpandNodesResult;
 
@@ -364,12 +477,12 @@ declare function expand_nodes(args: ExpandNodesArguments): ExpandNodesResult;
  */
 interface ExpandNodesArguments {
   /**
-   * Handles returned by other graph tools.
+   * One or more `handle:n:...` values copied from `query_nodes` or `query_files`. Full internal node IDs are also accepted.
    */
   ids: string[];
 
   /**
-   * Expansion view. `source` opens declaration source; `flow` adds flow evidence.
+   * `flow` starts from the exact nodes and expands downstream value-call/value-access path nodes; prefer it for call-path, relation-flow, lifecycle, dispatch, or "how does X reach Y" questions. `source` returns exact declaration bodies without replaying relationship edges; use it for a specific body, not as the default follow-up to a flow answer.
    */
   mode?: "source" | "flow";
 }
@@ -454,7 +567,11 @@ interface ExpandedSource {
 
 ```ts
 /**
- * Map files to declaration rosters and adjacent files.
+ * A roster of one or more source files: the file's adjacent files (the ones it reaches and is reached by) and a flat list of the declarations inside it, by kind, name, and line.
+ *
+ * Pass paths in `locations`; each file is answered as its own block, in input order.
+ *
+ * It is a cheap index for finding your way around a file: what is in it and what sits next to it. To see a listed declaration's relationships or body, call expand_nodes with its handle, or query_nodes when you need fuzzy relationship discovery.
  */
 declare function query_files(args: QueryFilesArguments): QueryFilesResult;
 
@@ -463,7 +580,7 @@ declare function query_files(args: QueryFilesArguments): QueryFilesResult;
  */
 interface QueryFilesArguments {
   /**
-   * File paths or trailing path fragments.
+   * File paths to render (absolute, or a trailing fragment like `src/main.ts`). Each is answered as its own block, in the order given.
    */
   locations: string[];
 }
@@ -563,7 +680,11 @@ interface FileDeclaration {
 
 ```ts
 /**
- * List current compiler and plugin diagnostics.
+ * Compiler diagnostics: TypeScript type errors, plus the project's @ttsc/lint rule violations and transform-plugin (typia, nestia) findings when present, each with its code and location exactly as ttsc reports them.
+ *
+ * Pass `files` for specific files, each answered as its own block, or omit it for every current finding across the project, grouped by file. Use the whole-project form after an edit to see what is now broken.
+ *
+ * Reports errors by default. Pass `severity` as `warning` for warnings only, or `all` for both.
  */
 declare function query_diagnostics(args?: QueryDiagnosticsArguments): QueryDiagnosticsResult;
 
@@ -572,12 +693,12 @@ declare function query_diagnostics(args?: QueryDiagnosticsArguments): QueryDiagn
  */
 interface QueryDiagnosticsArguments {
   /**
-   * Optional file paths or trailing path fragments. Omit for project-wide diagnostics.
+   * File paths, absolute or a trailing fragment like `src/main.ts`. Each is answered as its own block, in order. Omit for every diagnostic across the whole project.
    */
   files?: string[];
 
   /**
-   * Severity filter. Defaults to `error`.
+   * Defaults to `error`. Use `warning` for warnings only, or `all` for both.
    */
   severity?: "error" | "warning" | "all";
 }

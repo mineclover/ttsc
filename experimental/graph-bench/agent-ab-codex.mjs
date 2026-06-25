@@ -53,10 +53,9 @@ function resolveQuestion(repoKey) {
 
 const CODEX_GRAPH_ARM_PROMPT = [
   "A ttsc-graph MCP server is configured for this graph arm.",
-  "For TypeScript project orientation, use query_exports first only for onboarding, exported symbols, public API, or an uncertain entry point.",
-  "If the prompt already names the exact entry symbols or call chain, go straight to query_nodes.",
-  "For an ordered call chain, call query_nodes once with mode:'flow' and the named symbols in order; answer from the compact flow result.",
-  "Use a broad owner/action/noun query only when the chain is not already named. Use shell search/read only when the graph does not fit.",
+  "Use query_path when the task gives exact start/end symbols or an ordered call chain.",
+  "Use query_exports for orientation or uncertain entrypoints, and query_nodes for relationship discovery when endpoints are unknown.",
+  "Use expand_nodes only for handles that need source context. Use shell search/read only when the graph does not fit.",
 ].join("\n");
 
 // TypeScript benchmark repos and their medium-difficulty questions.

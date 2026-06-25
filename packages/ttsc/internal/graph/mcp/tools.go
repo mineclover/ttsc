@@ -84,6 +84,32 @@ func toolsListResult() any {
 			},
 		},
 		map[string]any{
+			"name":         "query_path",
+			"description":  queryPathDescription,
+			"outputSchema": queryPathOutputSchema(),
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"from": map[string]any{
+						"type":        "string",
+						"minLength":   1,
+						"description": queryPathFromDescription,
+					},
+					"to": map[string]any{
+						"type":        "string",
+						"minLength":   1,
+						"description": queryPathToDescription,
+					},
+					"via": map[string]any{
+						"type":        "array",
+						"items":       map[string]any{"type": "string", "minLength": 1},
+						"description": queryPathViaDescription,
+					},
+				},
+				"required": []any{"from", "to"},
+			},
+		},
+		map[string]any{
 			"name":         "expand_nodes",
 			"description":  expandNodesDescription,
 			"outputSchema": expandNodesOutputSchema(),
@@ -292,6 +318,28 @@ func graphIndexDefs() map[string]any {
 	}
 }
 
+func pathIndexDefs() map[string]any {
+	return map[string]any{
+		"QueryPathNode": objectOutputSchema(map[string]any{
+			"handle": schemaString("Stable handle for exact follow-up tools."),
+			"kind":   schemaNodeKind("Declaration kind."),
+			"name":   schemaString("Symbol name."),
+			"file":   schemaString("Project-relative file."),
+			"line":   schemaInteger("Declaration line."),
+		}, []any{"handle", "kind", "name", "file", "line"}),
+		"QueryPathEdge": objectOutputSchema(map[string]any{
+			"fromHandle": schemaString("Source node handle from nodes."),
+			"toHandle":   schemaString("Target node handle from nodes."),
+			"kind":       schemaRuntimeEdgeKind("Runtime edge kind."),
+			"use":        schemaRef("Source use location when known.", "#/$defs/QueryLocation"),
+		}, []any{"fromHandle", "toHandle", "kind"}),
+		"QueryLocation": objectOutputSchema(map[string]any{
+			"file": schemaString("Project-relative file."),
+			"line": schemaInteger("One-based line number."),
+		}, []any{"file", "line"}),
+	}
+}
+
 func queryExportsOutputSchema() map[string]any {
 	properties := map[string]any{}
 	properties["page"] = schemaRef("Compact page metadata with no derived duplicates.", "#/$defs/QueryExportsPage")
@@ -322,6 +370,16 @@ func queryNodesOutputSchema() map[string]any {
 	properties["flow"] = schemaRef("Runtime-flow evidence when mode is flow.", "#/$defs/QueryFlow")
 	schema := objectOutputSchema(properties, []any{"totalMatches", "nodes"})
 	schema["$defs"] = graphIndexDefs()
+	return schema
+}
+
+func queryPathOutputSchema() map[string]any {
+	properties := map[string]any{}
+	properties["message"] = schemaString("Optional status when no path or partial handling needs explanation.")
+	properties["nodes"] = schemaArrayRef("Path nodes in order.", "#/$defs/QueryPathNode")
+	properties["edges"] = schemaArrayRef("Selected runtime edges between consecutive path nodes.", "#/$defs/QueryPathEdge")
+	schema := objectOutputSchema(properties, []any{"nodes", "edges"})
+	schema["$defs"] = pathIndexDefs()
 	return schema
 }
 
@@ -431,6 +489,8 @@ func (s *Server) callTool(params json.RawMessage) (any, *rpcError) {
 		return s.queryExports(call.Arguments)
 	case "query_nodes":
 		return s.queryNodes(call.Arguments)
+	case "query_path":
+		return s.queryPath(call.Arguments)
 	case "expand_nodes":
 		return s.expandNodes(call.Arguments)
 	case "query_files":
@@ -596,6 +656,20 @@ type queryNodesResult struct {
 	Message      string            `json:"message,omitempty"`
 	Nodes        []graphNodeResult `json:"nodes"`
 	Flow         *flowResult       `json:"flow,omitempty"`
+}
+
+type queryPathResult struct {
+	Message string           `json:"message,omitempty"`
+	Nodes   []pathNodeResult `json:"nodes"`
+	Edges   []flowEdgeResult `json:"edges"`
+}
+
+type pathNodeResult struct {
+	Handle string         `json:"handle"`
+	Kind   graph.NodeKind `json:"kind"`
+	Name   string         `json:"name"`
+	File   string         `json:"file"`
+	Line   int            `json:"line"`
 }
 
 type expandNodesResult struct {
@@ -1254,6 +1328,253 @@ func (s *Server) queryNodes(args json.RawMessage) (any, *rpcError) {
 	}
 	result := s.queryNodesResult(in.Query, queryNodeModeSearch, matches, nodes)
 	return structuredToolResult(result, fmt.Sprintf("query_nodes returned %d nodes", len(result.Nodes))), nil
+}
+
+// queryPath answers an exact A-to-B runtime-flow question. It resolves the
+// caller-provided anchors and stitches each ordered segment through the resident
+// in-memory graph, returning only path coordinates and selected edge evidence.
+func (s *Server) queryPath(args json.RawMessage) (any, *rpcError) {
+	var in struct {
+		From string   `json:"from"`
+		To   string   `json:"to"`
+		Via  []string `json:"via"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, &rpcError{Code: codeInvalidParams, Message: "query_path: invalid arguments"}
+	}
+	from := cleanPathAnchor(in.From)
+	to := cleanPathAnchor(in.To)
+	if from == "" || to == "" {
+		return nil, &rpcError{Code: codeInvalidParams, Message: "query_path requires non-empty 'from' and 'to'"}
+	}
+	anchors := []string{from}
+	for _, item := range in.Via {
+		if anchor := cleanPathAnchor(item); anchor != "" {
+			anchors = append(anchors, anchor)
+		}
+	}
+	anchors = append(anchors, to)
+	if err := s.ensureLoaded(); err != nil {
+		return nil, &rpcError{Code: codeInternal, Message: "graph not available: " + err.Error()}
+	}
+	s.refreshIfStale()
+	groups := make([][]*graph.Node, 0, len(anchors))
+	missing := make([]string, 0)
+	for _, anchor := range anchors {
+		candidates := s.pathAnchorCandidates(anchor)
+		if len(candidates) == 0 {
+			missing = append(missing, anchor)
+		}
+		groups = append(groups, candidates)
+	}
+	if len(missing) > 0 {
+		result := queryPathResult{
+			Message: fmt.Sprintf("%d path anchor(s) did not resolve to graph nodes.", len(missing)),
+			Nodes:   []pathNodeResult{},
+			Edges:   []flowEdgeResult{},
+		}
+		return structuredToolResult(result, result.Message), nil
+	}
+	path, ok := s.pathThroughAnchors(groups, strings.Join(anchors, " "))
+	if !ok {
+		result := queryPathResult{
+			Message: "No runtime value-flow path connects the requested anchors in order.",
+			Nodes:   []pathNodeResult{},
+			Edges:   []flowEdgeResult{},
+		}
+		return structuredToolResult(result, result.Message), nil
+	}
+	result := queryPathResult{
+		Nodes: s.pathNodeRefs(path),
+		Edges: s.pathEdgeResults(path),
+	}
+	return structuredToolResult(result, fmt.Sprintf("query_path returned %d nodes", len(result.Nodes))), nil
+}
+
+func cleanPathAnchor(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.Trim(value, "`")
+	value = strings.TrimSuffix(value, "()")
+	return strings.TrimSpace(value)
+}
+
+const maxPathAnchorCandidates = 24
+
+func (s *Server) pathAnchorCandidates(anchor string) []*graph.Node {
+	raw := cleanPathAnchor(anchor)
+	ref := normalizeNodeRef(raw)
+	lower := strings.ToLower(raw)
+	type candidate struct {
+		node  *graph.Node
+		score int
+	}
+	candidates := make([]candidate, 0)
+	seen := map[string]bool{}
+	for _, node := range s.graph.Nodes {
+		if node == nil || seen[node.ID] || node.External || s.ignored[node.File] || !flowNodeEligible(node) {
+			continue
+		}
+		name := strings.ToLower(node.Name)
+		member := strings.ToLower(memberName(node.Name))
+		score := 0
+		switch {
+		case node.ID == ref:
+			score = 1000
+		case nodeHandle(node.ID) == ref:
+			score = 1000
+		case node.Name == raw:
+			score = 950
+		case name == lower:
+			score = 900
+		case s.relFile(node.File) == raw || node.File == raw:
+			score = 700
+		case member == lower && flowMemberAnchorEligible(node):
+			score = 500
+		}
+		if score == 0 {
+			continue
+		}
+		seen[node.ID] = true
+		candidates = append(candidates, candidate{node: node, score: score})
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].score != candidates[j].score {
+			return candidates[i].score > candidates[j].score
+		}
+		left := candidates[i].node
+		right := candidates[j].node
+		if left.File != right.File {
+			return left.File < right.File
+		}
+		if s.declLine(left) != s.declLine(right) {
+			return s.declLine(left) < s.declLine(right)
+		}
+		return left.Name < right.Name
+	})
+	if len(candidates) > maxPathAnchorCandidates {
+		candidates = candidates[:maxPathAnchorCandidates]
+	}
+	out := make([]*graph.Node, 0, len(candidates))
+	for _, candidate := range candidates {
+		out = append(out, candidate.node)
+	}
+	return out
+}
+
+const maxQueryPathNodes = 32
+
+type queryPathState struct {
+	path []string
+	cost int
+}
+
+func (s *Server) pathThroughAnchors(groups [][]*graph.Node, query string) ([]*graph.Node, bool) {
+	if len(groups) == 0 || len(groups[0]) == 0 {
+		return nil, false
+	}
+	tokens := queryTokens(query)
+	words := queryWords(query)
+	states := map[string]queryPathState{}
+	for i, node := range groups[0] {
+		if node == nil {
+			continue
+		}
+		states[node.ID] = queryPathState{path: []string{node.ID}, cost: i}
+	}
+	for groupIndex := 1; groupIndex < len(groups); groupIndex++ {
+		nextStates := map[string]queryPathState{}
+		for fromID, state := range states {
+			for candidateIndex, target := range groups[groupIndex] {
+				if target == nil {
+					continue
+				}
+				segment := s.shortestFlowPath(fromID, target.ID, tokens, words)
+				if len(segment) == 0 {
+					continue
+				}
+				combined := append(append([]string(nil), state.path...), segment[1:]...)
+				if len(combined) > maxQueryPathNodes {
+					continue
+				}
+				cost := state.cost + len(segment)*100 + candidateIndex
+				if prev, ok := nextStates[target.ID]; !ok || cost < prev.cost || (cost == prev.cost && pathKey(combined) < pathKey(prev.path)) {
+					nextStates[target.ID] = queryPathState{path: combined, cost: cost}
+				}
+			}
+		}
+		if len(nextStates) == 0 {
+			return nil, false
+		}
+		states = nextStates
+	}
+	var best queryPathState
+	ok := false
+	for _, state := range states {
+		if !ok || state.cost < best.cost || (state.cost == best.cost && pathKey(state.path) < pathKey(best.path)) {
+			best = state
+			ok = true
+		}
+	}
+	if !ok {
+		return nil, false
+	}
+	out := make([]*graph.Node, 0, len(best.path))
+	for _, id := range best.path {
+		node := s.graph.Nodes[id]
+		if node != nil {
+			out = append(out, node)
+		}
+	}
+	return out, len(out) > 0
+}
+
+func pathKey(path []string) string {
+	return strings.Join(path, "\x00")
+}
+
+func (s *Server) pathNodeRefs(nodes []*graph.Node) []pathNodeResult {
+	out := make([]pathNodeResult, 0, len(nodes))
+	for _, node := range nodes {
+		out = append(out, pathNodeResult{
+			Handle: nodeHandle(node.ID),
+			Kind:   node.Kind,
+			Name:   node.Name,
+			File:   s.relFile(node.File),
+			Line:   s.declLine(node),
+		})
+	}
+	return out
+}
+
+func (s *Server) pathEdgeResults(nodes []*graph.Node) []flowEdgeResult {
+	if len(nodes) < 2 {
+		return nil
+	}
+	out := make([]flowEdgeResult, 0, len(nodes)-1)
+	for i := 1; i < len(nodes); i++ {
+		from := nodes[i-1]
+		to := nodes[i]
+		edge := s.runtimeEdgeBetween(from.ID, to.ID)
+		if edge == nil {
+			continue
+		}
+		out = append(out, flowEdgeResult{
+			FromHandle: nodeHandle(from.ID),
+			ToHandle:   nodeHandle(to.ID),
+			Kind:       edge.Kind,
+			Use:        s.edgeUseLocation(edge),
+		})
+	}
+	return out
+}
+
+func (s *Server) runtimeEdgeBetween(fromID string, toID string) *graph.Edge {
+	for _, edge := range s.graph.Edges {
+		if edge.From == fromID && edge.To == toID && (edge.Kind == graph.EdgeValueCall || edge.Kind == graph.EdgeValueAccess) {
+			return edge
+		}
+	}
+	return nil
 }
 
 func (s *Server) shouldAutoFlow(query string, matches []*graph.Node) bool {

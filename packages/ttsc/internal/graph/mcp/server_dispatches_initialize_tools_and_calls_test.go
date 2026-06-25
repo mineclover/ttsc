@@ -60,7 +60,7 @@ export const bad: number = "not a number";
 	if info, _ := init["serverInfo"].(map[string]any); info == nil || info["name"] != "ttsc-graph" {
 		t.Fatalf("initialize serverInfo missing or wrong: %v", init["serverInfo"])
 	}
-	if text, _ := init["instructions"].(string); !strings.Contains(text, "query_exports") || !strings.Contains(text, "query_nodes") {
+	if text, _ := init["instructions"].(string); !strings.Contains(text, "query_exports") || !strings.Contains(text, "query_path") || !strings.Contains(text, "query_nodes") {
 		t.Fatalf("initialize did not ship server instructions: %v", init["instructions"])
 	}
 
@@ -72,7 +72,7 @@ export const bad: number = "not a number";
 	// tools/list advertises the graph tools.
 	list := result(t, server, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`)
 	names := toolNames(t, list)
-	if !names["query_exports"] || !names["query_nodes"] || !names["expand_nodes"] || !names["query_files"] || !names["query_diagnostics"] {
+	if !names["query_exports"] || !names["query_path"] || !names["query_nodes"] || !names["expand_nodes"] || !names["query_files"] || !names["query_diagnostics"] {
 		t.Fatalf("tools/list missing expected tools: %v", names)
 	}
 	tools := toolsByName(t, list)
@@ -104,13 +104,13 @@ export const bad: number = "not a number";
 	exportSymbolProperties := exportSymbol["properties"].(map[string]any)
 	assertStringEnum(t, exportSymbolProperties["kind"].(map[string]any), "class", "interface", "method")
 	nodes := tools["query_nodes"]
-	if desc, _ := nodes["description"].(string); !strings.Contains(desc, "already names symbols") {
+	if desc, _ := nodes["description"].(string); !strings.Contains(desc, "relationship discovery") {
 		t.Fatalf("query_nodes did not use the embedded description: %v", desc)
 	}
 	nodesSchema := nodes["inputSchema"].(map[string]any)
 	nodesProperties := nodesSchema["properties"].(map[string]any)
 	queryProperty := nodesProperties["query"].(map[string]any)
-	if desc, _ := queryProperty["description"].(string); !strings.Contains(desc, "ordered call chain") {
+	if desc, _ := queryProperty["description"].(string); !strings.Contains(desc, "Focused relationship") {
 		t.Fatalf("query_nodes query did not use the embedded description: %v", desc)
 	}
 	modeProperty := nodesProperties["mode"].(map[string]any)
@@ -130,6 +130,30 @@ export const bad: number = "not a number";
 	edgeRef := nodesDefs["QueryEdgeRef"].(map[string]any)
 	edgeRefProperties := edgeRef["properties"].(map[string]any)
 	assertStringEnum(t, edgeRefProperties["kind"].(map[string]any), "heritage", "value-call", "value-access", "type-ref")
+	pathTool := tools["query_path"]
+	if desc, _ := pathTool["description"].(string); !strings.Contains(desc, "start and end symbol") {
+		t.Fatalf("query_path did not use the embedded description: %v", desc)
+	}
+	pathSchema := pathTool["inputSchema"].(map[string]any)
+	pathProperties := pathSchema["properties"].(map[string]any)
+	if desc, _ := pathProperties["from"].(map[string]any)["description"].(string); !strings.Contains(desc, "Start symbol") {
+		t.Fatalf("query_path from did not use the embedded description: %v", desc)
+	}
+	if desc, _ := pathProperties["via"].(map[string]any)["description"].(string); !strings.Contains(desc, "intermediate") {
+		t.Fatalf("query_path via did not use the embedded description: %v", desc)
+	}
+	pathOutput := pathTool["outputSchema"].(map[string]any)
+	assertNoOutputEchoFields(t, pathOutput, "schemaVersion", "tool", "from", "to", "via", "missing")
+	pathDefs := pathOutput["$defs"].(map[string]any)
+	if pathDefs["QueryPathNode"] == nil || pathDefs["QueryPathEdge"] == nil {
+		t.Fatalf("query_path output schema did not expose named defs: %v", pathDefs)
+	}
+	pathNode := pathDefs["QueryPathNode"].(map[string]any)
+	pathNodeProperties := pathNode["properties"].(map[string]any)
+	if _, ok := pathNodeProperties["external"]; ok {
+		t.Fatalf("query_path node schema leaked external flag despite in-project path filtering: %v", pathNodeProperties)
+	}
+	assertStringEnum(t, pathNodeProperties["kind"].(map[string]any), "class", "interface", "method")
 	expand := tools["expand_nodes"]
 	if desc, _ := expand["description"].(string); !strings.Contains(desc, "Exact source expansion") {
 		t.Fatalf("expand_nodes did not use the embedded description: %v", desc)

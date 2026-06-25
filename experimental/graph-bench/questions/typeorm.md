@@ -1,1 +1,1 @@
-Trace how `Repository.find()` turns `relations` find options into query-builder joins: `Repository.find` -> `EntityManager.find` -> `SelectQueryBuilder.setFindOptions` -> `applyFindOptions` -> `buildRelations`. Explain how relation paths become join aliases and join attributes.
+Trace how `Repository.find()` turns `relations` find options into query-builder joins: `Repository.find` -> `EntityManager.find` -> `SelectQueryBuilder.setFindOptions` -> `applyFindOptions` -> `buildRelations`. Explain how the relation paths are expanded into join aliases and join attributes.

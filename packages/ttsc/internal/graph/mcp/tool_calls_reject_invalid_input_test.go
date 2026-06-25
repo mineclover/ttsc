@@ -87,7 +87,15 @@ func TestToolCallsRejectInvalidInput(t *testing.T) {
 		t.Fatalf("blank query message did not mention non-empty: %v", blankQuery["message"])
 	}
 
-	blankExpand := errorOf(t, server, `{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"expand_nodes","arguments":{"ids":[]}}}`)
+	blankPath := errorOf(t, server, `{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"query_path","arguments":{"from":"value","to":"  "}}}`)
+	if blankPath["code"] != float64(-32602) {
+		t.Fatalf("blank path code was not -32602: %v", blankPath["code"])
+	}
+	if msg, _ := blankPath["message"].(string); !strings.Contains(msg, "from") || !strings.Contains(msg, "to") {
+		t.Fatalf("blank path message did not mention from/to: %v", blankPath["message"])
+	}
+
+	blankExpand := errorOf(t, server, `{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"expand_nodes","arguments":{"ids":[]}}}`)
 	if blankExpand["code"] != float64(-32602) {
 		t.Fatalf("blank expand code was not -32602: %v", blankExpand["code"])
 	}
@@ -95,7 +103,7 @@ func TestToolCallsRejectInvalidInput(t *testing.T) {
 		t.Fatalf("blank expand message did not mention non-empty: %v", blankExpand["message"])
 	}
 
-	badMode := errorOf(t, server, `{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"expand_nodes","arguments":{"ids":["n:deadbeef"],"mode":"impact"}}}`)
+	badMode := errorOf(t, server, `{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"expand_nodes","arguments":{"ids":["n:deadbeef"],"mode":"impact"}}}`)
 	if badMode["code"] != float64(-32602) {
 		t.Fatalf("bad expand mode code was not -32602: %v", badMode["code"])
 	}
@@ -106,7 +114,7 @@ func TestToolCallsRejectInvalidInput(t *testing.T) {
 	// A blank query_diagnostics file is not an error: it asks for the whole
 	// project's diagnostics. The one-file fixture is clean, so the project-wide
 	// listing reports none rather than rejecting the call.
-	projectDiag := toolStructured(t, server, `{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"query_diagnostics","arguments":{"files":[""]}}}`)
+	projectDiag := toolStructured(t, server, `{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"query_diagnostics","arguments":{"files":[""]}}}`)
 	if projectDiag["total"] != float64(0) {
 		t.Fatalf("blank file did not return whole-project diagnostics: %v", projectDiag)
 	}

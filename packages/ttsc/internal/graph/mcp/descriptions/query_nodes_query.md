@@ -1,1 +1,1 @@
-For an ordered call chain, put the named symbols in order in one query, e.g. "Gateway.fetch Coordinator.fetch Pipeline.setPlan applyPlan buildSteps", and use `mode: "flow"`. Use a broad owner/action/noun query, e.g. "controller dispatch service cache", only when the chain is not already named.
+Focused relationship query using relevant symbol names, owners, actions, files, or domain terms. Use query_path instead when exact path endpoints are known.

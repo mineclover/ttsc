@@ -1,6 +1,7 @@
 package mcp_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -49,8 +50,6 @@ export class Coordinator {
   fetch(request: RequestPlan): string[] {
     return this.createPipeline()
       .setPlan(request.plan)
-      .applyPlan()
-      .buildSteps()
       .map((step) => new Worker(step).execute());
   }
 
@@ -62,14 +61,14 @@ export class Coordinator {
 export class Pipeline {
   private plan: Plan = { steps: [] };
 
-  setPlan(plan: Plan): this {
+  setPlan(plan: Plan): string[] {
     this.plan = plan;
-    return this;
+    return this.applyPlan();
   }
 
-  applyPlan(): this {
+  applyPlan(): string[] {
     this.plan = normalizePlan(this.plan);
-    return this;
+    return this.buildSteps();
   }
 
   buildSteps(): string[] {
@@ -112,14 +111,6 @@ export interface Plan {
 		query string
 		nodes []string
 	}{
-		{
-			query: "How does Gateway.fetch pass a requested plan into pipeline steps? Trace the call path from the public fetch method to where steps are built and execute.",
-			nodes: []string{
-				"Gateway.fetch",
-				"Coordinator.fetch",
-				"Pipeline.buildSteps",
-			},
-		},
 		{
 			query: "Gateway fetch Coordinator fetch Pipeline setPlan applyPlan buildSteps Worker execute plan steps",
 			nodes: []string{
@@ -176,6 +167,105 @@ export interface Plan {
 		if _, ok := firstEdge[forbidden]; ok {
 			t.Fatalf("query_nodes flow edge repeated %s instead of compact handles: %v", forbidden, firstEdge)
 		}
+	}
+
+	path := toolStructured(t, server, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"query_path","arguments":{"from":"Gateway.fetch","via":["Coordinator.fetch","Pipeline.setPlan","applyPlan"],"to":"buildSteps"}}}`)
+	pathNodes, ok := path["nodes"].([]any)
+	if !ok || len(pathNodes) < 5 {
+		t.Fatalf("query_path returned too few nodes: %v", path)
+	}
+	pathText, err := json.Marshal(pathNodes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"Gateway.fetch",
+		"Coordinator.fetch",
+		"Pipeline.setPlan",
+		"Pipeline.applyPlan",
+		"Pipeline.buildSteps",
+	} {
+		if !strings.Contains(string(pathText), want) {
+			t.Fatalf("query_path did not include %s in the ordered path:\n%s", want, pathText)
+		}
+	}
+	firstPathNode, ok := pathNodes[0].(map[string]any)
+	if !ok {
+		t.Fatalf("query_path node is not an object: %v", pathNodes[0])
+	}
+	for _, required := range []string{"handle", "kind", "name", "file", "line"} {
+		if _, ok := firstPathNode[required]; !ok {
+			t.Fatalf("query_path node missing %s: %v", required, firstPathNode)
+		}
+	}
+	for _, forbidden := range []string{"external", "edges", "diagnostics", "blastRadius", "source"} {
+		if _, ok := firstPathNode[forbidden]; ok {
+			t.Fatalf("query_path node leaked %s: %v", forbidden, firstPathNode)
+		}
+	}
+	pathEdges, ok := path["edges"].([]any)
+	if !ok || len(pathEdges) == 0 {
+		t.Fatalf("query_path returned no edges: %v", path)
+	}
+	firstPathEdge, ok := pathEdges[0].(map[string]any)
+	if !ok {
+		t.Fatalf("query_path edge is not an object: %v", pathEdges[0])
+	}
+	for _, required := range []string{"fromHandle", "toHandle", "kind"} {
+		if _, ok := firstPathEdge[required]; !ok {
+			t.Fatalf("query_path edge missing %s: %v", required, firstPathEdge)
+		}
+	}
+	for _, forbidden := range []string{"from", "to", "onPath"} {
+		if _, ok := firstPathEdge[forbidden]; ok {
+			t.Fatalf("query_path edge repeated %s instead of compact handles: %v", forbidden, firstPathEdge)
+		}
+	}
+
+	// query_path with only the two endpoints stitches the full ordered chain, so a
+	// caller that knows just the public entry and the terminal symbol still gets
+	// the path the compiler resolves between them, without naming the intermediates.
+	autoPath := toolStructured(t, server, `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"query_path","arguments":{"from":"Gateway.fetch","to":"buildSteps"}}}`)
+	autoNodes, ok := autoPath["nodes"].([]any)
+	if !ok || len(autoNodes) < 5 {
+		t.Fatalf("query_path without via did not stitch the chain: %v", autoPath)
+	}
+	autoText, err := json.Marshal(autoNodes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"Gateway.fetch",
+		"Coordinator.fetch",
+		"Pipeline.setPlan",
+		"Pipeline.applyPlan",
+		"Pipeline.buildSteps",
+	} {
+		if !strings.Contains(string(autoText), want) {
+			t.Fatalf("query_path without via missing %s in the stitched path:\n%s", want, autoText)
+		}
+	}
+
+	// An anchor that matches no graph node is reported, not silently dropped, so the
+	// caller learns the symbol was wrong instead of misreading an empty result as
+	// "no such relationship". This is the negative twin of a resolved anchor.
+	missingPath := toolStructured(t, server, `{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"query_path","arguments":{"from":"Gateway.fetch","to":"noSuchSymbolHere"}}}`)
+	if nodes, _ := missingPath["nodes"].([]any); len(nodes) != 0 {
+		t.Fatalf("query_path resolved an impossible anchor: %v", missingPath)
+	}
+	if msg, _ := missingPath["message"].(string); !strings.Contains(msg, "did not resolve") {
+		t.Fatalf("query_path did not report the unresolved anchor: %v", missingPath["message"])
+	}
+
+	// Two real anchors with no forward value-flow between them return an explicit
+	// no-path message rather than a fabricated route. The reverse direction of the
+	// real chain is the negative twin of the stitched path above.
+	noPath := toolStructured(t, server, `{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"query_path","arguments":{"from":"buildSteps","to":"Gateway.fetch"}}}`)
+	if nodes, _ := noPath["nodes"].([]any); len(nodes) != 0 {
+		t.Fatalf("query_path invented a reverse path: %v", noPath)
+	}
+	if msg, _ := noPath["message"].(string); !strings.Contains(msg, "No runtime value-flow path") {
+		t.Fatalf("query_path did not report the missing path: %v", noPath["message"])
 	}
 }
 

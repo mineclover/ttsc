@@ -1,1 +1,1 @@
-How does Vue re-render a component's DOM when its reactive state changes?
+In Vue reactivity, what ordered call path takes a property write on a `reactive()` object from `MutableReactiveHandler.set` to the `ReactiveEffect` created for `watchEffect` running again? Include the steps through `trigger`, `Dep.notify`, effect scheduling, and the final `ReactiveEffect.run`.

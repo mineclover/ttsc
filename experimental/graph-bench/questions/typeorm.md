@@ -1,1 +1,1 @@
-How does TypeORM turn a high-level Repository.find call with relations into a query that runs against the database and loads those relations?
+Trace how `Repository.find()` turns `relations` find options into query-builder joins: `Repository.find` -> `EntityManager.find` -> `SelectQueryBuilder.setFindOptions` -> `applyFindOptions` -> `buildRelations`. Explain how the relation paths are expanded into join aliases and join attributes.

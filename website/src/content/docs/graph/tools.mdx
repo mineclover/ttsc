@@ -120,11 +120,6 @@ interface QueryNodesArguments {
   query: string;
 
   /**
-   * `auto` lets the server infer search versus flow. `search` returns ranked matches with adjacent relationships. `flow` returns compact value-call/value-access context when the path shape still needs inference.
-   */
-  mode?: "auto" | "search" | "flow";
-
-  /**
    * Match strategy. `exact` accepts only exact symbol names, handles, or file paths.
    */
   match?: "auto" | "exact" | "fuzzy";
@@ -148,11 +143,6 @@ interface QueryNodesResult {
    * Matched graph nodes as compact index records, not source bodies.
    */
   nodes: QueryGraphNode[];
-
-  /**
-   * Runtime-flow evidence when mode is flow.
-   */
-  flow?: QueryFlow;
 }
 
 /**

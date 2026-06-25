@@ -26,9 +26,6 @@ var queryExportsPageDescriptionMarkdown string
 //go:embed descriptions/query_nodes_query.md
 var queryNodesQueryDescriptionMarkdown string
 
-//go:embed descriptions/query_nodes_mode.md
-var queryNodesModeDescriptionMarkdown string
-
 //go:embed descriptions/query_path.md
 var queryPathDescriptionMarkdown string
 
@@ -72,7 +69,6 @@ var (
 	queryExportsLimitDescription        = strings.TrimSpace(queryExportsLimitDescriptionMarkdown)
 	queryExportsPageDescription         = strings.TrimSpace(queryExportsPageDescriptionMarkdown)
 	queryNodesQueryDescription          = strings.TrimSpace(queryNodesQueryDescriptionMarkdown)
-	queryNodesModeDescription           = strings.TrimSpace(queryNodesModeDescriptionMarkdown)
 	queryPathDescription                = strings.TrimSpace(queryPathDescriptionMarkdown)
 	queryPathFromDescription            = strings.TrimSpace(queryPathFromDescriptionMarkdown)
 	queryPathToDescription              = strings.TrimSpace(queryPathToDescriptionMarkdown)

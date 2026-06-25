@@ -67,12 +67,6 @@ func toolsListResult() any {
 						"type":        "string",
 						"description": queryNodesQueryDescription,
 					},
-					"mode": map[string]any{
-						"type":        "string",
-						"enum":        []any{"auto", "search", "flow"},
-						"default":     "auto",
-						"description": queryNodesModeDescription,
-					},
 					"match": map[string]any{
 						"type":        "string",
 						"enum":        []any{"auto", "exact", "fuzzy"},
@@ -367,7 +361,6 @@ func queryNodesOutputSchema() map[string]any {
 	properties["totalMatches"] = schemaInteger("Number of matched nodes before result shaping.")
 	properties["message"] = schemaString("Optional status when no match or partial handling needs explanation.")
 	properties["nodes"] = schemaArrayRef("Matched graph nodes as index records, not source bodies.", "#/$defs/QueryGraphNode")
-	properties["flow"] = schemaRef("Runtime-flow evidence when mode is flow.", "#/$defs/QueryFlow")
 	schema := objectOutputSchema(properties, []any{"totalMatches", "nodes"})
 	schema["$defs"] = graphIndexDefs()
 	return schema
@@ -539,14 +532,6 @@ const (
 	diagnosticSeverityFilterAll     diagnosticSeverityFilter = "all"
 )
 
-type queryNodeMode string
-
-const (
-	queryNodeModeAuto   queryNodeMode = "auto"
-	queryNodeModeSearch queryNodeMode = "search"
-	queryNodeModeFlow   queryNodeMode = "flow"
-)
-
 type nodeMatchMode string
 
 const (
@@ -655,7 +640,6 @@ type queryNodesResult struct {
 	TotalMatches int               `json:"totalMatches"`
 	Message      string            `json:"message,omitempty"`
 	Nodes        []graphNodeResult `json:"nodes"`
-	Flow         *flowResult       `json:"flow,omitempty"`
 }
 
 type queryPathResult struct {
@@ -781,16 +765,11 @@ func exportedAliases(entry exportEntry) []string {
 	return aliases
 }
 
-func (s *Server) queryNodesResult(query string, resolvedMode queryNodeMode, matches []*graph.Node, nodes []*graph.Node) queryNodesResult {
-	includeGraphDetails := resolvedMode != queryNodeModeFlow
-	out := queryNodesResult{
+func (s *Server) queryNodesResult(matches []*graph.Node) queryNodesResult {
+	return queryNodesResult{
 		TotalMatches: len(matches),
-		Nodes:        s.graphNodeResults(nodes, includeGraphDetails),
+		Nodes:        s.graphNodeResults(matches, true),
 	}
-	if resolvedMode == queryNodeModeFlow {
-		out.Flow = s.flowResult(nodes, query)
-	}
-	return out
 }
 
 func (s *Server) graphNodeResults(nodes []*graph.Node, includeGraphDetails bool) []graphNodeResult {
@@ -1279,18 +1258,10 @@ func (s *Server) queryExports(args json.RawMessage) (any, *rpcError) {
 func (s *Server) queryNodes(args json.RawMessage) (any, *rpcError) {
 	var in struct {
 		Query string        `json:"query"`
-		Mode  queryNodeMode `json:"mode"`
 		Match nodeMatchMode `json:"match"`
 	}
 	if err := json.Unmarshal(args, &in); err != nil || strings.TrimSpace(in.Query) == "" {
 		return nil, &rpcError{Code: codeInvalidParams, Message: "query_nodes requires a non-empty 'query'"}
-	}
-	mode := queryNodeMode(strings.TrimSpace(string(in.Mode)))
-	if mode == "" {
-		mode = queryNodeModeAuto
-	}
-	if mode != queryNodeModeAuto && mode != queryNodeModeSearch && mode != queryNodeModeFlow {
-		return nil, &rpcError{Code: codeInvalidParams, Message: "query_nodes mode must be auto, search, or flow"}
 	}
 	match := nodeMatchMode(strings.TrimSpace(string(in.Match)))
 	if match == "" {
@@ -1313,20 +1284,7 @@ func (s *Server) queryNodes(args json.RawMessage) (any, *rpcError) {
 		}
 		return structuredToolResult(result, result.Message), nil
 	}
-	// Expand the downstream call path only when the user actually asked for a flow.
-	// Exact public-surface questions need the next few compiler-resolved calls
-	// inline; otherwise thorough agents re-query or read the target files just to
-	// confirm the path. Plain symbol lookups can still opt out by setting
-	// TTSC_GRAPH_CALLPATH=0.
-	nodes := matches
-	callPath := mode == queryNodeModeFlow || (mode == queryNodeModeAuto && s.shouldAutoFlow(in.Query, matches))
-	if callPath {
-		nodes = s.withCallPath(matches, maxPathNodes, in.Query)
-		nodes = s.filterFlowNodes(nodes, in.Query)
-		result := s.queryNodesResult(in.Query, queryNodeModeFlow, matches, nodes)
-		return structuredToolResult(result, fmt.Sprintf("query_nodes returned %d flow nodes", len(result.Nodes))), nil
-	}
-	result := s.queryNodesResult(in.Query, queryNodeModeSearch, matches, nodes)
+	result := s.queryNodesResult(matches)
 	return structuredToolResult(result, fmt.Sprintf("query_nodes returned %d nodes", len(result.Nodes))), nil
 }
 
@@ -1461,8 +1419,6 @@ func (s *Server) pathAnchorCandidates(anchor string) []*graph.Node {
 	return out
 }
 
-const maxQueryPathNodes = 32
-
 type queryPathState struct {
 	path []string
 	cost int
@@ -1493,9 +1449,6 @@ func (s *Server) pathThroughAnchors(groups [][]*graph.Node, query string) ([]*gr
 					continue
 				}
 				combined := append(append([]string(nil), state.path...), segment[1:]...)
-				if len(combined) > maxQueryPathNodes {
-					continue
-				}
 				cost := state.cost + len(segment)*100 + candidateIndex
 				if prev, ok := nextStates[target.ID]; !ok || cost < prev.cost || (cost == prev.cost && pathKey(combined) < pathKey(prev.path)) {
 					nextStates[target.ID] = queryPathState{path: combined, cost: cost}

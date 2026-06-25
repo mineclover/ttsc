@@ -113,10 +113,6 @@ export const bad: number = "not a number";
 	if desc, _ := queryProperty["description"].(string); !strings.Contains(desc, "Focused relationship") {
 		t.Fatalf("query_nodes query did not use the embedded description: %v", desc)
 	}
-	modeProperty := nodesProperties["mode"].(map[string]any)
-	if desc, _ := modeProperty["description"].(string); !strings.Contains(desc, "flow") {
-		t.Fatalf("query_nodes mode did not use the embedded description: %v", desc)
-	}
 	matchProperty := nodesProperties["match"].(map[string]any)
 	if desc, _ := matchProperty["description"].(string); !strings.Contains(desc, "exact") {
 		t.Fatalf("query_nodes match did not describe exact matching: %v", desc)

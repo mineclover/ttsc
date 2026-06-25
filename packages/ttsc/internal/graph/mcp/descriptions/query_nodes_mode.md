@@ -1,1 +1,0 @@
-`auto` lets the server infer search versus flow. `search` returns ranked matches with adjacent relationships. `flow` returns compact value-call/value-access context when the path shape still needs inference.

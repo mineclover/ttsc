@@ -69,8 +69,15 @@ type Edge struct {
   From string
   To   string
   Kind EdgeKind
-  Pos  int
-  End  int
+  // Origin records the syntactic form a value-call or heritage edge came from,
+  // so the JSON dump can split one internal kind into the finer schema kinds
+  // (calls / instantiates / renders, extends / implements) without the
+  // MCP-facing model losing the distinction. It is "" for kinds that need no
+  // split (type-ref, value-access). For EdgeValueCall it is "call", "new",
+  // "jsx", or "tagged"; for EdgeHeritage it is "extends" or "implements".
+  Origin string
+  Pos    int
+  End    int
 }
 
 // Graph is the in-memory adjacency the MCP tools query. Edges are added by the
@@ -78,6 +85,12 @@ type Edge struct {
 type Graph struct {
   Nodes map[string]*Node
   Edges []*Edge
+  // Decorators holds the decorators written on the workspace's declarations,
+  // captured syntactically so the JSON dump can emit `decorates` edges and a
+  // framework pass can synthesize routes from `@Controller`/`@Get` conventions
+  // without re-parsing source. It is dump-only metadata, separate from Edges so
+  // the existing checker-resolved relationships are untouched.
+  Decorators []*Decorator
   // bodyNodes tracks whether a callable node's display span is the overload
   // implementation rather than an overload signature. It is build-only metadata
   // and intentionally stays out of JSON dumps.

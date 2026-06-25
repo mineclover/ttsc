@@ -18,6 +18,9 @@ func (g *Graph) addEdges(prog *driver.Program) {
     g.collectHeritage(checker, file)
     g.collectCalls(checker, file)
     g.collectTypeRefs(checker, file)
+    if file.Statements != nil {
+      g.collectDecorators(file.FileName(), file.Statements.Nodes)
+    }
   }
 }
 
@@ -25,16 +28,16 @@ func (g *Graph) addEdges(prog *driver.Program) {
 // caller that invokes the same function several times yields one edge, not one
 // per call site. The dedup is an O(1) set lookup, so building N edges is O(N).
 func (g *Graph) addEdge(from, to string, kind EdgeKind) {
-  g.addEdgeAt(from, to, kind, -1, -1)
+  g.addEdgeAt(from, to, kind, "", -1, -1)
 }
 
-func (g *Graph) addEdgeAt(from, to string, kind EdgeKind, pos, end int) {
+func (g *Graph) addEdgeAt(from, to string, kind EdgeKind, origin string, pos, end int) {
   key := from + "\x00" + to + "\x00" + string(kind)
   if _, exists := g.seen[key]; exists {
     return
   }
   g.seen[key] = struct{}{}
-  g.Edges = append(g.Edges, &Edge{From: from, To: to, Kind: kind, Pos: pos, End: end})
+  g.Edges = append(g.Edges, &Edge{From: from, To: to, Kind: kind, Origin: origin, Pos: pos, End: end})
 }
 
 // collectHeritage adds a heritage edge for every base of every class and
@@ -81,6 +84,13 @@ func (g *Graph) heritageEdges(checker *shimchecker.Checker, path string, node *s
     if clause == nil || clause.Types == nil {
       continue
     }
+    // The clause keyword splits one internal heritage kind into the schema's
+    // `extends` vs `implements`: an interface's bases and a class's superclass
+    // are `extends`; a class's interface list is `implements`.
+    origin := "implements"
+    if clause.Token == shimast.KindExtendsKeyword {
+      origin = "extends"
+    }
     for _, typeNode := range clause.Types.Nodes {
       base := typeNode.AsExpressionWithTypeArguments()
       if base == nil || base.Expression == nil {
@@ -94,7 +104,7 @@ func (g *Graph) heritageEdges(checker *shimchecker.Checker, path string, node *s
       if to == "" {
         continue
       }
-      g.addEdgeAt(from, to, EdgeHeritage, base.Expression.Pos(), base.Expression.End())
+      g.addEdgeAt(from, to, EdgeHeritage, origin, base.Expression.Pos(), base.Expression.End())
     }
   }
 }
@@ -255,16 +265,16 @@ func (g *Graph) callsWithin(checker *shimchecker.Checker, from string, node *shi
     switch child.Kind {
     case shimast.KindCallExpression:
       if call := child.AsCallExpression(); call != nil && call.Expression != nil {
-        g.callEdge(checker, from, call.Expression)
+        g.callEdge(checker, from, call.Expression, "call")
       }
     case shimast.KindNewExpression:
       if newExpr := child.AsNewExpression(); newExpr != nil && newExpr.Expression != nil {
-        g.callEdge(checker, from, newExpr.Expression)
+        g.callEdge(checker, from, newExpr.Expression, "new")
       }
     case shimast.KindTaggedTemplateExpression:
       // A tagged template (styled`…`, gql`…`) is a call to its tag function.
       if tagged := child.AsTaggedTemplateExpression(); tagged != nil && tagged.Tag != nil {
-        g.callEdge(checker, from, tagged.Tag)
+        g.callEdge(checker, from, tagged.Tag, "tagged")
       }
     case shimast.KindPropertyAccessExpression:
       // Accessor/property reads are runtime uses too. Without this edge the
@@ -284,11 +294,11 @@ func (g *Graph) callsWithin(checker *shimchecker.Checker, from string, node *shi
       // `<Component />` is a use of the component; an intrinsic tag (`<div />`)
       // resolves to nothing and is dropped by callEdge.
       if jsx := child.AsJsxSelfClosingElement(); jsx != nil && jsx.TagName != nil {
-        g.callEdge(checker, from, jsx.TagName)
+        g.callEdge(checker, from, jsx.TagName, "jsx")
       }
     case shimast.KindJsxOpeningElement:
       if jsx := child.AsJsxOpeningElement(); jsx != nil && jsx.TagName != nil {
-        g.callEdge(checker, from, jsx.TagName)
+        g.callEdge(checker, from, jsx.TagName, "jsx")
       }
     }
     g.callsWithin(checker, from, child)
@@ -317,18 +327,20 @@ func isInvokedAccess(access *shimast.Node) bool {
 }
 
 // callEdge resolves a callee expression to its declaration and records a
-// value-call edge, skipping an unresolved callee and a self-call.
-func (g *Graph) callEdge(checker *shimchecker.Checker, from string, callee *shimast.Node) {
-  g.valueUseEdge(checker, from, callee, EdgeValueCall)
+// value-call edge, skipping an unresolved callee and a self-call. origin records
+// the call form ("call", "new", "jsx", "tagged") so the dump can split it into
+// the schema's calls / instantiates / renders kinds.
+func (g *Graph) callEdge(checker *shimchecker.Checker, from string, callee *shimast.Node, origin string) {
+  g.valueUseEdge(checker, from, callee, EdgeValueCall, origin)
 }
 
 // accessEdge resolves a property or element access to its declaration and
 // records a value-access edge, skipping unresolved/external/self targets.
 func (g *Graph) accessEdge(checker *shimchecker.Checker, from string, access *shimast.Node) {
-  g.valueUseEdge(checker, from, access, EdgeValueAccess)
+  g.valueUseEdge(checker, from, access, EdgeValueAccess, "")
 }
 
-func (g *Graph) valueUseEdge(checker *shimchecker.Checker, from string, targetExpr *shimast.Node, kind EdgeKind) {
+func (g *Graph) valueUseEdge(checker *shimchecker.Checker, from string, targetExpr *shimast.Node, kind EdgeKind, origin string) {
   if targetExpr == nil {
     return
   }
@@ -340,7 +352,7 @@ func (g *Graph) valueUseEdge(checker *shimchecker.Checker, from string, targetEx
   if to == "" || to == from {
     return
   }
-  g.addEdgeAt(from, to, kind, targetExpr.Pos(), targetExpr.End())
+  g.addEdgeAt(from, to, kind, origin, targetExpr.Pos(), targetExpr.End())
 }
 
 // collectTypeRefs records a type-ref edge from each top-level function, class,
@@ -400,7 +412,7 @@ func (g *Graph) typeRefEdge(checker *shimchecker.Checker, from string, typeName 
   if to == "" || to == from {
     return
   }
-  g.addEdgeAt(from, to, EdgeTypeRef, typeName.Pos(), typeName.End())
+  g.addEdgeAt(from, to, EdgeTypeRef, "", typeName.Pos(), typeName.End())
 }
 
 // ensureTargetNode returns the node id for a resolved edge target, creating the

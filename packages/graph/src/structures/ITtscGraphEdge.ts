@@ -9,10 +9,9 @@ import { TtscGraphProvenance } from "./TtscGraphProvenance";
  * keeps the first source-order evidence.
  *
  * `provenance` and `confidence` are mandatory so every edge declares how it was
- * derived: a `calls` edge the checker resolved is `checker-resolved`/`high`; a
- * `handles_route` edge a framework pass synthesized is
- * `framework-derived`/`medium`; an opt-in callback bridge is
- * `heuristic`/`low`.
+ * derived and how far to trust it: a `calls` edge the checker resolved is
+ * `checker-resolved`/`high`. The `framework-derived` and `heuristic`
+ * provenances are reserved for inference layers a consumer may add on top.
  */
 export interface ITtscGraphEdge {
   /** Node id the relationship originates from. */

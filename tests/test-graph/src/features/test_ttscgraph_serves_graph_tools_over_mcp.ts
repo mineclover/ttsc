@@ -17,15 +17,13 @@ const callJson = <T>(result: ToolResult): T =>
  * shipped pipeline works: the Node launcher spawns, runs `ttscgraph dump` once
  * for a real project, builds the resident graph, and answers
  * initialize/tools-list/tools-call for graph_overview, graph_query,
- * graph_trace, and graph_expand, including a NestJS route synthesized from
- * decorator facts, then exits cleanly when stdin closes.
+ * graph_trace, and graph_expand, then exits cleanly when stdin closes.
  *
- * 1. Materialize a project with a Service.run -> helper call chain and a
- *    @Controller/@Get NestJS controller, then spawn the launcher against it.
+ * 1. Materialize a project with a Service.run -> helper call chain, then spawn the
+ *    launcher against it.
  * 2. Drive initialize, tools/list, and a call to each of the four tools.
  * 3. Assert the architecture counts, a query hit, the forward trace reaching the
- *    callee, expanded source, the synthesized route reaching its handler, and a
- *    clean exit.
+ *    callee, expanded source, and a clean exit.
  */
 export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
   const root = TestProject.createProject({
@@ -49,22 +47,6 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
       "  run(): void {",
       "    helper();",
       "  }",
-      "}",
-      "",
-    ].join("\n"),
-    "src/users.controller.ts": [
-      "function Controller(prefix: string): any {",
-      "  void prefix;",
-      "  return () => {};",
-      "}",
-      "function Get(path: string): any {",
-      "  void path;",
-      "  return () => {};",
-      "}",
-      '@Controller("users")',
-      "export class UsersController {",
-      '  @Get(":id")',
-      "  find(): void {}",
       "}",
       "",
     ].join("\n"),
@@ -109,9 +91,10 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
     const byKind = overview.counts.byKind;
     assert.ok(
       overview.counts.nodes > 0 &&
-        (byKind.class ?? 0) >= 2 &&
+        (byKind.class ?? 0) >= 1 &&
         (byKind.method ?? 0) >= 1 &&
-        (byKind.file ?? 0) >= 2,
+        (byKind.function ?? 0) >= 1 &&
+        (byKind.file ?? 0) >= 1,
       `graph_overview returns architecture counts: ${JSON.stringify(overview.counts)}`,
     );
 
@@ -158,18 +141,6 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
     assert.ok(
       expand.nodes.some((node) => (node.source ?? "").includes("helper(")),
       `graph_expand returns the run body: ${JSON.stringify(expand.nodes)}`,
-    );
-
-    // Framework pass: the synthesized NestJS route traces to its handler.
-    const routeTrace = callJson<{ reached: { name: string }[] }>(
-      (await client.request("tools/call", {
-        name: "graph_trace",
-        arguments: { from: "GET /users/:id", direction: "forward" },
-      })) as ToolResult,
-    );
-    assert.ok(
-      routeTrace.reached.some((node) => node.name === "UsersController.find"),
-      `graph_trace from the route reaches the handler: ${JSON.stringify(routeTrace.reached)}`,
     );
   } finally {
     client.endStdin();

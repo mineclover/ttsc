@@ -4,7 +4,7 @@
 
 Every node and edge carries where it came from:
 
-- `provenance`: `checker-resolved` (the TypeScript checker resolved both ends), `framework-derived` (a framework convention, e.g. a Nest route or Next page), or `heuristic` (opt-in inference). `confidence`: `high` | `medium` | `low`.
+- `provenance`: `checker-resolved` — the TypeScript checker resolved both ends. (`framework-derived` and `heuristic` are reserved for inference layers a consumer may add; the graph itself emits checker-resolved facts.) `confidence`: `high` | `medium` | `low`.
 
 Pick the entry tool by what you know: `graph_overview` to orient, `graph_query` to find symbols from a natural query, `graph_trace` to follow flow, `graph_expand` to read the source the others located.
 
@@ -53,8 +53,8 @@ interface Overview {
 
 ```ts
 /**
- * Find the symbols, routes, and clusters most relevant to a natural query, even
- * without the exact name. Mix code vocabulary and plain words; matches rank by
+ * Find the symbols and clusters most relevant to a natural query, even without
+ * the exact name. Mix code vocabulary and plain words; matches rank by
  * exact and dotted names, CamelCase/subword overlap, file path, and centrality.
  * Returns handles to follow with graph_expand or graph_trace.
  */
@@ -86,16 +86,15 @@ interface QueryResult {
 
 ```ts
 /**
- * Trace dependency flow from a symbol or route: `forward` to what it uses,
- * `reverse` to what uses it, or `impact` to the public API, routes, and tests a
- * change would reach. Follows real call/type edges only — structural and
- * heuristic edges are excluded. An ambiguous start name returns its candidates
- * instead of guessing.
+ * Trace dependency flow from a symbol: `forward` to what it uses, `reverse` to
+ * what uses it, or `impact` to the public API and tests a change would reach.
+ * Follows real call/type edges only — structural and heuristic edges are
+ * excluded. An ambiguous start name returns its candidates instead of guessing.
  */
 declare function graph_trace(props: TraceProps): TraceResult;
 
 interface TraceProps {
-  /** A node id from another tool, or a symbol/route name. */
+  /** A node id from another tool, or a symbol name. */
   from: string;
   /** @default "forward" */
   direction?: "forward" | "reverse" | "impact";
@@ -126,7 +125,7 @@ interface TraceNode {
   file: string;
   /** Hops from the start, on a reached node. */
   depth?: number;
-  /** Why it matters to an impact trace: `exported`, `route`, `test`. */
+  /** Why it matters to an impact trace: `exported`, `test`. */
   roles?: string[];
 }
 ```
@@ -179,23 +178,22 @@ interface ExpandRef {
 
 ## Node kinds
 
-Symbol kinds are declarations the checker owns: `file`, `package`, `namespace`, `module`, `function`, `class`, `interface`, `type`, `enum`, `variable`, `method`, `property`, `parameter`. `route` and `component` are virtual nodes a framework pass synthesizes; `external_symbol` is a dependency-boundary leaf.
+Symbol kinds are declarations the checker owns: `file`, `package`, `namespace`, `module`, `function`, `class`, `interface`, `type`, `enum`, `variable`, `method`, `property`, `parameter`. `external_symbol` is a dependency-boundary leaf. The graph does not interpret framework conventions; the checker-resolved decorator facts on a node are left for an agent to read.
 
 ## Edge kinds
 
-| Kind            | Meaning                                     |
-| --------------- | ------------------------------------------- |
-| `contains`      | File/class/namespace ownership of a member. |
-| `exports`       | A file exports a symbol.                    |
-| `imports`       | A module imports another.                   |
-| `calls`         | A runtime call.                             |
-| `instantiates`  | A `new T()` construction.                   |
-| `accesses`      | A property/accessor read or write.          |
-| `type_ref`      | A type-position reference.                  |
-| `extends`       | Class/interface `extends`.                  |
-| `implements`    | Class `implements`.                         |
-| `overrides`     | A member overrides a base member.           |
-| `decorates`     | A decorator applied to a declaration.       |
-| `renders`       | A JSX component use.                        |
-| `handles_route` | A route is served by a handler/component.   |
-| `tests`         | A test exercises a symbol.                  |
+| Kind           | Meaning                                     |
+| -------------- | ------------------------------------------- |
+| `contains`     | File/class/namespace ownership of a member. |
+| `exports`      | A file exports a symbol.                    |
+| `imports`      | A module imports another.                   |
+| `calls`        | A runtime call.                             |
+| `instantiates` | A `new T()` construction.                   |
+| `accesses`     | A property/accessor read or write.          |
+| `type_ref`     | A type-position reference.                  |
+| `extends`      | Class/interface `extends`.                  |
+| `implements`   | Class `implements`.                         |
+| `overrides`    | A member overrides a base member.           |
+| `decorates`    | A decorator applied to a declaration.       |
+| `renders`      | A JSX component use.                        |
+| `tests`        | A test exercises a symbol.                  |

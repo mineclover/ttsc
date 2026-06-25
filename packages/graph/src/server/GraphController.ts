@@ -1,6 +1,7 @@
 import { GraphModel } from "../model/GraphModel";
 import { IExpandProps, IExpandResult, runExpand } from "./expand";
 import { IQueryProps, IQueryResult, runQuery } from "./query";
+import { ITraceProps, ITraceResult, runTrace } from "./trace";
 
 /**
  * The MCP tool surface, as a plain class. Each public method is one tool; its
@@ -79,6 +80,20 @@ export class GraphController {
    */
   public query(props: IQueryProps): IQueryResult {
     return runQuery(this.graph, props);
+  }
+
+  /**
+   * Trace dependency flow from a symbol or route: `forward` to what it uses,
+   * `reverse` to what uses it, or `impact` to the public API, routes, and tests
+   * a change would reach. Follows real call/type edges only — structural and
+   * heuristic edges are excluded — and returns ordered hops with handles.
+   *
+   * @param props The start, direction, and bounds
+   * @returns The ordered hops and reached nodes, or candidates for an ambiguous
+   *   start
+   */
+  public trace(props: ITraceProps): ITraceResult {
+    return runTrace(this.graph, props);
   }
 
   /**

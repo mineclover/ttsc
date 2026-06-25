@@ -26,6 +26,17 @@ func Build(prog *driver.Program) *Graph {
   return g
 }
 
+// SourceTexts maps each program source file to its text — the evidence input
+// NewDump needs to turn a node or edge byte span into a line/column.
+func SourceTexts(prog *driver.Program) map[string]string {
+  files := prog.SourceFiles()
+  out := make(map[string]string, len(files))
+  for _, file := range files {
+    out[file.FileName()] = file.Text()
+  }
+  return out
+}
+
 // collectDeclarations records a node for each declaration statement in file,
 // plus a method node for each callable member of a class or interface, so
 // method-to-method calls have both endpoints. It descends into namespace bodies

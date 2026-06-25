@@ -37,7 +37,7 @@ func run() int {
 
   g := graph.Build(prog)
   ignored := graph.GitIgnoredFiles(*cwd, g)
-  data, err := graph.MarshalDump(g, *cwd, *tsconfig, ignored, *pretty)
+  data, err := graph.MarshalDump(g, *cwd, *tsconfig, ignored, graph.SourceTexts(prog), *pretty)
   if err != nil {
     fmt.Fprintf(os.Stderr, "graphdump: %v\n", err)
     return 1

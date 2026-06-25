@@ -48,7 +48,7 @@ func runDump(args []string) int {
 
   g := graph.Build(prog)
   ignored := graph.GitIgnoredFiles(cwd, g)
-  data, err := graph.MarshalDump(g, cwd, tsconfig, ignored, *prettyFlag)
+  data, err := graph.MarshalDump(g, cwd, tsconfig, ignored, graph.SourceTexts(prog), *prettyFlag)
   if err != nil {
     fmt.Fprintf(stderr, "ttscgraph: %v\n", err)
     return 1

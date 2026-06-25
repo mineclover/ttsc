@@ -47,20 +47,24 @@ export function main(): void {
 
   var dump struct {
     SchemaVersion int              `json:"schemaVersion"`
-    Provenance    string           `json:"provenance"`
     Nodes         []map[string]any `json:"nodes"`
     Edges         []map[string]any `json:"edges"`
   }
   if err := json.Unmarshal(out.Bytes(), &dump); err != nil {
     t.Fatalf("dump output is not valid JSON: %v\n%s", err, out.String())
   }
-  if dump.SchemaVersion != 1 {
-    t.Fatalf("schemaVersion = %d, want 1", dump.SchemaVersion)
-  }
-  if dump.Provenance != "checker-resolved" {
-    t.Fatalf("provenance = %q, want checker-resolved", dump.Provenance)
+  if dump.SchemaVersion != 2 {
+    t.Fatalf("schemaVersion = %d, want 2", dump.SchemaVersion)
   }
   if len(dump.Nodes) == 0 || len(dump.Edges) == 0 {
     t.Fatalf("expected nodes and edges, got %d/%d", len(dump.Nodes), len(dump.Edges))
+  }
+  // Provenance and confidence are now per-edge (not a top-level field); every
+  // edge the checker resolved must carry them.
+  if prov, _ := dump.Edges[0]["provenance"].(string); prov != "checker-resolved" {
+    t.Fatalf("edge provenance = %q, want checker-resolved", prov)
+  }
+  if conf, _ := dump.Edges[0]["confidence"].(string); conf != "high" {
+    t.Fatalf("edge confidence = %q, want high", conf)
   }
 }

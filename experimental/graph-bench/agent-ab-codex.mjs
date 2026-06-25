@@ -51,6 +51,14 @@ function resolveQuestion(repoKey) {
   return ARCHITECTURE_QUESTION;
 }
 
+const CODEX_GRAPH_ARM_PROMPT = [
+  "A ttsc-graph MCP server is configured for this graph arm.",
+  "For TypeScript project orientation, use query_exports first only for onboarding, exported symbols, public API, or an uncertain entry point.",
+  "If the prompt already names the exact entry symbols or call chain, go straight to query_nodes.",
+  "For an ordered call chain, call query_nodes once with mode:'flow' and the named symbols in order; answer from the compact flow result.",
+  "Use a broad owner/action/noun query only when the chain is not already named. Use shell search/read only when the graph does not fit.",
+].join("\n");
+
 // TypeScript benchmark repos and their medium-difficulty questions.
 const REPOS = {
   excalidraw: {
@@ -272,7 +280,12 @@ const thunks = arms.flatMap((arm) =>
     // keyed by run number, so a retry overwrites the attempt.
     let m;
     for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
-      m = await runCodex(question, arm.home, arm.name, r + 1);
+      m = await runCodex(
+        arm.name === "graph" ? `${CODEX_GRAPH_ARM_PROMPT}\n\n${question}` : question,
+        arm.home,
+        arm.name,
+        r + 1,
+      );
       if (m.ok) break;
       if (attempt < MAX_RUN_RETRIES)
         console.log(

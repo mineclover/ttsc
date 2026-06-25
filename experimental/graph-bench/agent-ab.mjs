@@ -40,7 +40,8 @@ const CLAUDE_GRAPH_ARM_PROMPT = [
   "For TypeScript project orientation, before Glob/Grep/Read, use ToolSearch with select:mcp__ttsc-graph__query_exports,mcp__ttsc-graph__query_nodes,mcp__ttsc-graph__expand_nodes,mcp__ttsc-graph__query_files.",
   "Call query_exports once before query_nodes only when the task asks for onboarding, exported symbols, public API, or an uncertain entry point.",
   "If the prompt already names the exact entry symbols or call chain, go straight to query_nodes.",
-  "Then use query_nodes once with one broad owner/action/noun query and answer from the graph result; use file tools only when the graph does not fit.",
+  "For an ordered call chain, call query_nodes once with mode:'flow' and the named symbols in order; answer from the compact flow result.",
+  "Use a broad owner/action/noun query only when the chain is not already named. Use file tools only when the graph does not fit.",
 ].join(" ");
 function resolveQuestion(repoKey) {
   if (process.env.TTSC_BENCH_QUESTION_FILE)

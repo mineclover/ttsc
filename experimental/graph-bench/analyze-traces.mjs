@@ -1,0 +1,231 @@
+#!/usr/bin/env node
+// Tool-usage analyzer for the @ttsc/graph A/B traces.
+//
+// agent-ab.mjs already writes the full action log of every run to
+// <arm>-run-<n>.stream.jsonl — every assistant turn and every tool_use with its
+// input. This reads those logs back and judges *how* the graph arm navigated:
+// every fall back to Read/Grep/Glob/Bash-search (where a graph tool should have
+// answered), every unbatched graph_expand, every repeated query, and runs that
+// produced an answer without touching the graph at all. Those are the cases the
+// benchmark exists to drive to zero, so the report lists them per run and in
+// aggregate, with the offending file or query named.
+//
+// It is pure log analysis: no model, no tokens, deterministic. Point it at a
+// trace dir (or a report.json, whose `traceDir` it follows) and it prints a
+// per-arm breakdown and writes <out> for the PR comment to quote.
+//
+// Usage:
+//   node analyze-traces.mjs --trace-dir=<dir> [--out=<analysis.json>]
+//   node analyze-traces.mjs --report=<report.json> [--out=<analysis.json>]
+
+import fs from "node:fs";
+import path from "node:path";
+
+function arg(name, fallback) {
+  const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
+  return hit ? hit.slice(name.length + 3) : fallback;
+}
+
+const reportPath = arg("report");
+let traceDir = arg("trace-dir");
+if (!traceDir && reportPath) {
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  traceDir = report.traceDir;
+}
+if (!traceDir) {
+  console.error("analyze-traces.mjs: --trace-dir=<dir> or --report=<path> required");
+  process.exit(2);
+}
+if (!fs.existsSync(traceDir)) {
+  console.error(`analyze-traces.mjs: trace dir not found: ${traceDir}`);
+  process.exit(1);
+}
+
+const outPath = arg("out");
+
+// A shell command that is really a text search or file read — the graph arm
+// reaching for one is the same miss as a Grep, just laundered through Bash.
+const SHELL_SEARCH = /\b(grep|rg|ag|find|cat|head|tail|sed|awk|ls)\b/;
+
+/** Classify a tool_use into the lane the analysis groups by. */
+function laneOf(name) {
+  if (/graph|ttsc/i.test(name)) return "graph";
+  if (name === "Read") return "read";
+  if (name === "Grep" || name === "Glob") return "search";
+  if (name === "Bash" || name === "PowerShell") return "shell";
+  return "other";
+}
+
+/** Pull the ordered tool calls and token total out of one stream-json log. */
+function parseTrace(text) {
+  const calls = [];
+  let tokens = 0;
+  for (const raw of text.split("\n")) {
+    if (!raw.trim()) continue;
+    let e;
+    try {
+      e = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    if (e.type !== "assistant") continue;
+    const u = e.message?.usage;
+    if (u)
+      tokens +=
+        (u.input_tokens || 0) +
+        (u.output_tokens || 0) +
+        (u.cache_read_input_tokens || 0) +
+        (u.cache_creation_input_tokens || 0);
+    for (const b of e.message?.content || []) {
+      if (b.type !== "tool_use" || b.name === "ToolSearch") continue;
+      calls.push({ name: b.name, input: b.input || {} });
+    }
+  }
+  return { calls, tokens };
+}
+
+/** A short, human-legible label for what a tool call targeted. */
+function targetOf(call) {
+  const i = call.input;
+  if (call.name === "Read") return i.file_path ?? "";
+  if (call.name === "Grep" || call.name === "Glob") return i.pattern ?? i.query ?? "";
+  if (call.name === "Bash" || call.name === "PowerShell") return (i.command ?? "").slice(0, 80);
+  if (/graph_query/i.test(call.name)) return i.query ?? "";
+  if (/graph_trace/i.test(call.name)) return `${i.from ?? ""}:${i.direction ?? "forward"}`;
+  if (/graph_expand/i.test(call.name))
+    return `[${(i.handles ?? []).length} handle(s)]`;
+  if (/graph_overview/i.test(call.name)) return i.aspect ?? "all";
+  return "";
+}
+
+/**
+ * Judge one graph-arm run. Misuse is anything that means the graph did not carry
+ * the navigation it should have: a text search or raw file read, a graph_expand
+ * that read one handle at a time, a query asked twice, or — worst — an answer
+ * reached without a single graph call.
+ */
+function misuseOf(calls) {
+  const lanes = calls.map((c) => laneOf(c.name));
+  const graphCalls = calls.filter((_, k) => lanes[k] === "graph");
+  const issues = [];
+
+  for (const c of calls) {
+    const lane = laneOf(c.name);
+    if (lane === "read")
+      issues.push({ kind: "fell back to Read", detail: targetOf(c) });
+    else if (lane === "search")
+      issues.push({ kind: "fell back to Grep/Glob", detail: targetOf(c) });
+    else if (lane === "shell" && SHELL_SEARCH.test(c.input.command ?? ""))
+      issues.push({ kind: "text search via shell", detail: targetOf(c) });
+  }
+
+  const expands = graphCalls.filter((c) => /graph_expand/i.test(c.name));
+  if (expands.length > 1)
+    issues.push({
+      kind: "unbatched graph_expand",
+      detail: `${expands.length} calls; batch handles into one`,
+    });
+
+  const queries = graphCalls
+    .filter((c) => /graph_query/i.test(c.name))
+    .map((c) => (c.input.query ?? "").trim().toLowerCase());
+  const dupes = queries.filter((q, k) => q && queries.indexOf(q) !== k);
+  for (const q of new Set(dupes))
+    issues.push({ kind: "repeated graph_query", detail: q });
+
+  if (graphCalls.length === 0)
+    issues.push({ kind: "answered without the graph", detail: "0 graph calls" });
+
+  return issues;
+}
+
+const files = fs
+  .readdirSync(traceDir)
+  .filter((f) => f.endsWith(".stream.jsonl"));
+
+const byArm = {};
+for (const file of files) {
+  const m = /^(.*)-run-(\d+)\.stream\.jsonl$/.exec(file);
+  if (!m) continue;
+  const [, arm, run] = m;
+  const { calls, tokens } = parseTrace(
+    fs.readFileSync(path.join(traceDir, file), "utf8"),
+  );
+  const counts = { graph: 0, read: 0, search: 0, shell: 0, other: 0 };
+  for (const c of calls) counts[laneOf(c.name)]++;
+  const issues = arm === "graph" ? misuseOf(calls) : [];
+  (byArm[arm] ??= []).push({
+    run: Number(run),
+    tokens,
+    tools: calls.length,
+    counts,
+    sequence: calls.map((c) => `${c.name}(${targetOf(c)})`),
+    issues,
+  });
+}
+
+const median = (xs) => {
+  if (!xs.length) return 0;
+  const s = [...xs].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+};
+
+console.log(`Trace analysis: ${traceDir}\n`);
+const summary = {};
+for (const [arm, runs] of Object.entries(byArm)) {
+  const medTokens = median(runs.map((r) => r.tokens));
+  const medTools = median(runs.map((r) => r.tools));
+  const lanes = ["graph", "read", "search", "shell", "other"];
+  const medLanes = Object.fromEntries(
+    lanes.map((l) => [l, median(runs.map((r) => r.counts[l]))]),
+  );
+  const allIssues = runs.flatMap((r) => r.issues);
+  const issueTally = {};
+  for (const i of allIssues) issueTally[i.kind] = (issueTally[i.kind] ?? 0) + 1;
+  summary[arm] = {
+    runs: runs.length,
+    medianTokens: medTokens,
+    medianTools: medTools,
+    medianByLane: medLanes,
+    misuseTally: issueTally,
+  };
+  console.log(`[${arm}]  ${runs.length} run(s)`);
+  console.log(
+    `  median tokens ${medTokens}   tools ${medTools}` +
+      `   (graph ${medLanes.graph}, read ${medLanes.read}, search ${medLanes.search}, shell ${medLanes.shell})`,
+  );
+  if (arm === "graph") {
+    if (allIssues.length === 0) {
+      console.log("  tool usage: clean — every navigation went through the graph");
+    } else {
+      console.log("  misuse:");
+      for (const [kind, n] of Object.entries(issueTally))
+        console.log(`    ${n}x ${kind}`);
+      for (const r of runs) {
+        if (!r.issues.length) continue;
+        console.log(`    run ${r.run}:`);
+        for (const i of r.issues)
+          console.log(`      - ${i.kind}${i.detail ? `: ${i.detail}` : ""}`);
+      }
+    }
+  }
+  console.log("");
+}
+
+if (reportPath || arg("token-headline")) {
+  const b = summary.baseline?.medianTokens ?? 0;
+  const g = summary.graph?.medianTokens ?? 0;
+  if (b && g)
+    console.log(
+      `Token reduction (graph vs baseline): ${Math.round((1 - g / b) * 100)}%  (${b} -> ${g})\n`,
+    );
+}
+
+if (outPath) {
+  fs.writeFileSync(
+    path.resolve(outPath),
+    `${JSON.stringify({ traceDir, arms: summary, runs: byArm }, null, 2)}\n`,
+  );
+  console.log(`analysis written: ${outPath}`);
+}

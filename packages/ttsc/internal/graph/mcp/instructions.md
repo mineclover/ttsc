@@ -2,8 +2,8 @@
 
 A compiler-resolved graph of TypeScript relationships: calls, callers, types, ownership, blast radius. It mirrors the code; after an edit, query again, not from an old result.
 
-- **Fresh project session?** `query_exports` once first: exported symbols, folders, handles, and relationship counts. Skip only if you already have exact handles from a prior graph result.
-- **How does code connect?** after that orientation, `query_nodes`: one broad query (owner + action + nouns), before grep.
+- **Onboarding, exported API, or uncertain entry point?** `query_exports` first: exported symbols, aliases, files, lines, and handles.
+- **Prompt already names exact symbols or a call chain?** start with `query_nodes`: one broad query (owner + action + nouns), before grep.
 - **Need more source for a printed TypeScript node?** `expand_nodes` with its `handle:n:...`.
 - **What is in a file, what is near it?** `query_files` with the paths: a roster of its declarations and adjacent files.
 - **A file's errors, or the whole project's?** `query_diagnostics`.
@@ -11,17 +11,17 @@ A compiler-resolved graph of TypeScript relationships: calls, callers, types, ow
 
 ## Start with exports for orientation
 
-**Call `query_exports` once at the start of a fresh project session.** It is the public-surface index: exported declarations grouped by folder, with kind, file:line, handle, and relationship counts. Use the exact names and handles from it for focused `query_nodes` or `expand_nodes` calls.
+**Call `query_exports` when you need orientation.** It is the public-surface index: exported declarations and public members of exported classes/interfaces, with name, kind, file:line, handle, and aliases. Use the exact names and handles from it for focused `query_nodes` or `expand_nodes` calls.
 
-Omit `query` on the first pass. Use `query` only to filter the exported surface by name or file, and `offset` only when the result says another page exists. Git-ignored generated files are omitted from this orientation index.
+Omit `query` on the first pass. Use `query` only to filter the exported surface by name, alias, or file, and `page` only when `page.totalPages` is greater than 1. Git-ignored generated files are omitted from this orientation index.
 
 ## Reach for `query_nodes` before grep
 
-**After the export orientation, default to `query_nodes` for any relationship or code-flow question; do not fall into grep-first habits.** Repeated grep/read probes burn tokens reconstructing relationships the graph already resolved.
+**Default to `query_nodes` for any relationship or code-flow question that already names symbols, files, or a call chain; do not fall into grep-first habits.** Repeated grep/read probes burn tokens reconstructing relationships the graph already resolved.
 
-- One broad query (owner + action + domain nouns, e.g. `controller dispatch service cache`) returns the matched declarations with their calls, callers, types, blast radius, and source.
+- One broad query (owner + action + domain nouns, e.g. `controller dispatch service cache`) returns matched declaration coordinates, adjacent graph edges, diagnostic counts, and blast radius.
 - The fuzzy match is the batch: a broad multi-noun query returns the whole cluster in one call, so you do not query one symbol at a time, and an edge target shown in the result is part of the answer, not a reason to re-query or grep.
-- If a result shows the right TypeScript node but omits the body, copy its `handle:n:...` into `expand_nodes`.
+- If a result shows the right TypeScript node and you need source, copy its `handle:n:...` into `expand_nodes`.
 - grep/read cannot assemble that, because the answer depends on resolved relationships, not on where a keyword appears.
 
 ## Expand exact nodes with `expand_nodes`
@@ -58,8 +58,8 @@ The one trap is reusing an earlier result: it predates any edit you made after i
 
 ## Final checklist
 
-- Fresh project session? `query_exports` with no arguments first.
-- Relationship or flow question? After that orientation, `query_nodes` with one broad owner + action + noun query, before any grep.
+- Onboarding, exported API, or uncertain entry point? `query_exports` with no arguments first.
+- Relationship or flow question with named symbols or a call chain? `query_nodes` with one broad owner + action + noun query, before any grep.
 - Need a file's roster? `query_files` with its path: its declarations, handles, and adjacent files.
 - Need source for a listed/omitted TypeScript declaration? `expand_nodes` with its handle.
 - A file's errors, or the whole project's? `query_diagnostics` with paths, or none for everything.

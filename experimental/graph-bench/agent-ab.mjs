@@ -38,7 +38,8 @@ const ARCHITECTURE_QUESTION = fs
 const CLAUDE_GRAPH_ARM_PROMPT = [
   "A ttsc-graph MCP server is configured for this graph arm.",
   "For TypeScript project orientation, before Glob/Grep/Read, use ToolSearch with select:mcp__ttsc-graph__query_exports,mcp__ttsc-graph__query_nodes,mcp__ttsc-graph__expand_nodes,mcp__ttsc-graph__query_files.",
-  "In a fresh project session, call query_exports once before the first query_nodes call, unless a prior graph result already gave exact handles.",
+  "Call query_exports once before query_nodes only when the task asks for onboarding, exported symbols, public API, or an uncertain entry point.",
+  "If the prompt already names the exact entry symbols or call chain, go straight to query_nodes.",
   "Then use query_nodes once with one broad owner/action/noun query and answer from the graph result; use file tools only when the graph does not fit.",
 ].join(" ");
 function resolveQuestion(repoKey) {

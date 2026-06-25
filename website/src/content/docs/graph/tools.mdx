@@ -2,9 +2,7 @@
 
 `@ttsc/graph` exposes four tools. Each is a narrowing engine over the checker-resolved graph: they return compact index records — symbol coordinates, relationships, and stable handles — not source bodies. Read source on demand with `graph_expand`. Each tool's result is returned as JSON; the shapes below describe that JSON.
 
-Every node and edge carries where it came from:
-
-- `provenance`: `checker-resolved` — the TypeScript checker resolved both ends. (`framework-derived` and `heuristic` are reserved for inference layers a consumer may add; the graph itself emits checker-resolved facts.) `confidence`: `high` | `medium` | `low`.
+Every node and edge is resolved by the TypeScript checker — the graph is checker-resolved fact end to end, so there is no per-edge trust flag to weigh.
 
 Pick the entry tool by what you know: `graph_overview` to orient, `graph_query` to find symbols from a natural query, `graph_trace` to follow flow, `graph_expand` to read the source the others located.
 
@@ -88,8 +86,8 @@ interface QueryResult {
 /**
  * Trace dependency flow from a symbol: `forward` to what it uses, `reverse` to
  * what uses it, or `impact` to the public API and tests a change would reach.
- * Follows real call/type edges only — structural and heuristic edges are
- * excluded. An ambiguous start name returns its candidates instead of guessing.
+ * Follows real call/type edges only — structural edges are excluded. An
+ * ambiguous start name returns its candidates instead of guessing.
  */
 declare function graph_trace(props: TraceProps): TraceResult;
 

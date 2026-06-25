@@ -50,8 +50,8 @@ export interface ITtscGraphApplication {
   /**
    * Trace dependency flow from a symbol: `forward` to what it uses, `reverse`
    * to what uses it, or `impact` to the public API and tests a change would
-   * reach. Follows real call/type edges only — structural and heuristic edges
-   * are excluded — and returns ordered hops with handles.
+   * reach. Follows real call/type edges only — structural edges are excluded —
+   * and returns ordered hops with handles.
    *
    * @param props The start, direction, and bounds
    * @returns The ordered hops and reached nodes, or candidates for an ambiguous

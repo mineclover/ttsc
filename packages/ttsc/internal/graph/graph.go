@@ -16,12 +16,6 @@ const (
   NodeMethod NodeKind = "method"
 )
 
-// Provenance marks how a node or edge was derived. Every relationship in this
-// graph is resolved by the in-process type checker, so the single value is a
-// trust signal: the inverse of a tree-sitter tool tagging an uncertain edge
-// "heuristic".
-const Provenance = "checker-resolved"
-
 // Node is one declared symbol. Its ID is position-invariant, built from the file
 // realpath, the declared name, and the kind, so inserting a line above a
 // declaration does not re-key it. That keeps a future incremental layer from

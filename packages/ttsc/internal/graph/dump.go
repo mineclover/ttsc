@@ -25,10 +25,6 @@ import (
 // edges) are left to the TypeScript loader, which has the node set in hand and
 // is where the redesign keeps that logic.
 
-// dumpSchemaVersion is the IGraphDump.schemaVersion this writer emits. Keep it in
-// lockstep with TTSC_GRAPH_SCHEMA_VERSION in packages/graph/src/structures.
-const dumpSchemaVersion = 2
-
 // DumpEvidence is a 1-based source span grounding a node declaration or an edge
 // expression. It is display/expansion only, never identity.
 type DumpEvidence struct {
@@ -70,25 +66,22 @@ type DumpNode struct {
   Decorators    []DumpDecorator `json:"decorators,omitempty"`
 }
 
-// DumpEdge is the wire shape of a graph edge, with the provenance and confidence
-// every relationship in this graph declares.
+// DumpEdge is the wire shape of a graph edge. Lowercase json keys are the
+// contract; the Go field names are not.
 type DumpEdge struct {
-  From       string        `json:"from"`
-  To         string        `json:"to"`
-  Kind       string        `json:"kind"`
-  Provenance string        `json:"provenance"`
-  Confidence string        `json:"confidence"`
-  Evidence   *DumpEvidence `json:"evidence,omitempty"`
+  From     string        `json:"from"`
+  To       string        `json:"to"`
+  Kind     string        `json:"kind"`
+  Evidence *DumpEvidence `json:"evidence,omitempty"`
 }
 
-// Dump is the IGraphDump envelope: schema version, the project it was built for,
-// and the full node and edge sets with none of the MCP response caps.
+// Dump is the IGraphDump envelope: the project it was built for and the full
+// node and edge sets with none of the MCP response caps.
 type Dump struct {
-  SchemaVersion int        `json:"schemaVersion"`
-  Project       string     `json:"project"`
-  Tsconfig      string     `json:"tsconfig"`
-  Nodes         []DumpNode `json:"nodes"`
-  Edges         []DumpEdge `json:"edges"`
+  Project  string     `json:"project"`
+  Tsconfig string     `json:"tsconfig"`
+  Nodes    []DumpNode `json:"nodes"`
+  Edges    []DumpEdge `json:"edges"`
 }
 
 // NewDump projects a built graph onto the export shape. project is the absolute
@@ -132,12 +125,10 @@ func NewDump(g *Graph, project, tsconfig string, ignored map[string]bool, source
   edges := make([]DumpEdge, 0, len(g.Edges))
   for _, e := range g.Edges {
     edges = append(edges, DumpEdge{
-      From:       ctx.relID(e.From),
-      To:         ctx.relID(e.To),
-      Kind:       dumpEdgeKind(e),
-      Provenance: Provenance,
-      Confidence: "high",
-      Evidence:   ctx.edgeEvidence(e),
+      From:     ctx.relID(e.From),
+      To:       ctx.relID(e.To),
+      Kind:     dumpEdgeKind(e),
+      Evidence: ctx.edgeEvidence(e),
     })
   }
   sort.Slice(edges, func(i, j int) bool {
@@ -151,11 +142,10 @@ func NewDump(g *Graph, project, tsconfig string, ignored map[string]bool, source
   })
 
   return Dump{
-    SchemaVersion: dumpSchemaVersion,
-    Project:       project,
-    Tsconfig:      tsconfig,
-    Nodes:         nodes,
-    Edges:         edges,
+    Project:  project,
+    Tsconfig: tsconfig,
+    Nodes:    nodes,
+    Edges:    edges,
   }
 }
 

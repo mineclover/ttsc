@@ -7,8 +7,8 @@ const DEFAULT_MAX_NODES = 60;
 
 /**
  * Breadth-first trace along the dependency graph. Structural
- * (contains/exports/imports) and heuristic edges are excluded so the path is
- * real call/type flow; forward walks callees, reverse and impact walk callers.
+ * (contains/exports/imports) edges are excluded so the path is real call/type
+ * flow; forward walks callees, reverse and impact walk callers.
  * Impact additionally tags each reached node's role so the blast radius on the
  * public surface is legible.
  */
@@ -55,7 +55,7 @@ export function runTrace(
       }
       const edges = reverse ? graph.incoming(id) : graph.outgoing(id);
       for (const edge of edges) {
-        if (!traversable(edge.kind, edge.provenance)) continue;
+        if (!traversable(edge.kind)) continue;
         const otherId = reverse ? edge.from : edge.to;
         const other = graph.node(otherId);
         if (other === undefined || other.kind === "file") continue;
@@ -133,9 +133,8 @@ function summary(
   return out;
 }
 
-/** An edge the trace should follow: real dependency, not structure or guess. */
-function traversable(kind: string, provenance: string): boolean {
-  if (provenance === "heuristic") return false;
+/** An edge the trace should follow: a real dependency, not a structural edge. */
+function traversable(kind: string): boolean {
   return kind !== "contains" && kind !== "exports" && kind !== "imports";
 }
 

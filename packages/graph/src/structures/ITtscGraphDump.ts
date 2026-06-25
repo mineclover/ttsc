@@ -12,13 +12,9 @@ import { ITtscGraphNode } from "./ITtscGraphNode";
  * tool call from that warm model; the bundled 3D viewer reduces the same dump.
  *
  * Paths in `project` and `tsconfig` are absolute; `file` fields on nodes,
- * edges, and diagnostics are project-relative. `schemaVersion` is bumped on any
- * breaking shape change so a consumer can refuse a dump it cannot read.
+ * edges, and diagnostics are project-relative.
  */
 export interface ITtscGraphDump {
-  /** The dump shape version; bumped on any breaking change. */
-  schemaVersion: number;
-
   /** Absolute path of the project root the graph was built for. */
   project: string;
 
@@ -37,9 +33,3 @@ export interface ITtscGraphDump {
    */
   diagnostics?: ITtscGraphDiagnostic[];
 }
-
-/**
- * The current {@link ITtscGraphDump.schemaVersion}. Bump this in lockstep with
- * the Go `dump.go` writer whenever the dump shape changes in a breaking way.
- */
-export const TTSC_GRAPH_SCHEMA_VERSION = 2;

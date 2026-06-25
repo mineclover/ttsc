@@ -2,10 +2,7 @@ import { spawnSync } from "node:child_process";
 import typia from "typia";
 
 import { resolveGraphBinary } from "../resolveGraphBinary";
-import {
-  ITtscGraphDump,
-  TTSC_GRAPH_SCHEMA_VERSION,
-} from "../structures/ITtscGraphDump";
+import { ITtscGraphDump } from "../structures/ITtscGraphDump";
 import { TtscGraphMemory } from "./TtscGraphMemory";
 
 // A full-project dump is the whole fact graph as one JSON document; a large
@@ -84,11 +81,5 @@ function parseDump(json: string): ITtscGraphDump {
       }`,
     );
   }
-  const dump = typia.assert<ITtscGraphDump>(value);
-  if (dump.schemaVersion !== TTSC_GRAPH_SCHEMA_VERSION) {
-    throw new Error(
-      `@ttsc/graph: dump schemaVersion ${dump.schemaVersion} is incompatible with this build (expected ${TTSC_GRAPH_SCHEMA_VERSION}); rebuild ttsc and @ttsc/graph to the same version.`,
-    );
-  }
-  return dump;
+  return typia.assert<ITtscGraphDump>(value);
 }

@@ -23,9 +23,8 @@ Pick the entry tool by what you know:
   dependencies and dependents. This is how you read code the graph located —
   pass every handle you need in one call instead of opening files.
 
-Every relationship carries a provenance and confidence; the engine resolves all
-of them with the compiler, so treat the graph as fact. The graph mirrors the
-current program; after an edit, query again. Fall back to grep or read only when
-the graph cannot answer: a non-TypeScript file, generated output, or a literal
-text search.
+Every relationship is resolved by the compiler, so treat the graph as fact. The
+graph mirrors the current program; after an edit, query again. Fall back to grep
+or read only when the graph cannot answer: a non-TypeScript file, generated
+output, or a literal text search.
 `.trim();

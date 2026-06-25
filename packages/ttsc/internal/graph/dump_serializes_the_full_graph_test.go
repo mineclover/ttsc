@@ -11,20 +11,18 @@ import (
 
 // TestMarshalDumpSerializesTheFullGraph verifies that MarshalDump projects a
 // built graph onto the IGraphDump wire contract the `ttscgraph dump` command
-// prints and the @ttsc/graph engine loads: the schema-version-2 envelope, every
-// node and edge, project-relative paths, the per-edge provenance/confidence the
-// graph guarantees, line/col evidence, and the lowercase wire keys.
+// prints and the @ttsc/graph engine loads: the project envelope, every node and
+// edge, project-relative paths, line/col evidence, and the lowercase wire keys.
 //
 // The Node/Edge structs carry no json tags, so dump.go's projection is the only
 // thing standing between the Go fields and the wire. A regression there would
-// ship keys or kinds the engine does not read, so the key, kind, and
-// provenance assertions are load-bearing, not cosmetic.
+// ship keys or kinds the engine does not read, so the key and kind assertions
+// are load-bearing, not cosmetic.
 //
 //  1. Build a two-function fixture with one call, so the dump has a node set and
 //     a value-call edge.
 //  2. Marshal it with source texts and assert the envelope, counts, and that the
-//     call edge maps to kind "calls" with checker-resolved/high provenance and a
-//     line/col evidence span.
+//     call edge maps to kind "calls" with a line/col evidence span.
 //  3. Assert paths are project-relative, the wire keys are the lowercase json
 //     tags, every edge endpoint resolves to a dumped node, and --pretty indents.
 func TestMarshalDumpSerializesTheFullGraph(t *testing.T) {
@@ -56,9 +54,6 @@ export function main(): void {
   var dump Dump
   if err := json.Unmarshal(data, &dump); err != nil {
     t.Fatalf("dump is not valid JSON: %v\n%s", err, data)
-  }
-  if dump.SchemaVersion != dumpSchemaVersion {
-    t.Fatalf("schemaVersion = %d, want %d", dump.SchemaVersion, dumpSchemaVersion)
   }
   if dump.Project != root || dump.Tsconfig != "tsconfig.json" {
     t.Fatalf("project/tsconfig not echoed: %q / %q", dump.Project, dump.Tsconfig)
@@ -96,8 +91,7 @@ export function main(): void {
     t.Fatalf("main node missing line/col evidence: %+v", byID[mainID].Evidence)
   }
 
-  // The main -> helper call maps to kind "calls" with the graph's guaranteed
-  // provenance/confidence and a located evidence span.
+  // The main -> helper call maps to kind "calls" with a located evidence span.
   var call *DumpEdge
   for i := range dump.Edges {
     e := &dump.Edges[i]
@@ -107,9 +101,6 @@ export function main(): void {
   }
   if call == nil {
     t.Fatalf("no calls edge main -> helper in dump:\n%s", data)
-  }
-  if call.Provenance != "checker-resolved" || call.Confidence != "high" {
-    t.Fatalf("call edge provenance/confidence = %q/%q, want checker-resolved/high", call.Provenance, call.Confidence)
   }
   if call.Evidence == nil || call.Evidence.StartLine == 0 || call.Evidence.File != "src/main.ts" {
     t.Fatalf("call edge missing project-relative line/col evidence: %+v", call.Evidence)
@@ -127,14 +118,21 @@ export function main(): void {
 
   // The wire keys are the lowercase json tags, not the Go field names.
   s := string(data)
-  for _, key := range []string{`"schemaVersion"`, `"id":`, `"kind":`, `"name":`, `"file":`, `"external":`, `"from":`, `"to":`, `"provenance":`, `"confidence":`} {
+  for _, key := range []string{`"id":`, `"kind":`, `"name":`, `"file":`, `"external":`, `"from":`, `"to":`} {
     if !strings.Contains(s, key) {
       t.Fatalf("dump missing wire key %s:\n%s", key, s)
     }
   }
-  for _, leaked := range []string{`"ID":`, `"Kind":`, `"From":`, `"External":`, `"Provenance":`} {
+  for _, leaked := range []string{`"ID":`, `"Kind":`, `"From":`, `"External":`} {
     if strings.Contains(s, leaked) {
       t.Fatalf("dump leaked Go field name %s:\n%s", leaked, s)
+    }
+  }
+  // The dump carries no ceremony keys: it is wholly checker-resolved, so it has
+  // no per-edge trust flags and no schema version to negotiate.
+  for _, gone := range []string{`"schemaVersion"`, `"provenance":`, `"confidence":`} {
+    if strings.Contains(s, gone) {
+      t.Fatalf("dump still emits removed key %s:\n%s", gone, s)
     }
   }
 

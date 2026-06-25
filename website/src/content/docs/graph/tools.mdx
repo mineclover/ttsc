@@ -11,7 +11,10 @@ Pick the entry tool by what you know: `graph_overview` to orient, `graph_query` 
 ```ts
 /**
  * A compact architecture map of the project — layers, hotspots, and the public
- * API surface — with no source read. Call this first on an unfamiliar codebase.
+ * API surface (the exported types, named and ranked by how depended-on they
+ * are) — with no source read. Call this first on an unfamiliar codebase: the
+ * layers are the structure and the public API is the entry surface, so there is
+ * no need to list files or open the entry module to orient.
  */
 declare function graph_overview(props: OverviewProps): Overview;
 
@@ -42,8 +45,8 @@ interface Overview {
     fanIn: number;
     fanOut: number;
   }[];
-  /** Export surface by file, widest first. */
-  publicApi?: { file: string; symbols: string[] }[];
+  /** Exported API symbols, most-depended-on first (test/typings/generated excluded). */
+  publicApi?: { name: string; kind: string; file: string }[];
 }
 ```
 

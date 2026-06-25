@@ -14,9 +14,12 @@ import { ITtscGraphTrace } from "./ITtscGraphTrace";
 export interface ITtscGraphApplication {
   /**
    * A compact architecture map of the project: how big it is, how it is layered
-   * by folder, the symbols the most code depends on, and the public API
-   * surface. Call this first on an unfamiliar codebase — it names concrete
-   * files and symbols for every claim, with no source read.
+   * by folder, the symbols the most code depends on, and the public API surface
+   * — the exported types a consumer reaches for, named and ranked. Call this
+   * first on an unfamiliar codebase: it names concrete files and symbols for
+   * every claim with no source read, so you need not list files or open the
+   * entry module to orient — the layers are the structure and the public API is
+   * the entry surface.
    *
    * @param props Which facet to project
    * @returns The requested architecture facets

@@ -15,7 +15,7 @@ export interface ITtscGraphOverview {
   /** Highest-dependency symbols, busiest first. */
   hotspots?: ITtscGraphOverview.IHotspot[];
 
-  /** Export surface by file, widest first. */
+  /** Exported API symbols, most-depended-on first. */
   publicApi?: ITtscGraphOverview.IPublicApi[];
 }
 export namespace ITtscGraphOverview {
@@ -24,7 +24,7 @@ export namespace ITtscGraphOverview {
     /**
      * The facet to project, or `all` for every facet. `layers` is the folder
      * layering, `hotspots` the highest-dependency symbols, `publicApi` the
-     * export surface.
+     * exported API symbols ranked by how depended-on they are.
      *
      * @default "all"
      */
@@ -62,10 +62,18 @@ export namespace ITtscGraphOverview {
     fanOut: number;
   }
 
-  /** The exported symbols a single file contributes to the public surface. */
+  /**
+   * One symbol on the project's exported public API surface. The list is ranked
+   * by how depended-on the symbol is, with test, typings, and generated files
+   * excluded, so the names a consumer of the project would reach for surface
+   * first — not whichever file happens to declare the most exports.
+   */
   export interface IPublicApi {
+    /** The exported symbol's name. */
+    name: string;
+    /** Its declaration kind (`class`, `interface`, `function`, …). */
+    kind: string;
+    /** Project-relative path of the file that declares it. */
     file: string;
-    /** Exported symbol names declared in the file (capped). */
-    symbols: string[];
   }
 }

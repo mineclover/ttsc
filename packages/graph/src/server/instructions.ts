@@ -12,8 +12,10 @@ them.
 
 Pick the entry tool by what you know:
 
-- graph_overview: orient on an unfamiliar project — layers, hotspots, public API,
-  with no source read. Start here.
+- graph_overview: orient on an unfamiliar project — layers, hotspots, and the
+  public API (the exported types, named and ranked), with no source read. Start
+  here; the layers are the structure and the public API is the entry surface, so
+  do not list files or open the entry module to orient.
 - graph_query: find symbols or clusters from a natural query when you do not know
   the exact name. Mix code and plain words; it ranks by name, subword, path, and
   centrality and returns handles.

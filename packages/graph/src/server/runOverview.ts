@@ -92,19 +92,59 @@ function hotspots(graph: TtscGraphMemory): ITtscGraphOverview.IHotspot[] {
     .slice(0, 15);
 }
 
-/** The exported public surface, grouped by file and ordered by surface size. */
+/** Declaration kinds that make up a meaningful public API surface. */
+const API_KINDS = new Set<string>([
+  "class",
+  "interface",
+  "function",
+  "type",
+  "enum",
+]);
+
+/**
+ * The exported API surface: the exported symbols a consumer of the project would
+ * use, ranked by how depended-on each is (real fan-in/out, structural edges
+ * excluded). Ranking by dependency rather than by which file declares the most
+ * exports surfaces the load-bearing types (a DataSource, a SelectQueryBuilder)
+ * instead of whichever file bundles the most type aliases; test, typings, and
+ * generated files are dropped so they cannot crowd the real surface out.
+ */
 function publicApi(graph: TtscGraphMemory): ITtscGraphOverview.IPublicApi[] {
-  const byFile = new Map<string, string[]>();
-  for (const node of graph.exported()) {
-    if (node.kind === "file") continue;
-    const list = byFile.get(node.file) ?? [];
-    if (list.length < 24) list.push(node.qualifiedName ?? node.name);
-    byFile.set(node.file, list);
-  }
-  return [...byFile.entries()]
-    .map(([file, symbols]) => ({ file, symbols }))
-    .sort((a, b) => b.symbols.length - a.symbols.length)
-    .slice(0, 24);
+  const degree = (id: string): number => {
+    let n = 0;
+    for (const edge of graph.outgoing(id))
+      if (!STRUCTURAL_KINDS.has(edge.kind)) n++;
+    for (const edge of graph.incoming(id))
+      if (!STRUCTURAL_KINDS.has(edge.kind)) n++;
+    return n;
+  };
+  return graph
+    .exported()
+    .filter((node) => API_KINDS.has(node.kind) && !isNoiseFile(node.file))
+    .map((node) => ({
+      name: node.qualifiedName ?? node.name,
+      kind: node.kind,
+      file: node.file,
+      degree: degree(node.id),
+    }))
+    .sort((a, b) => b.degree - a.degree)
+    .slice(0, 30)
+    .map(({ name, kind, file }) => ({ name, kind, file }));
+}
+
+/**
+ * A file whose exports are noise for an architecture overview: a test, a
+ * dependency's bundled `.d.ts`/typings, or generated output. The conventions are
+ * universal (a `test`/`spec` path, a `typings` file), so excluding them is not
+ * framework-specific — it keeps the API surface to authored, used code.
+ */
+function isNoiseFile(file: string): boolean {
+  return (
+    /(^|\/)(test|tests|__tests__|spec|sample|samples)\//.test(file) ||
+    /\.(test|spec)\.[cm]?tsx?$/.test(file) ||
+    /(^|\/|\.)typings\.[cm]?ts$/.test(file) ||
+    /\.d\.[cm]?ts$/.test(file)
+  );
 }
 
 /** The parent directory of a project-relative path (`.` at the root). */

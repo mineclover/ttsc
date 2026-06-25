@@ -18,13 +18,21 @@ export function synthesizeNextRoutes(nodes: readonly ITtscGraphNode[]): {
   nodes: ITtscGraphNode[];
   edges: ITtscGraphEdge[];
 } {
-  // The first exported symbol declared in each file is taken as its page
-  // component — the default export a page module is required to have.
+  // Pick each file's page component: prefer an exported function or class (the
+  // page component) over an exported variable such as `metadata`. The dump does
+  // not yet carry which export is `default`, so this is best-effort.
+  const isComponent = (kind: ITtscGraphNode["kind"]): boolean =>
+    kind === "function" || kind === "class";
   const pageExport = new Map<string, ITtscGraphNode>();
   for (const node of nodes) {
     if (node.external || node.kind === "file") continue;
     if (!node.exported) continue;
-    if (!pageExport.has(node.file)) pageExport.set(node.file, node);
+    const current = pageExport.get(node.file);
+    if (current === undefined) {
+      pageExport.set(node.file, node);
+    } else if (!isComponent(current.kind) && isComponent(node.kind)) {
+      pageExport.set(node.file, node);
+    }
   }
 
   const routeNodes: ITtscGraphNode[] = [];

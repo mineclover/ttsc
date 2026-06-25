@@ -35,6 +35,11 @@ const ttscDir = path.join(repoRoot, "packages", "ttsc");
 const ARCHITECTURE_QUESTION = fs
   .readFileSync(path.join(here, "questions", "architecture-callpath.md"), "utf8")
   .trim();
+const CLAUDE_GRAPH_ARM_PROMPT = [
+  "A ttsc-graph MCP server is configured for this graph arm.",
+  "For TypeScript relationship or code-flow questions, before Glob/Grep/Read, use ToolSearch with select:mcp__ttsc-graph__query_nodes,mcp__ttsc-graph__expand_nodes,mcp__ttsc-graph__query_files.",
+  "Then use query_nodes once with one broad owner/action/noun query and answer from the graph result; use file tools only when the graph does not fit.",
+].join(" ");
 function resolveQuestion(repoKey) {
   if (process.env.TTSC_BENCH_QUESTION_FILE)
     return fs.readFileSync(process.env.TTSC_BENCH_QUESTION_FILE, "utf8").trim();
@@ -398,6 +403,9 @@ async function runClaude(question, cfg, armName, runNumber) {
     "--mcp-config",
     cfg,
   ];
+  if (armName === "graph") {
+    claudeArgs.push("--append-system-prompt", CLAUDE_GRAPH_ARM_PROMPT);
+  }
   const result = await spawnAsync("claude", claudeArgs, {
     cwd: repoDir,
     input: question,

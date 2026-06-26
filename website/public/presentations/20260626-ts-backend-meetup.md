@@ -671,7 +671,7 @@ Third, TTSC is the recovery path. At minimum, it is a transformer host for the n
 # Index
 
 1. Typia and Nestia
-2. TypeScript-Go Shock
+2. TypeScript-Go
 3. Transformer Survival
 4. Toolchain Opportunity
 
@@ -680,7 +680,11 @@ The talk has four chapters.
 
 The first chapter explains why transformers matter, using Typia and Nestia as concrete backend examples. I want everyone to see the real value before I talk about compiler internals.
 
-The second chapter is the breakage point: TypeScript-Go arrives, performance improves, and the old JavaScript patch model stops being a stable foundation.
+The second chapter starts with the good news: TypeScript-Go makes the compiler much faster, so everyday TypeScript work gets better.
+
+Then the chapter turns: the compiler implementation moves from JavaScript to Go, and the old transformer host model stops being a stable foundation.
+
+That is the breakage point. For typia and nestia, the visible TypeScript API can remain, while the generated runtime artifacts lose their engine.
 
 The third chapter explains TTSC as a survival layer. It gives transformers a new front door on top of the TypeScript-Go compiler.
 
@@ -693,9 +697,10 @@ The fourth chapter is the larger opportunity. If one tool already has the Progra
 
 # 1. Typia and Nestia
 
-- Show the code
-- Show the output
-- Then name the engine
+- Typia
+- Nestia
+- Common Engine
+- Transformer
 
 <!--
 I will begin with Typia and Nestia because they are the reason this problem matters to me.
@@ -1174,26 +1179,27 @@ That creates an important split. A new compiler can remain compatible with the T
 
 <!-- _class: lead -->
 
-# 2. TypeScript-Go Shock
+# 2. TypeScript-Go
 
-- Native compiler arrives
-- Faster is good
-- Compiler language changes
+- TypeScript-Go arrives
+- Faster compiler
+- Same language
+- Go implementation
 - Transformer host disappears
-- Typia and Nestia lose their engine
+- typia and nestia lose their engine
 
 <!--
-This is where the story turns from performance into crisis.
+This chapter starts with the upside.
 
 TypeScript-Go is exciting because the TypeScript compiler becomes much faster. For most users, that is simply good news. Faster type-checking, faster editor feedback, faster CI, and faster monorepo workflows are all wins.
 
 But speed is only half of the story. The TypeScript language stays the same, but the compiler implementation language changes. The old center was a JavaScript package running in a JavaScript process. The new center is a native Go compiler.
 
-For transformer-based projects, that creates a shock. The old patch point was not a formal cross-language plugin system. It was a JavaScript compiler implementation that JavaScript tools could patch and extend.
+That implementation change is what matters for the ecosystem. The old patch point was not a formal cross-language plugin system. It was a JavaScript compiler implementation that JavaScript tools could patch and extend.
 
 For typia and nestia, this was not a theoretical compatibility issue. The packages could still be installed. The source code could still look valid. But the generated validators, serializers, SDKs, and documents depended on a transformer host that was disappearing.
 
-That means the visible API could survive while the product engine died. That is the crisis I had to solve.
+That means the visible API could survive while the product engine died. The rest of chapter 2 is the breakdown of that failure.
 -->
 
 ---
@@ -1223,28 +1229,47 @@ That is why the language can be compatible while the transformer ecosystem break
 
 ---
 
-<!-- _class: cards -->
+<!-- _class: benchmark -->
 
 # 2.1. Native Compiler
 
-- Daily compiler cost
-  - monorepo type check
-  - watch mode
-  - editor startup
-  - CI feedback
-- Result
-  - shorter local loop
-  - shorter review loop
-  - shorter release loop
+- Same language
+  - TypeScript source stays valid
+  - everyday workflow stays familiar
+- Different engine
+  - compiler moves from JavaScript to Go
+  - this is where the speedup shows up
+
+<div class="benchmarks">
+  <div class="bench-card">
+    <div class="bench-title">VS Code type-check</div>
+    <div class="bench-row">
+      <div class="bench-name">legacy TypeScript</div>
+      <div class="bench-track">
+        <div class="bench-fill base" style="width: 100%"></div>
+      </div>
+      <div class="bench-value">73.3 s</div>
+    </div>
+    <div class="bench-row">
+      <div class="bench-name">TypeScript-Go</div>
+      <div class="bench-track">
+        <div class="bench-fill" style="width: 34.4%"></div>
+      </div>
+      <div class="bench-value">25.2 s</div>
+    </div>
+    <div class="bench-note">
+      73,293 ms vs 25,222 ms on the benchmark page. Same project, same check,
+      2.9x faster.
+    </div>
+  </div>
+</div>
 
 <!--
-Backend teams feel compiler cost every day.
+This is the upside that has to come first.
 
-A backend monorepo may type-check many packages, run watch mode while several services are changing, start the editor language service over a large dependency graph, and repeat type-checking in CI for every pull request.
+The benchmark page shows the practical payoff of TypeScript-Go on a real project. TypeScript still looks like TypeScript from the user's side, but the compiler implementation moves to Go and the wall-clock time drops.
 
-When those loops are slow, people change behavior. They run fewer checks locally. They wait longer for CI. They split feedback across multiple tools. They avoid large refactors because the verification loop is painful.
-
-So the TypeScript-Go upside is real. A faster compiler shortens the local loop, the review loop, and the release loop. The problem is not the native compiler itself. The problem is that the old transformer ecosystem was coupled to the old compiler implementation.
+The same benchmark page keeps the raw tsgo row around as a reference. That matters here because the story is not "ttsc is faster than tsc by magic." The story is that the new compiler base changes the cost of the everyday check loop.
 -->
 
 ---
@@ -1420,7 +1445,9 @@ So I chose the fourth option: build the missing host myself, on top of the TypeS
 - Replace the compiler path
 
 <!--
-Now the talk changes from crisis to response.
+This is the reversal.
+
+2장에서는 TypeScript-Go가 기존 transformer 생태계를 무너뜨렸습니다. 여기서는 그 뒤에 무엇을 했는지 보여줍니다.
 
 At this point in the story, TTSC is not a finished toolchain waiting on the shelf. The old host is disappearing, and the replacement does not exist yet.
 

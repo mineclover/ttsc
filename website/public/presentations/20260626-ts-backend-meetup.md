@@ -341,154 +341,21 @@ style: |
     font-size: 19px;
     line-height: 1.2;
   }
-  section.benchmark .benchmarks {
-    display: grid;
-    gap: 12px;
-    grid-column: 2;
+  section.benchmark > p:has(img[src*="../benchmark/meetup-"]),
+  section.lint-benchmark > p:has(img[src*="../benchmark/meetup-"]),
+  section.graph-token > p:has(img[src*="../benchmark/meetup-"]) {
+    margin: 0;
   }
-  section.benchmark .bench-card {
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    padding: 14px;
-  }
-  section.benchmark .bench-title {
-    color: #2563eb;
-    font-size: 22px;
-    font-weight: 800;
-    margin-bottom: 10px;
-  }
-  section.benchmark .bench-row {
-    align-items: center;
-    display: grid;
-    gap: 10px;
-    grid-template-columns: 150px minmax(0, 1fr) 104px;
-    margin-top: 7px;
-  }
-  section.benchmark .bench-name {
-    color: #334155;
-    font-size: 17px;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-  section.benchmark .bench-value {
-    color: #0f172a;
-    font-size: 21px;
-    font-weight: 900;
-    line-height: 1;
-    text-align: right;
-    white-space: nowrap;
-  }
-  section.benchmark .bench-track {
-    background: #e2e8f0;
-    border-radius: 999px;
-    height: 22px;
-    overflow: hidden;
-  }
-  section.benchmark .bench-fill {
-    background: #2563eb;
-    border-radius: 999px;
-    height: 100%;
-  }
-  section.benchmark .bench-fill.base {
-    background: #94a3b8;
-  }
-  section.benchmark .w-base {
-    width: 8%;
-  }
-  section.benchmark .w-10 {
-    width: 36%;
-  }
-  section.benchmark .w-30 {
-    width: 48%;
-  }
-  section.benchmark .w-200 {
-    width: 64%;
-  }
-  section.benchmark .w-20000 {
-    width: 100%;
-  }
-  section.benchmark .bench-note {
-    color: #64748b;
-    font-size: 17px;
-    margin-top: 10px;
-  }
-  section.benchmark .speed-chart,
-  section.lint-benchmark .speed-chart {
+  section.benchmark > p:has(img[src*="../benchmark/meetup-"]) {
     align-self: start;
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    box-sizing: border-box;
-    display: grid;
-    gap: 10px;
-    padding: 16px 18px 18px;
-    width: 100%;
-  }
-  section.benchmark .speed-chart {
     grid-column: 2;
   }
-  section.benchmark .speed-title,
-  section.lint-benchmark .speed-title {
-    color: #0f172a;
-    font-size: 23px;
-    font-weight: 900;
-    line-height: 1.1;
-    margin-bottom: 2px;
-  }
-  section.benchmark .speed-row,
-  section.lint-benchmark .speed-row {
-    align-items: center;
-    display: grid;
-    gap: 10px;
-    grid-template-columns: 120px minmax(0, 1fr) 64px;
-    min-height: 33px;
-  }
-  section.lint-benchmark .speed-row {
-    grid-template-columns: 120px minmax(0, 1fr) 86px;
-    min-height: 40px;
-  }
-  section.benchmark .speed-label,
-  section.lint-benchmark .speed-label {
-    color: #334155;
-    font-size: 17px;
-    font-weight: 800;
-    white-space: nowrap;
-  }
-  section.lint-benchmark .speed-label {
-    font-size: 20px;
-    font-weight: 900;
-  }
-  section.benchmark .speed-track,
-  section.lint-benchmark .speed-track {
-    background: #e2e8f0;
-    border-radius: 999px;
-    height: 18px;
-    overflow: hidden;
-  }
-  section.lint-benchmark .speed-track {
-    height: 22px;
-  }
-  section.benchmark .speed-bar,
-  section.lint-benchmark .speed-bar {
-    background: linear-gradient(90deg, #2563eb, #0f766e);
-    border-radius: 999px;
-    height: 100%;
-  }
-  section.lint-benchmark .speed-bar {
-    background: linear-gradient(90deg, #16a34a, #2563eb);
-  }
-  section.benchmark .speed-value,
-  section.lint-benchmark .speed-value {
-    color: #0f172a;
-    font-size: 20px;
-    font-weight: 900;
-    line-height: 1;
-    text-align: right;
-    white-space: nowrap;
-  }
-  section.lint-benchmark .speed-value {
-    font-size: 24px;
+  section.benchmark img[src*="../benchmark/meetup-"],
+  section.lint-benchmark img[src*="../benchmark/meetup-"],
+  section.graph-token img[src*="../benchmark/meetup-"] {
+    display: block;
+    height: auto;
+    width: 100%;
   }
   section.cards > ul {
     display: grid;
@@ -680,66 +547,6 @@ style: |
   section.graph-token h1 {
     font-size: 44px;
     margin-bottom: 18px;
-  }
-  section.graph-token .token-chart {
-    align-self: start;
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    box-shadow: 0 12px 28px rgba(49, 120, 198, 0.12);
-    display: grid;
-    gap: 14px;
-    padding: 18px 22px 22px;
-  }
-  section.graph-token .token-title {
-    color: #0f172a;
-    font-size: 26px;
-    font-weight: 900;
-    line-height: 1.1;
-  }
-  section.graph-token .token-group {
-    border-top: 1px solid #e2e8f0;
-    display: grid;
-    gap: 8px;
-    padding-top: 12px;
-  }
-  section.graph-token .token-model {
-    align-items: baseline;
-    color: #0f172a;
-    display: flex;
-    font-size: 21px;
-    font-weight: 900;
-    gap: 14px;
-    justify-content: space-between;
-    line-height: 1;
-  }
-  section.graph-token .token-model strong {
-    color: #2563eb;
-    font-size: 24px;
-  }
-  section.graph-token .token-row {
-    align-items: center;
-    display: grid;
-    gap: 12px;
-    grid-template-columns: 100px minmax(0, 1fr) 112px;
-    min-height: 32px;
-  }
-  section.graph-token .token-label {
-    color: #334155;
-    font-size: 18px;
-    font-weight: 800;
-  }
-  section.graph-token .token-track {
-    background: #e2e8f0;
-    border-radius: 999px;
-    height: 18px;
-  }
-  section.graph-token .token-value {
-    color: #0f172a;
-    font-size: 19px;
-    font-weight: 900;
-    line-height: 1;
-    text-align: right;
   }
   section.blueprint {
     background: #0f172a;
@@ -997,35 +804,7 @@ So the transformer is doing two jobs. It captures type information before erasur
   - JSDoc
   - tags
 
-<div class="benchmarks">
-  <div class="bench-card">
-    <div class="bench-title">Runtime validation</div>
-    <div class="bench-row">
-      <div class="bench-name">class-validator</div>
-      <div class="bench-track"><div class="bench-fill base w-base"></div></div>
-      <div class="bench-value">1x</div>
-    </div>
-    <div class="bench-row">
-      <div class="bench-name">typia</div>
-      <div class="bench-track"><div class="bench-fill w-20000"></div></div>
-      <div class="bench-value">20,000x</div>
-    </div>
-  </div>
-  <div class="bench-card">
-    <div class="bench-title">JSON serialization</div>
-    <div class="bench-row">
-      <div class="bench-name">class-transformer</div>
-      <div class="bench-track"><div class="bench-fill base w-base"></div></div>
-      <div class="bench-value">1x</div>
-    </div>
-    <div class="bench-row">
-      <div class="bench-name">typia</div>
-      <div class="bench-track"><div class="bench-fill w-200"></div></div>
-      <div class="bench-value">200x</div>
-    </div>
-  </div>
-  <div class="bench-note">Log-scaled visual, comparison target = 1x.</div>
-</div>
+![](../benchmark/meetup-typia-speedup.svg)
 
 <!--
 This is why typia has such a large practical impact in backend systems.
@@ -1132,47 +911,7 @@ This is also why the transformer problem is bigger than one function call. Once 
   - E2E test functions
   - Swagger editor
 
-<div class="benchmarks">
-  <div class="bench-card">
-    <div class="bench-title">Server path</div>
-    <div class="bench-row">
-      <div class="bench-name">NestJS base</div>
-      <div class="bench-track"><div class="bench-fill base w-base"></div></div>
-      <div class="bench-value">1x</div>
-    </div>
-    <div class="bench-row">
-      <div class="bench-name">nestia</div>
-      <div class="bench-track"><div class="bench-fill w-10"></div></div>
-      <div class="bench-value">10x+</div>
-    </div>
-  </div>
-  <div class="bench-card">
-    <div class="bench-title">Validation</div>
-    <div class="bench-row">
-      <div class="bench-name">class-validator</div>
-      <div class="bench-track"><div class="bench-fill base w-base"></div></div>
-      <div class="bench-value">1x</div>
-    </div>
-    <div class="bench-row">
-      <div class="bench-name">typia core</div>
-      <div class="bench-track"><div class="bench-fill w-20000"></div></div>
-      <div class="bench-value">20,000x</div>
-    </div>
-  </div>
-  <div class="bench-card">
-    <div class="bench-title">Serialization</div>
-    <div class="bench-row">
-      <div class="bench-name">class-transformer</div>
-      <div class="bench-track"><div class="bench-fill base w-base"></div></div>
-      <div class="bench-value">1x</div>
-    </div>
-    <div class="bench-row">
-      <div class="bench-name">typia core</div>
-      <div class="bench-track"><div class="bench-fill w-200"></div></div>
-      <div class="bench-value">200x</div>
-    </div>
-  </div>
-</div>
+![](../benchmark/meetup-nestia-speedup.svg)
 
 <!--
 nestia takes the same compiler-driven idea and applies it to a larger backend workflow.
@@ -1393,44 +1132,7 @@ The key phrase is "same TypeScript, different compiler implementation." The sour
   - fixture set repeats the win
   - speed comes from the native compiler base
 
-<div class="speed-chart" aria-label="TypeScript-Go type-check speedup by project">
-  <div class="speed-title">TypeScript-Go type-check speedup</div>
-  <div class="speed-row">
-    <div class="speed-label">VS Code</div>
-    <div class="speed-track"><div class="speed-bar" style="width: 100%"></div></div>
-    <div class="speed-value">11.2x</div>
-  </div>
-  <div class="speed-row">
-    <div class="speed-label">nestjs</div>
-    <div class="speed-track"><div class="speed-bar" style="width: 40%"></div></div>
-    <div class="speed-value">4.5x</div>
-  </div>
-  <div class="speed-row">
-    <div class="speed-label">vue</div>
-    <div class="speed-track"><div class="speed-bar" style="width: 64%"></div></div>
-    <div class="speed-value">7.2x</div>
-  </div>
-  <div class="speed-row">
-    <div class="speed-label">typeorm</div>
-    <div class="speed-track"><div class="speed-bar" style="width: 68%"></div></div>
-    <div class="speed-value">7.6x</div>
-  </div>
-  <div class="speed-row">
-    <div class="speed-label">zod</div>
-    <div class="speed-track"><div class="speed-bar" style="width: 48%"></div></div>
-    <div class="speed-value">5.4x</div>
-  </div>
-  <div class="speed-row">
-    <div class="speed-label">rxjs</div>
-    <div class="speed-track"><div class="speed-bar" style="width: 37%"></div></div>
-    <div class="speed-value">4.1x</div>
-  </div>
-  <div class="speed-row">
-    <div class="speed-label">shopping</div>
-    <div class="speed-track"><div class="speed-bar" style="width: 23%"></div></div>
-    <div class="speed-value">2.6x</div>
-  </div>
-</div>
+![](../benchmark/meetup-tsgo-speedup.svg)
 
 <!--
 This is the graph that makes the upside credible.
@@ -1958,39 +1660,7 @@ So the toolchain is not just about making one command faster. It is about making
 
 # 4.2. @ttsc/lint
 
-<div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 12px 28px rgba(49,120,198,.12);box-sizing:border-box;display:grid;gap:14px;padding:22px 28px;width:100%">
-  <div style="color:#0f172a;font-size:28px;font-weight:900;line-height:1.1">Isolated lint speedup</div>
-  <div style="align-items:center;display:grid;gap:14px;grid-template-columns:130px 500px 90px;min-height:42px">
-    <div style="color:#334155;font-size:21px;font-weight:900">vscode</div>
-    <div style="background:#e2e8f0;border-radius:999px;height:24px;width:500px"><div style="background:linear-gradient(90deg,#16a34a,#2563eb);border-radius:999px;height:24px;width:244px"></div></div>
-    <div style="color:#0f172a;font-size:26px;font-weight:900;text-align:right">901x</div>
-  </div>
-  <div style="align-items:center;display:grid;gap:14px;grid-template-columns:130px 500px 90px;min-height:42px">
-    <div style="color:#334155;font-size:21px;font-weight:900">nestjs</div>
-    <div style="background:#e2e8f0;border-radius:999px;height:24px;width:500px"><div style="background:linear-gradient(90deg,#16a34a,#2563eb);border-radius:999px;height:24px;width:500px"></div></div>
-    <div style="color:#0f172a;font-size:26px;font-weight:900;text-align:right">1848x</div>
-  </div>
-  <div style="align-items:center;display:grid;gap:14px;grid-template-columns:130px 500px 90px;min-height:42px">
-    <div style="color:#334155;font-size:21px;font-weight:900">vue</div>
-    <div style="background:#e2e8f0;border-radius:999px;height:24px;width:500px"><div style="background:linear-gradient(90deg,#16a34a,#2563eb);border-radius:999px;height:24px;width:205px"></div></div>
-    <div style="color:#0f172a;font-size:26px;font-weight:900;text-align:right">757x</div>
-  </div>
-  <div style="align-items:center;display:grid;gap:14px;grid-template-columns:130px 500px 90px;min-height:42px">
-    <div style="color:#334155;font-size:21px;font-weight:900">zod</div>
-    <div style="background:#e2e8f0;border-radius:999px;height:24px;width:500px"><div style="background:linear-gradient(90deg,#16a34a,#2563eb);border-radius:999px;height:24px;width:311px"></div></div>
-    <div style="color:#0f172a;font-size:26px;font-weight:900;text-align:right">1150x</div>
-  </div>
-  <div style="align-items:center;display:grid;gap:14px;grid-template-columns:130px 500px 90px;min-height:42px">
-    <div style="color:#334155;font-size:21px;font-weight:900">rxjs</div>
-    <div style="background:#e2e8f0;border-radius:999px;height:24px;width:500px"><div style="background:linear-gradient(90deg,#16a34a,#2563eb);border-radius:999px;height:24px;width:177px"></div></div>
-    <div style="color:#0f172a;font-size:26px;font-weight:900;text-align:right">653x</div>
-  </div>
-  <div style="align-items:center;display:grid;gap:14px;grid-template-columns:130px 500px 90px;min-height:42px">
-    <div style="color:#334155;font-size:21px;font-weight:900">shopping</div>
-    <div style="background:#e2e8f0;border-radius:999px;height:24px;width:500px"><div style="background:linear-gradient(90deg,#16a34a,#2563eb);border-radius:999px;height:24px;width:158px"></div></div>
-    <div style="color:#0f172a;font-size:26px;font-weight:900;text-align:right">583x</div>
-  </div>
-</div>
+![](../benchmark/meetup-lint-speedup.svg)
 
 <!--
 Linting is the easiest performance example.
@@ -2083,35 +1753,7 @@ Without this, an agent starts with grep and guesses from text. With this, the fi
 
 # 4.3. @ttsc/graph
 
-<div class="token-chart" aria-label="@ttsc/graph TypeORM agent token usage">
-  <div class="token-title">TypeORM agent token usage</div>
-  <div class="token-group">
-    <div class="token-model">Anthropic Opus <strong>9.9x fewer</strong></div>
-    <div class="token-row">
-      <div class="token-label">Baseline</div>
-      <div class="token-track" style="background: linear-gradient(90deg, #ef4444 0 100%, #e2e8f0 100% 100%)"></div>
-      <div class="token-value">1,471,202</div>
-    </div>
-    <div class="token-row">
-      <div class="token-label">Graph</div>
-      <div class="token-track" style="background: linear-gradient(90deg, #2563eb 0 10%, #e2e8f0 10% 100%)"></div>
-      <div class="token-value">148,231</div>
-    </div>
-  </div>
-  <div class="token-group">
-    <div class="token-model">OpenAI GPT <strong>4.0x fewer</strong></div>
-    <div class="token-row">
-      <div class="token-label">Baseline</div>
-      <div class="token-track" style="background: linear-gradient(90deg, #ef4444 0 100%, #e2e8f0 100% 100%)"></div>
-      <div class="token-value">586,338</div>
-    </div>
-    <div class="token-row">
-      <div class="token-label">Graph</div>
-      <div class="token-track" style="background: linear-gradient(90deg, #2563eb 0 25%, #e2e8f0 25% 100%)"></div>
-      <div class="token-value">145,493</div>
-    </div>
-  </div>
-</div>
+![](../benchmark/meetup-graph-token-usage.svg)
 
 <!--
 This benchmark cell shows the practical effect on a TypeORM task.

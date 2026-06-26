@@ -135,7 +135,7 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
     }>(
       (await client.request("tools/call", {
         name: "graph_expand",
-        arguments: { handles: [runId] },
+        arguments: { handles: [runId], source: true },
       })) as ToolResult,
     );
     assert.ok(

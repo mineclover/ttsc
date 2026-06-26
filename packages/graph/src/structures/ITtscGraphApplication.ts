@@ -24,12 +24,14 @@ export interface ITtscGraphApplication {
   graph_overview(props: ITtscGraphOverview.IProps): ITtscGraphOverview;
 
   /**
-   * Read the source of symbols the graph located, by their handles, instead of
-   * opening or `cat`-ing the files. Pass every handle you need in ONE call (never
-   * one at a time); optionally get each node's dependencies and dependents. The
-   * source returned is the authoritative declaration straight from the compiler's
-   * view — do not re-grep or reopen the file to double-check it; to see more code,
-   * expand the neighbor handles instead.
+   * Get the declared shape of symbols the graph located, by their handles: each
+   * one's signature, and for a class/interface/namespace/file its member outline
+   * (every member with its own signature) — the resolved structure, not inlined
+   * source. This is the graph's edge over reading files; it is compiler-resolved
+   * and authoritative, so don't grep or reopen the file to confirm it. Pass every
+   * handle in ONE call. Set `source: true` only for the few leaf methods or
+   * functions whose actual control-flow logic you must read; `neighbors: true`
+   * adds what each symbol uses and what uses it.
    *
    * @param props The handles to expand
    * @returns The resolved nodes with source, and any handles that did not

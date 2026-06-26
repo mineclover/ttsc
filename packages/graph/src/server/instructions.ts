@@ -22,8 +22,10 @@ The loop:
    query for one instead of grepping the tree or node_modules.
 3. graph_trace — follow flow from a symbol: forward to what it uses, reverse to
    what uses it, impact to the public API and tests a change reaches.
-4. graph_expand — read the located source: pass every handle you need in ONE
-   call, never one at a time, and read the result instead of opening the file.
+4. graph_expand — get the declared shape of the located symbols: each one's
+   signature, and a class/interface/namespace's member outline. That structure,
+   not inlined source, is the point — set source:true only for the few bodies
+   whose actual logic you must read. One call, all handles.
 
 The graph is checker-resolved fact and mirrors the current program (query again
 after an edit). It covers the whole workspace, so grep and read are only for what

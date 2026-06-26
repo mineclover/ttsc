@@ -27,6 +27,12 @@ The loop:
    not inlined source, is the point — set source:true only for the few bodies
    whose actual logic you must read. One call, all handles.
 
+Answer in as few calls as possible: each tool call is expensive, and a query
+already carries the signatures, so one query — plus at most one trace to follow a
+flow — usually suffices. Expand only the few bodies whose logic you must read;
+do not expand a node whose signature already answered the question, and do not
+re-explore what a previous call returned.
+
 The graph is checker-resolved fact and mirrors the current program (query again
 after an edit). It covers the whole workspace, so grep and read are only for what
 it cannot hold — a non-TypeScript file, generated output, a dependency under

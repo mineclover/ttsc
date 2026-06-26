@@ -44,7 +44,9 @@ export interface ITtscGraphApplication {
    * field — by name or a plain-language description, instead of grepping or
    * listing files. The project is fully indexed, so this resolves what `rg` would
    * but ranked by name, subword, path, and centrality, and returns handles to
-   * expand or trace. Reach for this first when you need to locate code.
+   * expand or trace. Each hit carries its signature, so you can often answer
+   * from this one call — expand only when you must read a body. Reach for this
+   * first when you need to locate code.
    *
    * @param props The query and result cap
    * @returns Ranked hits with handles

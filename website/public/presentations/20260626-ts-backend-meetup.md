@@ -413,6 +413,55 @@ style: |
     font-size: 17px;
     margin-top: 10px;
   }
+  section.benchmark .speed-chart {
+    align-self: start;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    display: grid;
+    gap: 10px;
+    grid-column: 2;
+    padding: 16px 18px 18px;
+  }
+  section.benchmark .speed-title {
+    color: #0f172a;
+    font-size: 23px;
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 2px;
+  }
+  section.benchmark .speed-row {
+    align-items: center;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 120px minmax(0, 1fr) 64px;
+    min-height: 33px;
+  }
+  section.benchmark .speed-label {
+    color: #334155;
+    font-size: 17px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  section.benchmark .speed-track {
+    background: #e2e8f0;
+    border-radius: 999px;
+    height: 18px;
+    overflow: hidden;
+  }
+  section.benchmark .speed-bar {
+    background: linear-gradient(90deg, #2563eb, #0f766e);
+    border-radius: 999px;
+    height: 100%;
+  }
+  section.benchmark .speed-value {
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1;
+    text-align: right;
+    white-space: nowrap;
+  }
   section.cards > ul {
     display: grid;
     gap: 18px;
@@ -1240,18 +1289,44 @@ That is why the language can be compatible while the transformer ecosystem break
   - compiler moves from JavaScript to Go
   - this is where the speedup shows up
 
-<div class="mermaid">
-xychart-beta
-  title "TypeScript-Go type-check speedup"
-  x-axis [vscode, nestjs, vue, typeorm, zod, rxjs, shopping]
-  y-axis "speedup (x)" 0 --> 12
-  bar [11.2, 4.5, 7.2, 7.6, 5.4, 4.1, 2.6]
+<div class="speed-chart" aria-label="TypeScript-Go type-check speedup by project">
+  <div class="speed-title">TypeScript-Go type-check speedup</div>
+  <div class="speed-row">
+    <div class="speed-label">VS Code</div>
+    <div class="speed-track"><div class="speed-bar" style="width: 100%"></div></div>
+    <div class="speed-value">11.2x</div>
+  </div>
+  <div class="speed-row">
+    <div class="speed-label">nestjs</div>
+    <div class="speed-track"><div class="speed-bar" style="width: 40%"></div></div>
+    <div class="speed-value">4.5x</div>
+  </div>
+  <div class="speed-row">
+    <div class="speed-label">vue</div>
+    <div class="speed-track"><div class="speed-bar" style="width: 64%"></div></div>
+    <div class="speed-value">7.2x</div>
+  </div>
+  <div class="speed-row">
+    <div class="speed-label">typeorm</div>
+    <div class="speed-track"><div class="speed-bar" style="width: 68%"></div></div>
+    <div class="speed-value">7.6x</div>
+  </div>
+  <div class="speed-row">
+    <div class="speed-label">zod</div>
+    <div class="speed-track"><div class="speed-bar" style="width: 48%"></div></div>
+    <div class="speed-value">5.4x</div>
+  </div>
+  <div class="speed-row">
+    <div class="speed-label">rxjs</div>
+    <div class="speed-track"><div class="speed-bar" style="width: 37%"></div></div>
+    <div class="speed-value">4.1x</div>
+  </div>
+  <div class="speed-row">
+    <div class="speed-label">shopping</div>
+    <div class="speed-track"><div class="speed-bar" style="width: 23%"></div></div>
+    <div class="speed-value">2.6x</div>
+  </div>
 </div>
-
-<script type="module">
-  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-  mermaid.initialize({ startOnLoad: true });
-</script>
 
 <!--
 This is the upside that has to come first.

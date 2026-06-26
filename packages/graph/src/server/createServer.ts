@@ -5,7 +5,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import typia from "typia";
 
-import { TtscGraphApplication } from "../TtscGraphApplication";
+import { TtscGraphApplication, TtscGraphSource } from "../TtscGraphApplication";
 import { TtscGraphMemory } from "../model/TtscGraphMemory";
 import { ITtscGraphApplication } from "../structures/ITtscGraphApplication";
 import { instructions } from "./instructions";
@@ -25,7 +25,7 @@ import { instructions } from "./instructions";
  * public output.
  */
 export function createServer(
-  graph: TtscGraphMemory,
+  graph: TtscGraphSource,
   version: string,
 ): McpServer {
   const controller = typia.llm.controller<ITtscGraphApplication>(

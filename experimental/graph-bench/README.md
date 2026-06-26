@@ -38,9 +38,11 @@ Read the coverage as the codegraph-style flex: 100% of symbol-bearing files have
 
 ## Agent-cost A/B (`agent-ab.mjs`)
 
-A faithful port of codegraph's headline benchmark (its `scripts/agent-eval`). For one question per repo it runs the Claude Code CLI headless twice, once with the `@ttsc/graph` MCP server and once with an empty MCP config, both under `--strict-mcp-config`, and reports codegraph's metrics: tokens summed per assistant turn (not last-turn `result.usage`), tool-call count, cost, and wall time, median over N runs. Only codegraph's two TypeScript repos are runnable by a checker-resolved graph, `excalidraw` and `vscode` (the other five are Python/Rust/Java/Go/Swift). It spends real Claude credits, is non-deterministic, and is not wired into CI. Requires `claude` and `go` on `PATH`, plus a built `@ttsc/graph` (`pnpm -C packages/graph build`), since the MCP server is the `@ttsc/graph` Node launcher: it runs `ttscgraph dump` once (the Go binary is dump-only now) and serves `graph_overview` / `graph_query` / `graph_trace` / `graph_expand` over stdio.
+A faithful port of codegraph's headline benchmark (its `scripts/agent-eval`). For one question per repo it runs the Claude Code CLI headless twice, once with the `@ttsc/graph` MCP server and once with an empty MCP config, both under `--strict-mcp-config`, and reports codegraph's metrics: tokens summed per assistant turn (not last-turn `result.usage`), tool-call count, cost, and wall time, median over N runs. Only codegraph's two TypeScript repos are runnable by a checker-resolved graph, `excalidraw` and `vscode` (the other five are Python/Rust/Java/Go/Swift). It spends real Claude credits, is non-deterministic, and is not wired into CI. Requires `claude` and `go` on `PATH`, plus a built `@ttsc/graph` (`pnpm -C packages/graph build`), since the MCP server is the `@ttsc/graph` Node launcher: it runs `ttscgraph dump` once (the Go binary is dump-only now) and serves `graph_index` / `graph_overview` / `graph_query` / `graph_trace` / `graph_expand` over stdio.
 
 The prompt is tool-neutral. No graph-specific guidance is appended to the user prompt; the tool guidance lives in the server's MCP initialize/tool descriptions, so both arms pose the identical question and the token comparison stays honest.
+
+When the target checkout has no `node_modules`, the runner installs dependencies from the repo's lockfile before measuring. Use `--no-install=1` only when the checkout is already prepared for type-checking.
 
 ```bash
 node experimental/graph-bench/agent-ab.mjs --repo=excalidraw --runs=10 --model=sonnet
@@ -67,7 +69,7 @@ node -e "const r=require('./experimental/graph-bench/agent-ab-report.json');requ
 node experimental/graph-bench/grade.mjs --report=/tmp/flat.json
 ```
 
-A cross-model companion, `agent-ab-codex.mjs`, drives OpenAI's codex (GPT-5.5) through a minimal temp `CODEX_HOME` (a copied auth + a generated config) so the user's global config does not leak into the measurement. It takes the same `--prompt-id` / `--prompt-family` / `--threshold` flags and captures + grades the answer the same way:
+A cross-model companion, `agent-ab-codex.mjs`, drives OpenAI's codex through a minimal temp `CODEX_HOME` (a copied auth + a generated config) so the user's global config does not leak into the measurement. It defaults to GPT-5.4 mini and takes the same `--prompt-id` / `--prompt-family` / `--threshold` flags and captures + grades the answer the same way:
 
 ```bash
 node experimental/graph-bench/agent-ab-codex.mjs --repo=excalidraw --runs=4

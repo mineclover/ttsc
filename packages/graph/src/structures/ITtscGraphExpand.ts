@@ -6,15 +6,15 @@
 export interface ITtscGraphExpand {
   nodes: ITtscGraphExpand.INode[];
 
-  /** Handles that resolved to no node. */
+  /** Handles that resolved to no node, or that were ambiguous. */
   unknown: string[];
 }
 export namespace ITtscGraphExpand {
   /** Which handles to expand, and how much of each to return. */
   export interface IProps {
     /**
-     * Node ids to expand, exactly as another tool returned them. Pass every
-     * handle you need in one call.
+     * Node ids from another tool, or dotted symbol handles such as
+     * `OrderService.create`. Pass every handle you need in one call.
      */
     handles: string[];
 
@@ -29,9 +29,9 @@ export namespace ITtscGraphExpand {
     /**
      * Return the full declaration source body too. Off by default: expand
      * returns the declared shape — a symbol's signature, and a class/interface/
-     * namespace's member outline — which is what you usually need and a fraction
-     * of the tokens. Turn this on only for the few leaf functions or methods
-     * whose actual control-flow logic you must read.
+     * namespace's member outline — which is what you usually need and a
+     * fraction of the tokens. Turn this on only for the few leaf functions or
+     * methods whose actual control-flow logic you must read.
      *
      * @default false
      */

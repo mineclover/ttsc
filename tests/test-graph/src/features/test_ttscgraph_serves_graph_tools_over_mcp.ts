@@ -16,14 +16,15 @@ const callJson = <T>(result: ToolResult): T =>
  * The TypeScript engine is unit-smoked in isolation; this case proves the
  * shipped pipeline works: the Node launcher spawns, runs `ttscgraph dump` once
  * for a real project, builds the resident graph, and answers
- * initialize/tools-list/tools-call for graph_overview, graph_query,
- * graph_trace, and graph_expand, then exits cleanly when stdin closes.
+ * initialize/tools-list/tools-call for graph_index, graph_overview,
+ * graph_query, graph_trace, and graph_expand, then exits cleanly when stdin
+ * closes.
  *
  * 1. Materialize a project with a Service.run -> helper call chain, then spawn the
  *    launcher against it.
- * 2. Drive initialize, tools/list, and a call to each of the four tools.
- * 3. Assert the architecture counts, a query hit, the forward trace reaching the
- *    callee, expanded source, and a clean exit.
+ * 2. Drive initialize, tools/list, and a call to each of the five tools.
+ * 3. Assert the index, architecture counts, a query hit, forward/path traces
+ *    reaching the callee, expanded source, and a clean exit.
  */
 export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
   const root = TestProject.createProject({
@@ -76,8 +77,51 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
     const names = list.tools.map((tool) => tool.name).sort();
     assert.deepEqual(
       names,
-      ["graph_expand", "graph_overview", "graph_query", "graph_trace"],
-      `tools/list advertises the four graph tools, got ${names.join(", ")}`,
+      [
+        "graph_expand",
+        "graph_index",
+        "graph_overview",
+        "graph_query",
+        "graph_trace",
+      ],
+      `tools/list advertises the five graph tools, got ${names.join(", ")}`,
+    );
+
+    // graph_index: the first source-free index resolves direct handles and
+    // nearby dependency context.
+    const index = callJson<{
+      hits: { name: string; signature?: string }[];
+      mentions: { handle: string; node?: { name: string } }[];
+      neighborhood: { name: string; dependsOn: { name: string }[] }[];
+    }>(
+      (await client.request("tools/call", {
+        name: "graph_index",
+        arguments: { query: "how Service.run reaches helper" },
+      })) as ToolResult,
+    );
+    assert.ok(
+      index.hits.some(
+        (hit) =>
+          hit.name === "Service.run" &&
+          (hit.signature ?? "").includes("run(): void"),
+      ),
+      `graph_index ranks Service.run with a signature: ${JSON.stringify(index.hits)}`,
+    );
+    assert.ok(
+      index.mentions.some(
+        (mention) =>
+          mention.handle === "Service.run" &&
+          mention.node?.name === "Service.run",
+      ),
+      `graph_index resolves direct dotted mentions: ${JSON.stringify(index.mentions)}`,
+    );
+    assert.ok(
+      index.neighborhood.some(
+        (node) =>
+          node.name === "Service.run" &&
+          node.dependsOn.some((ref) => ref.name === "helper"),
+      ),
+      `graph_index includes direct dependency context: ${JSON.stringify(index.neighborhood)}`,
     );
 
     // graph_overview: a compact architecture map with real counts.
@@ -126,17 +170,34 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
       `graph_trace forward reaches helper: ${JSON.stringify(trace.reached)}`,
     );
 
+    // graph_trace path mode: dotted from handles can be used directly.
+    const pathTrace = callJson<{
+      path?: { name: string; signature?: string }[];
+    }>(
+      (await client.request("tools/call", {
+        name: "graph_trace",
+        arguments: { from: "Service.run", to: "helper" },
+      })) as ToolResult,
+    );
+    assert.ok(
+      pathTrace.path?.some((node) => node.name === "helper"),
+      `graph_trace path reaches helper from dotted handle: ${JSON.stringify(pathTrace.path)}`,
+    );
+    assert.ok(
+      pathTrace.path?.some((node) =>
+        (node.signature ?? "").includes("run(): void"),
+      ),
+      `graph_trace path carries signatures: ${JSON.stringify(pathTrace.path)}`,
+    );
+
     // graph_expand: reads the declaration source the graph located.
-    const runId = service
-      ? service.id.replace("Service:class", "Service.run:method")
-      : "";
     const expand = callJson<{
       nodes: { id: string; source?: string }[];
       unknown: string[];
     }>(
       (await client.request("tools/call", {
         name: "graph_expand",
-        arguments: { handles: [runId], source: true },
+        arguments: { handles: ["Service.run"], source: true },
       })) as ToolResult,
     );
     assert.ok(

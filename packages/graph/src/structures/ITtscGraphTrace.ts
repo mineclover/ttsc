@@ -22,7 +22,8 @@ export interface ITtscGraphTrace {
 
   /**
    * When `to` was given: the ordered dependency path from `from` to `to`
-   * (`from` first, `to` last), or empty when `to` is not reachable from `from`.
+   * (`from` first, `to` last), or empty when `to` is not reachable from
+   * `from`.
    */
   path?: ITtscGraphTrace.INode[];
 
@@ -33,15 +34,17 @@ export namespace ITtscGraphTrace {
   /** Where and how far to trace dependency flow. */
   export interface IProps {
     /**
-     * Where to start: a node id from another tool, or a symbol name. An
-     * ambiguous name returns its candidates instead of a trace.
+     * Where to start: a node id from another tool, a simple symbol name, or a
+     * dotted member name such as `OrderService.create`. An ambiguous name
+     * returns its candidates instead of a trace.
      */
     from: string;
 
     /**
-     * A target symbol (id or name). When given, the tool returns the dependency
-     * path from `from` to this target — the one-call answer for "how does A
-     * reach B" — instead of an open-ended trace.
+     * A target symbol: node id, simple symbol name, or dotted member name. When
+     * given, the tool returns the dependency path from `from` to this target —
+     * the one-call answer for "how does A reach B" — instead of an open-ended
+     * trace.
      */
     to?: string;
 

@@ -1,6 +1,7 @@
 import { TtscGraphMemory } from "../model/TtscGraphMemory";
 import { ITtscGraphNode } from "../structures/ITtscGraphNode";
 import { ITtscGraphTrace } from "../structures/ITtscGraphTrace";
+import { resolveGraphHandle } from "./resolveHandle";
 import { signatureOf } from "./runExpand";
 
 const DEFAULT_DEPTH = 6;
@@ -9,9 +10,9 @@ const DEFAULT_MAX_NODES = 60;
 /**
  * Breadth-first trace along the dependency graph. Structural
  * (contains/exports/imports) edges are excluded so the path is real call/type
- * flow; forward walks callees, reverse and impact walk callers.
- * Impact additionally tags each reached node's role so the blast radius on the
- * public surface is legible.
+ * flow; forward walks callees, reverse and impact walk callers. Impact
+ * additionally tags each reached node's role so the blast radius on the public
+ * surface is legible.
  */
 export function runTrace(
   graph: TtscGraphMemory,
@@ -25,7 +26,7 @@ export function runTrace(
   // forward/reverse the role is noise.
   const withRoles = direction === "impact";
 
-  const start = resolveStart(graph, props.from);
+  const start = resolveGraphHandle(graph, props.from);
   if (start.candidates) {
     return {
       direction,
@@ -43,7 +44,7 @@ export function runTrace(
   // one-call answer for "how does A reach B" — instead of an open-ended trace.
   if (props.to !== undefined && props.to !== "") {
     const base = { direction: "path", hops: [], reached: [], truncated: false };
-    const target = resolveStart(graph, props.to);
+    const target = resolveGraphHandle(graph, props.to);
     if (target.candidates) {
       return {
         ...base,
@@ -129,19 +130,6 @@ export function runTrace(
     reached: [...reached.values()],
     truncated,
   };
-}
-
-/** Resolve `from` to a single node, or report ambiguous-name candidates. */
-function resolveStart(
-  graph: TtscGraphMemory,
-  from: string,
-): { node?: ITtscGraphNode; candidates?: ITtscGraphNode[] } {
-  const byId = graph.node(from);
-  if (byId !== undefined) return { node: byId };
-  const named = graph.named(from).filter((n) => n.kind !== "file");
-  if (named.length === 1) return { node: named[0] };
-  if (named.length > 1) return { candidates: named.slice(0, 12) };
-  return {};
 }
 
 /**

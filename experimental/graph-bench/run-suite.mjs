@@ -14,7 +14,8 @@
 //   node run-suite.mjs --arm=graph --runs=1 --harness=codex --model=gpt-5.4-mini
 //
 // Flags: --family=dedicated|common|all (default dedicated, = one prompt/project),
-// --concurrency (prompts in flight, default 4), --baseline-store=<path>,
+// --concurrency (prompts in flight, default 4), --inner-concurrency (agent runs
+// in flight inside one prompt, default = --runs), --baseline-store=<path>,
 // --out=<combined report>.
 
 import cp from "node:child_process";
@@ -60,6 +61,7 @@ const model = arg("model", harness === "codex" ? "gpt-5.4-mini" : "sonnet");
 const runs = Number(arg("runs", arm === "baseline" ? "5" : "1"));
 const family = arg("family", "dedicated");
 const outer = Number(arg("concurrency", "4"));
+const inner = Number(arg("inner-concurrency", String(runs)));
 const storePath = path.resolve(
   arg("baseline-store", path.join(here, `baselines-${harness}.json`)),
 );
@@ -85,9 +87,13 @@ const prompts = (manifest.prompts ?? []).filter(
 if (prompts.length === 0) throw new Error(`no prompts for family ${family}`);
 
 const fixtureOf = (repo) => {
-  if (repo === "excalidraw")
-    return fs.existsSync(FIXTURES.excalidraw) ? FIXTURES.excalidraw : EXCALIDRAW_CORPUS;
-  return FIXTURES[repo];
+  if (repo === "excalidraw") {
+    if (fs.existsSync(FIXTURES.excalidraw)) return FIXTURES.excalidraw;
+    if (fs.existsSync(EXCALIDRAW_CORPUS)) return EXCALIDRAW_CORPUS;
+    return null;
+  }
+  const dir = FIXTURES[repo];
+  return dir && fs.existsSync(dir) ? dir : null;
 };
 
 const tmpDir = path.join(here, ".suite-tmp");
@@ -105,22 +111,18 @@ function runPrompt(prompt) {
   return new Promise((resolve) => {
     const report = path.join(tmpDir, `${harness}-${model}-${prompt.id}-${arm}.json`);
     const dir = fixtureOf(prompt.repo);
-    if (!dir || !fs.existsSync(dir)) {
-      console.log(`  ${prompt.id}: SKIP (no fixture at ${dir})`);
-      return resolve({ prompt, samples: [], skipped: true });
-    }
     const childArgs = [
       harnessScript,
       `--prompt-id=${prompt.id}`,
       `--arm=${arm}`,
       `--runs=${runs}`,
       `--model=${model}`,
-      `--repo-dir=${dir}`,
       `--report=${report}`,
     ];
+    if (dir) childArgs.push(`--repo-dir=${dir}`);
     const child = cp.spawn(process.execPath, childArgs, {
       cwd: repoRoot,
-      env: { ...process.env, TTSC_BENCH_CONCURRENCY: String(runs) },
+      env: { ...process.env, TTSC_BENCH_CONCURRENCY: String(inner) },
       windowsHide: true,
     });
     let err = "";
@@ -179,6 +181,9 @@ if (arm === "baseline") {
       promptId: prompt.id,
       runs: samples.length,
       medianTokens: median(toks),
+      medianTools: median(samples.map((s) => s.tools)),
+      medianShell: median(samples.map((s) => s.shell)),
+      medianGraph: median(samples.map((s) => s.graph)),
       tokens: toks,
       pass: graded.length
         ? { passed: graded.filter((s) => s.quality.pass).length, graded: graded.length }
@@ -199,14 +204,28 @@ if (arm === "baseline") {
   for (const { prompt, samples } of results) {
     if (!samples.length) continue;
     const g = median(samples.map((s) => s.tokens));
+    const graphCalls = median(samples.map((s) => s.graph));
+    const shellCalls = median(samples.map((s) => s.shell));
+    const toolCalls = median(samples.map((s) => s.tools));
     const base = store[`${model}/${prompt.id}`];
     const b = base?.medianTokens ?? 0;
     const red = b ? Math.round((1 - g / b) * 100) : null;
     const graded = samples.filter((s) => s.quality);
     const passed = graded.filter((s) => s.quality.pass).length;
-    rows.push({ id: prompt.id, b, g, red, passed, graded: graded.length });
+    rows.push({
+      id: prompt.id,
+      b,
+      g,
+      red,
+      graphCalls,
+      shellCalls,
+      toolCalls,
+      passed,
+      graded: graded.length,
+    });
     console.log(
-      `  ${prompt.id.padEnd(32)} ${b || "?"} -> ${g}  ${red === null ? "(no baseline)" : red + "%"}  ${passed}/${graded.length}`,
+      `  ${prompt.id.padEnd(32)} ${b || "?"} -> ${g}  ${red === null ? "(no baseline)" : red + "%"}  ${passed}/${graded.length}` +
+        `  graph ${graphCalls} shell ${shellCalls} tools ${toolCalls}`,
     );
   }
   const reds = rows.filter((r) => r.red !== null).map((r) => r.red);

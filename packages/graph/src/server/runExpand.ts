@@ -5,6 +5,7 @@ import { TtscGraphMemory } from "../model/TtscGraphMemory";
 import { ITtscGraphEdge } from "../structures/ITtscGraphEdge";
 import { ITtscGraphExpand } from "../structures/ITtscGraphExpand";
 import { ITtscGraphNode } from "../structures/ITtscGraphNode";
+import { resolveGraphHandle } from "./resolveHandle";
 
 // A whole declaration body can be large, so the full source is opt-in and capped
 // when asked for; the default response carries only the declared shape.
@@ -28,11 +29,11 @@ const CONTAINER_KINDS = new Set<string>([
 ]);
 
 /**
- * Resolve each handle to its declared shape — its signature, and for a container
- * the outline of its members — and, only when asked, its full source body. This
- * is the graph's edge over a plain file read: it answers from the resolved
- * structure it already holds, so the agent reads compact shape, not inlined code,
- * unless it explicitly needs a body's logic.
+ * Resolve each handle to its declared shape — its signature, and for a
+ * container the outline of its members — and, only when asked, its full source
+ * body. This is the graph's edge over a plain file read: it answers from the
+ * resolved structure it already holds, so the agent reads compact shape, not
+ * inlined code, unless it explicitly needs a body's logic.
  */
 export function runExpand(
   graph: TtscGraphMemory,
@@ -42,11 +43,12 @@ export function runExpand(
   const nodes: ITtscGraphExpand.INode[] = [];
   const unknown: string[] = [];
   for (const handle of props.handles) {
-    const node = graph.node(handle);
-    if (node === undefined) {
+    const resolved = resolveGraphHandle(graph, handle);
+    if (resolved.node === undefined) {
       unknown.push(handle);
       continue;
     }
+    const node = resolved.node;
     const expanded: ITtscGraphExpand.INode = {
       id: node.id,
       name: node.qualifiedName ?? node.name,
@@ -122,27 +124,39 @@ function refs(
 }
 
 /** Read a file's lines once, or undefined when it cannot be read. */
-function fileLines(project: string, node: ITtscGraphNode): string[] | undefined {
+function fileLines(
+  project: string,
+  node: ITtscGraphNode,
+): string[] | undefined {
   if (node.evidence === undefined || node.file === "") return undefined;
   try {
-    return fs.readFileSync(path.join(project, node.file), "utf8").split(/\r?\n/);
+    return fs
+      .readFileSync(path.join(project, node.file), "utf8")
+      .split(/\r?\n/);
   } catch {
     return undefined;
   }
 }
 
 /**
- * The declaration signature: the head of the declaration up to and including the
- * line that opens its body (`{`), or the single declaration line when there is
- * no brace, capped so a wrapped signature cannot run away.
+ * The declaration signature: the head of the declaration up to and including
+ * the line that opens its body (`{`), or the single declaration line when there
+ * is no brace, capped so a wrapped signature cannot run away.
  */
-export function signatureOf(project: string, node: ITtscGraphNode): string | undefined {
+export function signatureOf(
+  project: string,
+  node: ITtscGraphNode,
+): string | undefined {
   const lines = fileLines(project, node);
   const evidence = node.evidence;
   if (lines === undefined || evidence === undefined) return undefined;
   const start = Math.max(0, evidence.startLine - 1);
   const out: string[] = [];
-  for (let i = start; i < lines.length && out.length < MAX_SIGNATURE_LINES; i++) {
+  for (
+    let i = start;
+    i < lines.length && out.length < MAX_SIGNATURE_LINES;
+    i++
+  ) {
     const line = lines[i];
     if (line === undefined) break;
     out.push(line);

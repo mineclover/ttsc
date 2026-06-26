@@ -1,4 +1,4 @@
-// Agent-cost A/B for @ttsc/graph driven by OpenAI's `codex` CLI (GPT-5.5), the
+// Agent-cost A/B for @ttsc/graph driven by OpenAI's `codex` CLI, the
 // cross-model companion to agent-ab.mjs (which drives Claude). Same codegraph
 // methodology: one structural question per repo, run twice — once with the
 // @ttsc/graph MCP server, once with no MCP — and report tokens (summed per turn),
@@ -7,12 +7,13 @@
 // codex is configured through a MINIMAL temp CODEX_HOME per arm (a copied
 // auth.json plus a generated config.toml) so the user's real AGENTS.md / hooks /
 // personality do not leak into the measurement and the only difference between
-// the two arms is the MCP server. Model and reasoning effort are pinned to
-// gpt-5.5 / high to line up with the Claude harness's --effort high.
+// the two arms is the MCP server. The default model is gpt-5.4-mini, and
+// reasoning effort is pinned high.
 //
 // The MCP server is the @ttsc/graph TypeScript launcher (packages/graph/lib/bin.js),
 // which runs `ttscgraph dump` once for the project (the Go binary is dump-only now)
-// and serves graph_overview / graph_query / graph_trace / graph_expand over stdio.
+// and serves graph_index / graph_overview / graph_query / graph_trace /
+// graph_expand over stdio.
 // Tool guidance comes from the server's MCP descriptions; the user prompt is the
 // manifest question verbatim, tool-neutral, so the token comparison stays honest —
 // no graph-specific instruction is prepended.
@@ -44,13 +45,7 @@ import { gradeAnswer, questionSha256 } from "./grade.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..");
 const ttscDir = path.join(repoRoot, "packages", "ttsc");
-const graphLauncher = path.join(
-  repoRoot,
-  "packages",
-  "graph",
-  "lib",
-  "bin.js",
-);
+const graphLauncher = path.join(repoRoot, "packages", "graph", "lib", "bin.js");
 // The shared structural question, kept as a markdown task spec so both harnesses
 // pose an identical prompt. It aims for the middle: a real call-path briefing that
 // reaches past the public facade to the real work (so a shallow answer does not
@@ -61,7 +56,10 @@ const graphLauncher = path.join(
 // resolveQuestion prefers an explicit --prompt-id (manifest-driven), then an
 // explicit override, then questions/<repo>.md, then the generic fallback.
 const ARCHITECTURE_QUESTION = fs
-  .readFileSync(path.join(here, "questions", "architecture-callpath.md"), "utf8")
+  .readFileSync(
+    path.join(here, "questions", "architecture-callpath.md"),
+    "utf8",
+  )
   .trim();
 
 // The manifest (questions/manifest.json) is the source of truth for graded
@@ -185,11 +183,12 @@ if (!spec)
     `unknown --repo ${repoKey}; choose ${Object.keys(REPOS).join(" | ")}`,
   );
 const runs = Number(args.runs ?? 2);
-const model = args.model ?? "gpt-5.5";
+const model = args.model ?? "gpt-5.4-mini";
 const effort = "high";
 const tsconfig =
   args.tsconfig ?? manifestPrompt?.entry.tsconfig ?? spec.tsconfig;
-const question = args.question ?? manifestPrompt?.text ?? resolveQuestion(repoKey);
+const question =
+  args.question ?? manifestPrompt?.text ?? resolveQuestion(repoKey);
 const promptId = manifestPrompt?.entry.id;
 const promptFamily =
   manifestPrompt?.entry.family ??
@@ -201,7 +200,8 @@ const gold = manifestPrompt?.gold ?? null;
 const goldThreshold = Number(args.threshold ?? 0.8);
 if (!question) throw new Error(`repo ${repoKey} has no benchmark question`);
 
-const fixtureBranch = args["fixture-branch"] ?? manifestPrompt?.entry.fixtureBranch;
+const fixtureBranch =
+  args["fixture-branch"] ?? manifestPrompt?.entry.fixtureBranch;
 if (
   fixtureBranch &&
   fixtureBranch !== "ttsc" &&
@@ -280,11 +280,13 @@ if (!args["repo-dir"] && !fs.existsSync(repoDir)) {
 if (!cg && !fs.existsSync(path.join(repoDir, tsconfig))) {
   throw new Error(`missing tsconfig: ${path.join(repoDir, tsconfig)}`);
 }
+if (!cg) ensureInstalled(repoDir);
 
 // 3. The graph server is the Node launcher run over stdio; it shells out to the
-// dump binary (pointed at via TTSC_GRAPH_BINARY) once at startup, then answers
-// tool calls from the resident graph. The launcher has no daemon/port mode — its
-// single type-check stays inside the measured cell — so there is no --daemon path.
+// dump binary (pointed at via TTSC_GRAPH_BINARY) on the first tool call, then
+// answers later tool calls from the resident graph. The launcher has no
+// daemon/port mode — its single type-check stays inside the measured cell — so
+// there is no --daemon path.
 const launcherArgs = [graphLauncher, "--cwd", repoDir, "--tsconfig", tsconfig];
 
 // 4. Two minimal CODEX_HOMEs: identical except the graph one configures the MCP
@@ -471,6 +473,53 @@ function codegraphServerArgs(targetRepoDir) {
     : args;
 }
 
+function ensureInstalled(targetRepoDir) {
+  if (truthy(args["no-install"])) return;
+  if (fs.existsSync(path.join(targetRepoDir, "node_modules"))) return;
+  const plan = installPlan(targetRepoDir);
+  if (!plan) return;
+  console.log(`Installing dependencies in ${targetRepoDir} (${plan.label})...`);
+  runOrThrow(plan.command, plan.args, targetRepoDir, process.env);
+}
+
+function installPlan(targetRepoDir) {
+  if (fs.existsSync(path.join(targetRepoDir, "pnpm-lock.yaml"))) {
+    return packageCommand("pnpm", [
+      "install",
+      "--frozen-lockfile",
+      "--ignore-scripts",
+    ]);
+  }
+  if (fs.existsSync(path.join(targetRepoDir, "package-lock.json"))) {
+    return packageCommand("npm", ["ci", "--ignore-scripts"]);
+  }
+  if (fs.existsSync(path.join(targetRepoDir, "yarn.lock"))) {
+    return packageCommand("yarn", [
+      "install",
+      "--frozen-lockfile",
+      "--ignore-scripts",
+    ]);
+  }
+  if (fs.existsSync(path.join(targetRepoDir, "package.json"))) {
+    return packageCommand("npm", ["install", "--ignore-scripts"]);
+  }
+  return null;
+}
+
+function packageCommand(command, args) {
+  return process.platform === "win32"
+    ? {
+        label: command,
+        command: "cmd.exe",
+        args: ["/d", "/s", "/c", command, ...args],
+      }
+    : { label: command, command, args };
+}
+
+function truthy(value) {
+  return value === "1" || value === "true" || value === "yes";
+}
+
 async function runCodex(question, codexHome, armName, runNumber) {
   const start = Date.now();
   const result = await spawnAsync(
@@ -497,7 +546,8 @@ async function runCodex(question, codexHome, armName, runNumber) {
   const stderr = result.stderr ?? "";
   const base = `${armName}-run-${runNumber}`;
   fs.writeFileSync(path.join(traceDir, `${base}.stream.jsonl`), stdout);
-  if (stderr) fs.writeFileSync(path.join(traceDir, `${base}.stderr.log`), stderr);
+  if (stderr)
+    fs.writeFileSync(path.join(traceDir, `${base}.stderr.log`), stderr);
   return parseStream(stdout, Date.now() - start);
 }
 

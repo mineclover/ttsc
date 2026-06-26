@@ -20,7 +20,7 @@ export function runQuery(
 ): ITtscGraphQuery {
   const terms = subwords(props.query);
   const queryLc = props.query.trim().toLowerCase();
-  if (terms.length === 0) return { hits: [] };
+  if (terms.length === 0) return { hits: [], next: { expand: [] } };
 
   const scored: ITtscGraphQuery.IHit[] = [];
   for (const node of graph.nodes) {
@@ -59,7 +59,7 @@ export function runQuery(
     const sig = signatureOf(graph.project, node);
     if (sig !== undefined) hit.signature = sig;
   }
-  return { hits };
+  return { hits, next: { expand: hits.map((hit) => hit.id) } };
 }
 
 /** Score one node against the query; 0 means no match. */
@@ -72,11 +72,14 @@ function scoreNode(
   const name = node.name.toLowerCase();
   const qualified = (node.qualifiedName ?? node.name).toLowerCase();
   const nameSubs = subwords(node.name);
+  const qualifiedSubs = subwords(node.qualifiedName ?? node.name);
   const pathSubs = subwords(node.file);
 
   let score = 0;
   if (queryLc === name || queryLc === qualified) {
     score += 100;
+  } else if (qualified.includes(".") && queryLc.includes(qualified)) {
+    score += 85;
   } else if (queryLc.includes(".") && qualified.includes(queryLc)) {
     score += 60;
   }
@@ -85,6 +88,9 @@ function scoreNode(
   for (const term of terms) {
     if (nameSubs.includes(term)) {
       score += 12;
+      covered++;
+    } else if (qualifiedSubs.includes(term)) {
+      score += 8;
       covered++;
     } else if (name.includes(term)) {
       score += 5;

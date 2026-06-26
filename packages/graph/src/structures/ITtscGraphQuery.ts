@@ -1,6 +1,9 @@
 /** The ranked hits the `graph_query` tool returns for a natural code query. */
 export interface ITtscGraphQuery {
   hits: ITtscGraphQuery.IHit[];
+
+  /** Follow-up handles for source or member details. */
+  next: ITtscGraphQuery.INext;
 }
 export namespace ITtscGraphQuery {
   /** Find the symbols and clusters most relevant to a natural code query. */
@@ -29,9 +32,18 @@ export namespace ITtscGraphQuery {
     file: string;
     /** 1-based declaration line, when known. */
     line?: number;
-    /** The hit's declaration signature, so you can often answer without expanding. */
+    /**
+     * The hit's declaration signature, so you can often answer without
+     * expanding.
+     */
     signature?: string;
     /** Relative relevance; higher is a better match. */
     score: number;
+  }
+
+  /** Tool-call handles suggested by this index result. */
+  export interface INext {
+    /** Pass these ids to `graph_expand`, with `source: true` only when needed. */
+    expand: string[];
   }
 }

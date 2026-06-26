@@ -57,6 +57,7 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
     const init = (await client.request("initialize", {
       protocolVersion: "2025-06-18",
       capabilities: {},
+      clientInfo: { name: "test-graph", version: "0.0.0" },
     })) as { serverInfo?: { name?: string }; instructions?: string };
     assert.equal(
       init.serverInfo?.name,

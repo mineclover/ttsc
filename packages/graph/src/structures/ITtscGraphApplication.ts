@@ -26,7 +26,10 @@ export interface ITtscGraphApplication {
   /**
    * Read the source of symbols the graph located, by their handles, instead of
    * opening or `cat`-ing the files. Pass every handle you need in ONE call (never
-   * one at a time); optionally get each node's dependencies and dependents.
+   * one at a time); optionally get each node's dependencies and dependents. The
+   * source returned is the authoritative declaration straight from the compiler's
+   * view — do not re-grep or reopen the file to double-check it; to see more code,
+   * expand the neighbor handles instead.
    *
    * @param props The handles to expand
    * @returns The resolved nodes with source, and any handles that did not

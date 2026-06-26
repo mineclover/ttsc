@@ -14,8 +14,9 @@
 //   node run-suite.mjs --arm=graph --runs=1 --harness=codex --model=gpt-5.4-mini
 //
 // Flags: --family=dedicated|common|all (default dedicated, = one prompt/project),
-// --concurrency (prompts in flight, default 4), --baseline-store=<path>,
-// --out=<combined report>.
+// --concurrency (prompts in flight, default 4), --inner-concurrency (agent runs
+// in flight inside one prompt, default = --runs), --baseline-store=<path>,
+// --out=<combined report>, --no-setup.
 
 import cp from "node:child_process";
 import fs from "node:fs";
@@ -27,25 +28,42 @@ import { gradeAnswer } from "./grade.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..");
 const work = path.join(repoRoot, "experimental", "benchmark", ".work");
-
-// Where each repo's source lives for the dump. excalidraw is codegraph's own
-// upstream (no @ttsc fixture); the rest are the samchon ttsc-branch fixtures.
-const FIXTURES = {
-  excalidraw: path.join(repoRoot, "experimental/benchmark/.work/ttsc-benchmark-excalidraw@ttsc"),
-  vscode: path.join(work, "ttsc-benchmark-vscode@ttsc"),
-  nestjs: path.join(work, "ttsc-benchmark-nestjs@ttsc"),
-  vue: path.join(work, "ttsc-benchmark-vue@ttsc"),
-  zod: path.join(work, "ttsc-benchmark-zod@ttsc"),
-  typeorm: path.join(work, "ttsc-benchmark-typeorm@ttsc"),
-  rxjs: path.join(work, "ttsc-benchmark-rxjs@ttsc"),
-  "shopping-backend": path.join(work, "shopping-backend@ttsc"),
-};
-// excalidraw has no @ttsc fixture; fall back to the upstream corpus clone.
-const EXCALIDRAW_CORPUS = path.join(
-  process.env.TMP || process.env.TEMP || "/tmp",
-  "graph-corpus",
-  "excalidraw",
+const graphBenchmarkScript = path.join(
+  repoRoot,
+  "experimental",
+  "benchmark",
+  "graph.mjs",
 );
+
+// Match experimental/benchmark/graph.mjs, which owns fixture setup. Source repos
+// live in .work/graph-source; performance fixtures live in .work/<repoName>@ttsc.
+const PROJECTS = {
+  excalidraw: {
+    repoName: "excalidraw",
+    sourceRepo: true,
+  },
+  vscode: {
+    repoName: "ttsc-benchmark-vscode",
+  },
+  nestjs: {
+    repoName: "ttsc-benchmark-nestjs",
+  },
+  vue: {
+    repoName: "ttsc-benchmark-vue",
+  },
+  zod: {
+    repoName: "ttsc-benchmark-zod",
+  },
+  typeorm: {
+    repoName: "ttsc-benchmark-typeorm",
+  },
+  rxjs: {
+    repoName: "ttsc-benchmark-rxjs",
+  },
+  "shopping-backend": {
+    repoName: "shopping-backend",
+  },
+};
 
 function arg(name, fallback) {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -60,11 +78,13 @@ const model = arg("model", harness === "codex" ? "gpt-5.4-mini" : "sonnet");
 const runs = Number(arg("runs", arm === "baseline" ? "5" : "1"));
 const family = arg("family", "dedicated");
 const outer = Number(arg("concurrency", "4"));
+const inner = Number(arg("inner-concurrency", String(runs)));
 const storePath = path.resolve(
   arg("baseline-store", path.join(here, `baselines-${harness}.json`)),
 );
 const outPath = arg("out");
 const threshold = Number(arg("threshold", "0.8"));
+const setup = !process.argv.includes("--no-setup");
 
 const harnessScript = path.join(
   here,
@@ -84,11 +104,67 @@ const prompts = (manifest.prompts ?? []).filter(
 );
 if (prompts.length === 0) throw new Error(`no prompts for family ${family}`);
 
-const fixtureOf = (repo) => {
-  if (repo === "excalidraw")
-    return fs.existsSync(FIXTURES.excalidraw) ? FIXTURES.excalidraw : EXCALIDRAW_CORPUS;
-  return FIXTURES[repo];
-};
+ensureFixtures(prompts);
+
+function fixtureOf(prompt) {
+  const spec = PROJECTS[prompt.repo];
+  if (!spec) throw new Error(`unknown repo ${prompt.repo}`);
+  if (spec.sourceRepo)
+    return path.join(work, "graph-source", spec.repoName);
+  const branch = prompt.fixtureBranch ?? "ttsc";
+  return path.join(work, `${spec.repoName}@${branch}`);
+}
+
+function ensureFixtures(selectedPrompts) {
+  const missing = new Map();
+  for (const prompt of selectedPrompts) {
+    const dir = fixtureOf(prompt);
+    if (fs.existsSync(dir)) continue;
+    const branch = prompt.fixtureBranch ?? "ttsc";
+    if (!missing.has(branch)) missing.set(branch, new Set());
+    missing.get(branch).add(prompt.repo);
+  }
+  if (missing.size === 0) return;
+  if (!setup) {
+    const names = [...missing.values()].flatMap((repos) => [...repos]);
+    throw new Error(`missing prepared graph fixtures: ${names.join(", ")}`);
+  }
+  for (const [branch, repos] of missing) {
+    runFixtureSetup(branch, [...repos]);
+  }
+  const stillMissing = selectedPrompts
+    .map((prompt) => [prompt.id, fixtureOf(prompt)])
+    .filter(([, dir]) => !fs.existsSync(dir));
+  if (stillMissing.length) {
+    throw new Error(
+      `graph fixture setup did not create: ${stillMissing
+        .map(([id, dir]) => `${id} at ${dir}`)
+        .join(", ")}`,
+    );
+  }
+}
+
+function runFixtureSetup(branch, repos) {
+  const args = [
+    graphBenchmarkScript,
+    "--setup-only",
+    `--project=${repos.join(",")}`,
+    `--branch=${branch}`,
+    "--tools=ttsc-graph",
+    `--models=${model}`,
+  ];
+  const result = cp.spawnSync(process.execPath, args, {
+    cwd: repoRoot,
+    env: process.env,
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0)
+    throw new Error(
+      `graph fixture setup failed (${result.status})\n${result.stdout ?? ""}${result.stderr ?? ""}`,
+    );
+}
 
 const tmpDir = path.join(here, ".suite-tmp");
 fs.mkdirSync(tmpDir, { recursive: true });
@@ -104,11 +180,9 @@ const median = (xs) => {
 function runPrompt(prompt) {
   return new Promise((resolve) => {
     const report = path.join(tmpDir, `${harness}-${model}-${prompt.id}-${arm}.json`);
-    const dir = fixtureOf(prompt.repo);
-    if (!dir || !fs.existsSync(dir)) {
-      console.log(`  ${prompt.id}: SKIP (no fixture at ${dir})`);
-      return resolve({ prompt, samples: [], skipped: true });
-    }
+    const dir = fixtureOf(prompt);
+    if (!dir || !fs.existsSync(dir))
+      throw new Error(`missing prepared graph fixture for ${prompt.id}: ${dir}`);
     const childArgs = [
       harnessScript,
       `--prompt-id=${prompt.id}`,
@@ -120,7 +194,7 @@ function runPrompt(prompt) {
     ];
     const child = cp.spawn(process.execPath, childArgs, {
       cwd: repoRoot,
-      env: { ...process.env, TTSC_BENCH_CONCURRENCY: String(runs) },
+      env: { ...process.env, TTSC_BENCH_CONCURRENCY: String(inner) },
       windowsHide: true,
     });
     let err = "";
@@ -179,6 +253,9 @@ if (arm === "baseline") {
       promptId: prompt.id,
       runs: samples.length,
       medianTokens: median(toks),
+      medianTools: median(samples.map((s) => s.tools)),
+      medianShell: median(samples.map((s) => s.shell)),
+      medianGraph: median(samples.map((s) => s.graph)),
       tokens: toks,
       pass: graded.length
         ? { passed: graded.filter((s) => s.quality.pass).length, graded: graded.length }
@@ -199,14 +276,28 @@ if (arm === "baseline") {
   for (const { prompt, samples } of results) {
     if (!samples.length) continue;
     const g = median(samples.map((s) => s.tokens));
+    const graphCalls = median(samples.map((s) => s.graph));
+    const shellCalls = median(samples.map((s) => s.shell));
+    const toolCalls = median(samples.map((s) => s.tools));
     const base = store[`${model}/${prompt.id}`];
     const b = base?.medianTokens ?? 0;
     const red = b ? Math.round((1 - g / b) * 100) : null;
     const graded = samples.filter((s) => s.quality);
     const passed = graded.filter((s) => s.quality.pass).length;
-    rows.push({ id: prompt.id, b, g, red, passed, graded: graded.length });
+    rows.push({
+      id: prompt.id,
+      b,
+      g,
+      red,
+      graphCalls,
+      shellCalls,
+      toolCalls,
+      passed,
+      graded: graded.length,
+    });
     console.log(
-      `  ${prompt.id.padEnd(32)} ${b || "?"} -> ${g}  ${red === null ? "(no baseline)" : red + "%"}  ${passed}/${graded.length}`,
+      `  ${prompt.id.padEnd(32)} ${b || "?"} -> ${g}  ${red === null ? "(no baseline)" : red + "%"}  ${passed}/${graded.length}` +
+        `  graph ${graphCalls} shell ${shellCalls} tools ${toolCalls}`,
     );
   }
   const reds = rows.filter((r) => r.red !== null).map((r) => r.red);

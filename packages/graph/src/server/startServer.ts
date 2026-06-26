@@ -1,13 +1,13 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
+import { TtscGraphMemory } from "../model/TtscGraphMemory";
 import { loadGraph } from "../model/loadGraph";
 import { createServer } from "./createServer";
 
 /**
- * Build the project's resident graph and serve it over MCP on stdio. This is
- * the default `ttsc-graph` invocation an agent's MCP client spawns: `ttscgraph
- * dump` runs once to produce the checker-resolved fact graph, then the
- * in-memory server answers every tool call until stdin closes.
+ * Serve the graph tools over MCP on stdio. The server answers the MCP handshake
+ * immediately and builds the resident graph on the first tool call, so a large
+ * project cannot make the client give up before tools are advertised.
  */
 export async function startServer(options: {
   cwd?: string;
@@ -15,8 +15,11 @@ export async function startServer(options: {
   /** Server version reported in the MCP handshake. */
   version: string;
 }): Promise<void> {
-  const graph = loadGraph({ cwd: options.cwd, tsconfig: options.tsconfig });
-  const server = createServer(graph, options.version);
+  let graph: TtscGraphMemory | undefined;
+  const server = createServer(() => {
+    graph ??= loadGraph({ cwd: options.cwd, tsconfig: options.tsconfig });
+    return graph;
+  }, options.version);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

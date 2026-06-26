@@ -12,7 +12,8 @@
 //
 // The MCP server is the @ttsc/graph TypeScript launcher (packages/graph/lib/bin.js),
 // which runs `ttscgraph dump` once for the project (the Go binary is now dump-only)
-// and serves graph_overview / graph_query / graph_trace / graph_expand over stdio.
+// and serves graph_index / graph_overview / graph_query / graph_trace /
+// graph_expand over stdio.
 // All tool guidance comes from the server's MCP initialize/tool descriptions; the
 // user prompt is the manifest question verbatim, tool-neutral, so the token
 // comparison stays honest. No graph-specific instruction is appended.
@@ -40,13 +41,7 @@ import { gradeAnswer, questionSha256 } from "./grade.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..");
 const ttscDir = path.join(repoRoot, "packages", "ttsc");
-const graphLauncher = path.join(
-  repoRoot,
-  "packages",
-  "graph",
-  "lib",
-  "bin.js",
-);
+const graphLauncher = path.join(repoRoot, "packages", "graph", "lib", "bin.js");
 // The question per repo, in codegraph's agent-eval style: a specific "how does
 // this concrete mechanism work" trace that names a real public API. A narrow,
 // mechanism-level question is what makes the comparison bite: a reader must dig
@@ -55,7 +50,10 @@ const graphLauncher = path.join(
 // then an explicit override, then a per-repo file (questions/<repo>.md), then the
 // generic fallback.
 const ARCHITECTURE_QUESTION = fs
-  .readFileSync(path.join(here, "questions", "architecture-callpath.md"), "utf8")
+  .readFileSync(
+    path.join(here, "questions", "architecture-callpath.md"),
+    "utf8",
+  )
   .trim();
 
 // The manifest (questions/manifest.json) is the source of truth for graded
@@ -183,7 +181,8 @@ const runs = Number(args.runs ?? 2);
 const model = args.model ?? "sonnet";
 const tsconfig =
   args.tsconfig ?? manifestPrompt?.entry.tsconfig ?? spec.tsconfig;
-const question = args.question ?? manifestPrompt?.text ?? resolveQuestion(repoKey);
+const question =
+  args.question ?? manifestPrompt?.text ?? resolveQuestion(repoKey);
 const promptId = manifestPrompt?.entry.id;
 const promptFamily =
   manifestPrompt?.entry.family ??
@@ -195,7 +194,8 @@ const gold = manifestPrompt?.gold ?? null;
 const goldThreshold = Number(args.threshold ?? 0.8);
 if (!question) throw new Error(`repo ${repoKey} has no benchmark question`);
 
-const fixtureBranch = args["fixture-branch"] ?? manifestPrompt?.entry.fixtureBranch;
+const fixtureBranch =
+  args["fixture-branch"] ?? manifestPrompt?.entry.fixtureBranch;
 if (
   fixtureBranch &&
   fixtureBranch !== "ttsc" &&
@@ -275,6 +275,7 @@ if (!args["repo-dir"] && !fs.existsSync(repoDir)) {
 if (!cg && !fs.existsSync(path.join(repoDir, tsconfig))) {
   throw new Error(`missing tsconfig: ${path.join(repoDir, tsconfig)}`);
 }
+if (!cg) ensureInstalled(repoDir);
 
 // 3. WITH = @ttsc/graph; WITHOUT = empty config. Both --strict-mcp-config. The
 // graph server is the Node launcher run over stdio; it shells out to the dump
@@ -484,7 +485,8 @@ async function runClaude(question, cfg, armName, runNumber) {
   const stderr = result.stderr ?? "";
   const base = `${armName}-run-${runNumber}`;
   fs.writeFileSync(path.join(traceDir, `${base}.stream.jsonl`), stdout);
-  if (stderr) fs.writeFileSync(path.join(traceDir, `${base}.stderr.log`), stderr);
+  if (stderr)
+    fs.writeFileSync(path.join(traceDir, `${base}.stderr.log`), stderr);
   return parseStream(stdout);
 }
 
@@ -523,6 +525,53 @@ function codegraphServerConfig(targetRepoDir) {
         args,
         env: { CODEGRAPH_NO_DAEMON: "1" },
       };
+}
+
+function ensureInstalled(targetRepoDir) {
+  if (truthy(args["no-install"])) return;
+  if (fs.existsSync(path.join(targetRepoDir, "node_modules"))) return;
+  const plan = installPlan(targetRepoDir);
+  if (!plan) return;
+  console.log(`Installing dependencies in ${targetRepoDir} (${plan.label})...`);
+  runOrThrow(plan.command, plan.args, targetRepoDir, process.env);
+}
+
+function installPlan(targetRepoDir) {
+  if (fs.existsSync(path.join(targetRepoDir, "pnpm-lock.yaml"))) {
+    return packageCommand("pnpm", [
+      "install",
+      "--frozen-lockfile",
+      "--ignore-scripts",
+    ]);
+  }
+  if (fs.existsSync(path.join(targetRepoDir, "package-lock.json"))) {
+    return packageCommand("npm", ["ci", "--ignore-scripts"]);
+  }
+  if (fs.existsSync(path.join(targetRepoDir, "yarn.lock"))) {
+    return packageCommand("yarn", [
+      "install",
+      "--frozen-lockfile",
+      "--ignore-scripts",
+    ]);
+  }
+  if (fs.existsSync(path.join(targetRepoDir, "package.json"))) {
+    return packageCommand("npm", ["install", "--ignore-scripts"]);
+  }
+  return null;
+}
+
+function packageCommand(command, args) {
+  return process.platform === "win32"
+    ? {
+        label: command,
+        command: "cmd.exe",
+        args: ["/d", "/s", "/c", command, ...args],
+      }
+    : { label: command, command, args };
+}
+
+function truthy(value) {
+  return value === "1" || value === "true" || value === "yes";
 }
 
 // parseStream mirrors codegraph's parse-bench-readme.mjs: tokens are summed over

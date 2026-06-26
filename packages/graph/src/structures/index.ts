@@ -11,6 +11,7 @@ export * from "./ITtscGraphDump";
 export * from "./ITtscGraphEdge";
 export * from "./ITtscGraphEvidence";
 export * from "./ITtscGraphExpand";
+export * from "./ITtscGraphIndex";
 export * from "./ITtscGraphNode";
 export * from "./ITtscGraphOverview";
 export * from "./ITtscGraphQuery";

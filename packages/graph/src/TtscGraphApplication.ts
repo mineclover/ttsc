@@ -1,13 +1,17 @@
 import { TtscGraphMemory } from "./model/TtscGraphMemory";
 import { runExpand } from "./server/runExpand";
+import { runIndex } from "./server/runIndex";
 import { runOverview } from "./server/runOverview";
 import { runQuery } from "./server/runQuery";
 import { runTrace } from "./server/runTrace";
 import { ITtscGraphApplication } from "./structures/ITtscGraphApplication";
 import { ITtscGraphExpand } from "./structures/ITtscGraphExpand";
+import { ITtscGraphIndex } from "./structures/ITtscGraphIndex";
 import { ITtscGraphOverview } from "./structures/ITtscGraphOverview";
 import { ITtscGraphQuery } from "./structures/ITtscGraphQuery";
 import { ITtscGraphTrace } from "./structures/ITtscGraphTrace";
+
+export type TtscGraphSource = TtscGraphMemory | (() => TtscGraphMemory);
 
 /**
  * The MCP tool surface as a plain class over the resident
@@ -25,21 +29,29 @@ import { ITtscGraphTrace } from "./structures/ITtscGraphTrace";
  * is the token win the redesign exists for.
  */
 export class TtscGraphApplication implements ITtscGraphApplication {
-  public constructor(private readonly graph: TtscGraphMemory) {}
+  private readonly graph: () => TtscGraphMemory;
+
+  public constructor(source: TtscGraphSource) {
+    this.graph = typeof source === "function" ? source : () => source;
+  }
+
+  public graph_index(props: ITtscGraphIndex.IProps): ITtscGraphIndex {
+    return runIndex(this.graph(), props);
+  }
 
   public graph_overview(props: ITtscGraphOverview.IProps): ITtscGraphOverview {
-    return runOverview(this.graph, props);
+    return runOverview(this.graph(), props);
   }
 
   public graph_expand(props: ITtscGraphExpand.IProps): ITtscGraphExpand {
-    return runExpand(this.graph, props);
+    return runExpand(this.graph(), props);
   }
 
   public graph_query(props: ITtscGraphQuery.IProps): ITtscGraphQuery {
-    return runQuery(this.graph, props);
+    return runQuery(this.graph(), props);
   }
 
   public graph_trace(props: ITtscGraphTrace.IProps): ITtscGraphTrace {
-    return runTrace(this.graph, props);
+    return runTrace(this.graph(), props);
   }
 }

@@ -15,8 +15,12 @@ const MAX_SIGNATURE_LINES = 6;
 // Neighbor lists are a map, not a dump; keep them scannable.
 const DEFAULT_NEIGHBORS = 6;
 const MAX_NEIGHBORS = 12;
-// A container's outline can be long (a big class); keep it bounded.
+// A container outline can be long; default to a scannable first page.
+const DEFAULT_MEMBERS = 24;
 const MAX_MEMBERS = 80;
+// Direct dependency groups are orientation slices, not full fan-out dumps.
+const DEFAULT_DEPENDENCIES = 4;
+const MAX_DEPENDENCIES = 12;
 // Object literal outlines are navigation aids, not source excerpts.
 const MAX_OBJECT_MEMBER_LINES = 300;
 // Structural relationships are navigation, not the dependency picture details is for.
@@ -45,6 +49,13 @@ export function runDetails(
     DEFAULT_NEIGHBORS,
     1,
     MAX_NEIGHBORS,
+  );
+  const memberLimit = bound(props.memberLimit, DEFAULT_MEMBERS, 1, MAX_MEMBERS);
+  const dependencyLimit = bound(
+    props.dependencyLimit,
+    DEFAULT_DEPENDENCIES,
+    1,
+    MAX_DEPENDENCIES,
   );
   const wantNeighbors = props.neighbors === true;
   const nodes: ITtscGraphDetails.INode[] = [];
@@ -78,16 +89,20 @@ export function runDetails(
         endLine: span.endLine,
       };
     }
-    const calls = dependencyRefs(graph, node, executionKinds, 6);
+    const calls = dependencyRefs(graph, node, executionKinds, dependencyLimit);
     if (calls.length > 0) detail.calls = calls;
-    const types = dependencyRefs(graph, node, typeKinds, 6);
+    const types = dependencyRefs(graph, node, typeKinds, dependencyLimit);
     if (types.length > 0) detail.types = types;
     if (CONTAINER_KINDS.has(node.kind)) {
-      const list = members(graph, node);
+      const list = members(graph, node, memberLimit);
       if (list.length > 0) detail.members = list;
     }
     if (node.kind === "variable" && detail.sourceSpan !== undefined) {
-      const list = objectLiteralMembers(graph.project, detail.sourceSpan);
+      const list = objectLiteralMembers(
+        graph.project,
+        detail.sourceSpan,
+        memberLimit,
+      );
       if (list.length > 0) detail.members = list;
     }
     if (signatureLiterals.length > 0)
@@ -115,6 +130,7 @@ export function runDetails(
 function members(
   graph: TtscGraphMemory,
   node: ITtscGraphNode,
+  limit: number,
 ): ITtscGraphDetails.IMember[] {
   const out: ITtscGraphDetails.IMember[] = [];
   for (const edge of graph.outgoing(node.id)) {
@@ -131,7 +147,7 @@ function members(
     const decorators = decoratorsOf(member);
     if (decorators !== undefined) m.decorators = decorators;
     out.push(m);
-    if (out.length >= MAX_MEMBERS) break;
+    if (out.length >= limit) break;
   }
   return out;
 }
@@ -139,6 +155,7 @@ function members(
 function objectLiteralMembers(
   project: string,
   span: Pick<ITtscGraphEvidence, "file" | "startLine" | "endLine">,
+  limit: number,
 ): ITtscGraphDetails.IMember[] {
   if (span.endLine === undefined) return [];
   if (span.endLine - span.startLine > MAX_OBJECT_MEMBER_LINES) return [];
@@ -157,7 +174,7 @@ function objectLiteralMembers(
       const member = objectMemberOf(raw, i + 1);
       if (member !== undefined) {
         members.push(member);
-        if (members.length >= MAX_MEMBERS) break;
+        if (members.length >= limit) break;
       }
     }
     for (const char of text) {

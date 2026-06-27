@@ -6,11 +6,13 @@ import { accessAliasesFor } from "./accessAliases";
 import { resolveGraphHandle } from "./resolveHandle";
 import { edgeEvidenceOf, edgeEvidenceTextOf, signatureOf } from "./runDetails";
 
-const DEFAULT_DEPTH = 6;
-const DEFAULT_MAX_NODES = 30;
+const DEFAULT_DEPTH = 4;
+const DEFAULT_MAX_NODES = 16;
 const MAX_OPEN_DEPTH = 6;
 const MAX_OPEN_NODES = 30;
-const MAX_HOPS_PER_NODE = 4;
+const MAX_HOPS_PER_NODE = 3;
+const MAX_STEPS = 24;
+const MAX_NEXT_HANDLES = 8;
 
 /**
  * Breadth-first trace along the dependency graph. Structural
@@ -163,8 +165,8 @@ export function runTrace(
     reached: [...reached.values()],
     steps: traceSteps(graph, hops),
     next: {
-      details: [start.node.id, ...reached.keys()],
-      traceFrom: [...reached.keys()],
+      details: [start.node.id, ...reached.keys()].slice(0, MAX_NEXT_HANDLES),
+      traceFrom: [...reached.keys()].slice(0, MAX_NEXT_HANDLES),
     },
     truncated,
   };
@@ -181,7 +183,7 @@ function traceSteps(
   graph: TtscGraphMemory,
   hops: ITtscGraphTrace.IHop[],
 ): string[] {
-  return hops.map((hop) => {
+  return hops.slice(0, MAX_STEPS).map((hop) => {
     const from = graph.node(hop.from);
     const to = graph.node(hop.to);
     const lhs = from?.qualifiedName ?? from?.name ?? hop.from;

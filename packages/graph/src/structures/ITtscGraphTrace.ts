@@ -29,7 +29,7 @@ export interface ITtscGraphTrace {
    */
   path?: ITtscGraphTrace.INode[];
 
-  /** Compact hop summaries preserving node names and edge evidence. */
+  /** Compact hop summaries preserving node names and edge evidence, capped. */
   steps?: string[];
 
   /** Follow-up handles for inspecting or continuing the trace. */
@@ -81,7 +81,7 @@ export namespace ITtscGraphTrace {
      * How many hops deep to follow. Open traces are capped at 6; path mode is
      * capped at 12.
      *
-     * @default 6
+     * @default 4
      */
     maxDepth?: number;
 
@@ -90,7 +90,7 @@ export namespace ITtscGraphTrace {
      * Open traces are capped at 30 nodes so a broad graph cannot flood
      * context.
      *
-     * @default 30
+     * @default 16
      */
     maxNodes?: number;
   }

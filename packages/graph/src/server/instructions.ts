@@ -53,9 +53,9 @@ Request types:
   source or the previous graph result is enough.
 
 For a flow question, use entrypoints once, then trace before details. Keep broad
-dependency maps compact. Prefer defaults: small candidate lists and minimal
-neighbors. Raise limits only after a prior graph result was truncated or
-ambiguous.
+dependency maps compact. Prefer defaults: small candidate lists, shallow open
+traces, and minimal details. Raise memberLimit, dependencyLimit, maxDepth, or
+maxNodes only after a prior graph result was truncated or ambiguous.
 
 Copy exact names from returned nodes, references, aliases, evidence ranges,
 sourceSpan anchors, and trace steps. Do not use shell to recover TypeScript line

@@ -45,6 +45,22 @@ export namespace ITtscGraphDetails {
      * @default 6
      */
     neighborLimit?: number;
+
+    /**
+     * Maximum owned members to return for a container or object literal. Raise
+     * only when the first outline is truncated.
+     *
+     * @default 24
+     */
+    memberLimit?: number;
+
+    /**
+     * Maximum direct execution and type references to return per group. Raise
+     * only when the first dependency slice is not enough.
+     *
+     * @default 4
+     */
+    dependencyLimit?: number;
   }
 
   /** One inspected node: its declared shape and graph coordinates. */

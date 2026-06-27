@@ -30,6 +30,7 @@ const singleGraphToolNames = new Set([
   "inspect_typescript_graph_before_shell_reading",
   "inspect_typescript_code_evidence_without_shell_search",
   "inspect_typescript_code_graph_evidence",
+  "inspect_typescript_project_graph_before_answering",
 ]);
 
 if (truthy(args["self-test"])) {
@@ -427,9 +428,8 @@ function summarizeRuns(runs) {
     graphArmRuns: graphArmRuns.length,
     graphArmRunsWithoutMcp: graphArmRuns.filter((run) => run.tools.mcp === 0)
       .length,
-    graphArmRunsWithShell: graphArmRuns.filter(
-      (run) => run.tools.command > 0,
-    ).length,
+    graphArmRunsWithShell: graphArmRuns.filter((run) => run.tools.command > 0)
+      .length,
     medianTokens: median(runs.map((run) => run.usage.tokens)),
     medianCachedInputTokens: median(
       runs.map((run) => run.usage.cachedInputTokens),
@@ -1844,11 +1844,17 @@ function graphPayloadResult(name, parsed) {
         payload: parsed.entrypoints,
       };
     case "lookup_symbols":
-      return { kind: graphToolKind(name, parsed.type), payload: parsed.symbols };
+      return {
+        kind: graphToolKind(name, parsed.type),
+        payload: parsed.symbols,
+      };
     case "trace_dependency_path":
       return { kind: graphToolKind(name, parsed.type), payload: parsed.trace };
     case "inspect_symbol_details":
-      return { kind: graphToolKind(name, parsed.type), payload: parsed.details };
+      return {
+        kind: graphToolKind(name, parsed.type),
+        payload: parsed.details,
+      };
     case "summarize_project":
       return {
         kind: graphToolKind(name, parsed.type),

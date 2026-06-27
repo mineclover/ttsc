@@ -4,11 +4,11 @@
  * files. Keep it short; the per-tool descriptions carry the detail.
  */
 export const instructions = `
-For TypeScript code questions, call inspect_typescript_code_graph_evidence
-first. It finds symbols, dependency paths, sourceSpan line anchors, and narrow
-source bodies from the resident TypeScript graph. Do not use ls, rg, cat, or
-Get-Content for TypeScript code evidence unless the user directly asks for a
-non-code file or raw file text.
+Before answering a TypeScript codebase question, call
+inspect_typescript_project_graph_before_answering. It finds symbols, dependency
+paths, sourceSpan line anchors, and narrow source bodies from the resident
+project graph. Do not answer from general memory, web documentation, ls, rg,
+cat, or Get-Content when the project graph can provide the code evidence.
 
 The graph is a TypeScript index, not an answer writer. Fill thinking before
 each call with the smallest next graph step and its stop condition, then choose
@@ -47,7 +47,7 @@ Copy exact names from returned nodes, references, aliases, evidence snippets,
 sourceSpan anchors, and trace steps. Do not use shell only to recover TypeScript
 line numbers already returned by graph evidence.
 
-Package scripts, config files, generated output, and exact text searches remain
-valid shell/file-read cases only when the user asks about those files directly;
+Package scripts, config files, generated output, web documentation, and exact
+text searches remain valid only when the user asks about those sources directly;
 do not use them to answer a TypeScript API or call-path question.
 `.trim();

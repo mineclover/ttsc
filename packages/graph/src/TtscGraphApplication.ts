@@ -29,7 +29,7 @@ export class TtscGraphApplication implements ITtscGraphApplication {
     this.graph = typeof source === "function" ? source : () => source;
   }
 
-  public inspect_typescript_code_graph_evidence(
+  public inspect_typescript_project_graph_before_answering(
     props: ITtscGraphApplication.IProps,
   ): ITtscGraphApplication.IResult {
     const graph = this.graph();

@@ -13,12 +13,13 @@ import { ITtscGraphTrace } from "./ITtscGraphTrace";
  */
 export interface ITtscGraphApplication {
   /**
-   * Find, trace, and inspect TypeScript code evidence from the graph.
+   * Inspect the TypeScript project graph before answering code questions.
    *
-   * Use this first for TypeScript code questions. It locates files, symbols,
-   * dependency paths, implementation bodies, and sourceSpan line anchors from
-   * the resident TypeScript graph, so shell search or file reads are usually
-   * unnecessary for code evidence.
+   * Use this before answering TypeScript codebase questions. It locates files,
+   * symbols, dependency paths, implementation bodies, and sourceSpan line
+   * anchors from the resident project graph, so answers do not need general
+   * framework memory, web documentation, shell search, or file reads for code
+   * evidence.
    *
    * In `thinking`, decide the smallest next graph step and the evidence needed
    * to stop. Then choose one `request.type`: find entrypoints, lookup symbols,
@@ -33,7 +34,7 @@ export interface ITtscGraphApplication {
    * @param props The reasoning and selected graph request
    * @returns The selected graph result, tagged with the request type
    */
-  inspect_typescript_code_graph_evidence(
+  inspect_typescript_project_graph_before_answering(
     props: ITtscGraphApplication.IProps,
   ): ITtscGraphApplication.IResult;
 }

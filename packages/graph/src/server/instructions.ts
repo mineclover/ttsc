@@ -4,16 +4,20 @@
  * files. Keep it short; the per-tool descriptions carry the detail.
  */
 export const instructions = `
-Before shell-reading TypeScript source, call
-inspect_typescript_graph_before_shell_reading. It is a staged TypeScript index,
-not an answer writer. Fill thinking before each call, then choose one
-request.type: find entrypoints, lookup symbols, trace dependency paths, inspect
-selected symbols, or summarize the project. Read source only for the few bodies
-whose logic decides the answer.
+For TypeScript code questions, call
+inspect_typescript_graph_before_shell_reading before any shell search or source
+read. Do not start with ls, rg, cat, or Get-Content to locate TypeScript files,
+symbols, dependencies, or line anchors. Ask the graph first, then answer from
+graph evidence and sourceSpan citations.
+
+The graph is a TypeScript index, not an answer writer. Fill thinking before
+each call, then choose one request.type: find entrypoints, lookup symbols, trace
+dependency paths, inspect selected symbols, or summarize the project. If more
+TypeScript evidence is needed, make another graph request instead of switching
+to shell search.
 
 The graph already knows resolved symbols, dependency edges, evidence spans,
-decorators, and stable handles. Prefer it before shell-reading TypeScript
-source.
+decorators, stable handles, source bodies, and sourceSpan line anchors.
 
 Request types:
 
@@ -26,7 +30,7 @@ Request types:
   lifecycle, request-flow, rendering-flow, validation-flow, and impact
   questions.
 - inspect_symbol_details: signatures, members, direct calls, direct types,
-  dependency neighbors, or narrow source reads for selected handles.
+  dependency neighbors, or narrow source/sourceSpan reads for selected handles.
 - summarize_project: source-free architecture map for layers, hotspots, counts,
   and public API.
 
@@ -35,8 +39,8 @@ trace_dependency_path before inspect_symbol_details. Keep broad dependency maps
 separate from source reads. When source is true, neighbor options are ignored.
 
 Copy exact names from returned nodes, references, aliases, evidence snippets,
-and trace steps. Prefer graph evidence and sourceSpan line anchors over shell
-reads for citations.
+sourceSpan anchors, and trace steps. Do not use shell only to recover TypeScript
+line numbers already returned by graph evidence.
 
 Package scripts, config files, generated output, and exact text searches remain
 valid shell/file-read cases because they are outside the symbol graph.

@@ -13,15 +13,21 @@ import { ITtscGraphTrace } from "./ITtscGraphTrace";
  */
 export interface ITtscGraphApplication {
   /**
-   * Inspect the TypeScript graph before shell-reading source.
+   * Inspect TypeScript code before any shell search or source read.
    *
-   * Use this as the first tool for TypeScript code questions. Explain the next
-   * graph step in `thinking`, then choose one `request.type`: find entrypoints,
-   * lookup symbols, trace dependencies, inspect selected symbols, or summarize
-   * the project.
+   * Use this first for TypeScript code questions, including locating files,
+   * symbols, dependencies, implementation bodies, and line anchors. Do not use
+   * shell search/read commands to find TypeScript code before asking the
+   * graph.
+   *
+   * Explain the next graph step in `thinking`, then choose one `request.type`:
+   * find entrypoints, lookup symbols, trace dependencies, inspect selected
+   * symbols, or summarize the project.
    *
    * Keep broad dependency mapping and source-body reads separate. Ask for
-   * source only when a selected implementation body decides the answer.
+   * source only when a selected implementation body decides the answer. Use
+   * returned sourceSpan anchors for citations instead of shell line-number
+   * checks.
    *
    * @param props The reasoning and selected graph request
    * @returns The selected graph result, tagged with the request type
@@ -38,9 +44,9 @@ export namespace ITtscGraphApplication {
      * Think before choosing the graph operation.
      *
      * State what the code question needs, which graph request is the next
-     * smallest step, and whether source is needed now. If source is needed,
-     * name the one or two leaf bodies to read and why graph summaries are not
-     * enough.
+     * smallest step, and why shell search is not needed for that TypeScript
+     * evidence. If source is needed, name the one or two leaf bodies to read
+     * through the graph and why summaries are not enough.
      */
     thinking: string;
 
@@ -53,7 +59,7 @@ export namespace ITtscGraphApplication {
       | ISummarizeProject;
   }
 
-  /** Find source-free starting handles for a natural-language code question. */
+  /** Find graph starting handles for a natural-language code question. */
   export interface IFindQuestionEntrypoints {
     /** Discriminator for first-pass question indexing. */
     type: "find_question_entrypoints";
@@ -61,8 +67,8 @@ export namespace ITtscGraphApplication {
     /**
      * Why this is the next step.
      *
-     * Use this when you need ranked starting symbols or direct mention
-     * resolution before tracing or inspecting.
+     * Use this as the first call for a natural-language TypeScript question. It
+     * replaces broad shell search for likely files and symbols.
      */
     purpose: string;
 
@@ -84,7 +90,7 @@ export namespace ITtscGraphApplication {
     neighbors?: number;
   }
 
-  /** Search for specific named symbols when a handle is missing. */
+  /** Search indexed TypeScript symbols when a handle is missing. */
   export interface ILookupSymbols {
     /** Discriminator for targeted symbol lookup. */
     type: "lookup_symbols";
@@ -92,8 +98,9 @@ export namespace ITtscGraphApplication {
     /**
      * Why lookup is the next step.
      *
-     * Name the symbol, method, class, property, or concept you are trying to
-     * locate. Do not use this for dependency flow.
+     * Name the symbol, method, class, property, file concept, or framework term
+     * you are trying to locate. Use this when you would otherwise reach for rg
+     * to find TypeScript code. Do not use it for dependency flow.
      */
     purpose: string;
 
@@ -108,7 +115,7 @@ export namespace ITtscGraphApplication {
     limit?: number;
   }
 
-  /** Trace call/type/dependency flow from one symbol, optionally to a target. */
+  /** Trace TypeScript call/type/dependency flow between graph handles. */
   export interface ITraceDependencyPath {
     /** Discriminator for dependency tracing. */
     type: "trace_dependency_path";
@@ -116,8 +123,8 @@ export namespace ITtscGraphApplication {
     /**
      * Why tracing is the next step.
      *
-     * State the relationship being tested, such as "how A reaches B" or "which
-     * callers depend on A".
+     * State the relationship being tested, such as request flow, render flow,
+     * validation flow, "how A reaches B", or "which callers depend on A".
      */
     purpose: string;
 
@@ -156,7 +163,7 @@ export namespace ITtscGraphApplication {
     maxNodes?: number;
   }
 
-  /** Inspect selected handles, with source bodies only when necessary. */
+  /** Inspect selected handles, including sourceSpan bodies when necessary. */
   export interface IInspectSymbolDetails {
     /** Discriminator for selected symbol inspection. */
     type: "inspect_symbol_details";
@@ -165,7 +172,9 @@ export namespace ITtscGraphApplication {
      * Why inspection is the next step.
      *
      * Say whether this is shape-only expansion, neighbor mapping, or a narrow
-     * source read. Source reads should be limited to decisive leaf bodies.
+     * graph source read. Source reads should be limited to decisive leaf
+     * bodies. Use returned sourceSpan anchors for citations instead of shell
+     * reads.
      */
     purpose: string;
 

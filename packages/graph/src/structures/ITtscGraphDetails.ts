@@ -5,7 +5,7 @@ import { ITtscGraphEvidence } from "./ITtscGraphEvidence";
  * The resolved symbol details returned for a set of handles.
  *
  * The default payload is source-free: signatures, member outlines, and direct
- * graph summaries. Source bodies are returned only when requested.
+ * graph summaries with sourceSpan anchors.
  */
 export interface ITtscGraphDetails {
   /** Discriminator for selected symbol inspection. */
@@ -24,9 +24,8 @@ export namespace ITtscGraphDetails {
 
     /**
      * Node ids from another tool, or dotted symbol handles such as
-     * `OrderService.create`. Pass every handle you need for shape-only details;
-     * with `source:true`, pass only the one or two leaf bodies whose
-     * implementation decides the answer.
+     * `OrderService.create`. Pass the few handles you need for source-free
+     * details; use `trace` when you need a path instead of widening this call.
      */
     handles: string[];
 
@@ -41,39 +40,14 @@ export namespace ITtscGraphDetails {
 
     /**
      * Maximum dependencies and dependents to return per side when
-     * `neighbors:true`. Source reads ignore neighbor details; split dependency
-     * mapping and source reading into separate calls.
+     * `neighbors:true`.
      *
      * @default 6
      */
     neighborLimit?: number;
-
-    /**
-     * Return the full declaration source body too. Off by default: details
-     * returns a symbol's signature, and a class/interface/namespace's member
-     * outline, which is what you usually need and a fraction of the tokens.
-     * Turn this on only for the few leaf functions or methods whose actual
-     * control-flow logic you must read. Prefer `source:true` without
-     * `neighbors:true`; when `source:true` is set, neighbor details are ignored
-     * so body reads stay separate from dependency maps.
-     *
-     * @default false
-     */
-    source?: boolean;
-
-    /**
-     * Include numbered source lines beside `source`.
-     *
-     * Use this with `source:true` only when the answer needs exact in-body line
-     * anchors. It replaces shell reads for "what line contains this call?"
-     * checks. Omitted unless requested.
-     *
-     * @default false
-     */
-    lineNumbers?: boolean;
   }
 
-  /** One inspected node: its declared shape, and on request its source. */
+  /** One inspected node: its declared shape and graph coordinates. */
   export interface INode {
     id: string;
     name: string;
@@ -91,7 +65,7 @@ export namespace ITtscGraphDetails {
     calls?: string[];
     /** Direct type dependencies in source order. */
     types?: string[];
-    /** String literal values from the signature or returned source. */
+    /** String literal values from the signature. */
     literals?: string[];
     /**
      * For a class, interface, namespace, module, enum, or file: the symbols it
@@ -99,17 +73,8 @@ export namespace ITtscGraphDetails {
      * reaches for, without the bodies.
      */
     members?: IMember[];
-    /**
-     * The full declaration source, or the assigned implementation source when
-     * `implementation` is present, only when `source` was requested.
-     */
-    source?: string;
-    /** Numbered source lines for citation, only when requested. */
-    sourceLines?: ISourceLine[];
-    /** The file and line range covered by `source`, when it was returned. */
+    /** The declaration or implementation file and line range, when known. */
     sourceSpan?: Pick<ITtscGraphEvidence, "file" | "startLine" | "endLine">;
-    /** True when `source` was cut at the line cap. */
-    truncated?: boolean;
     /** Symbols this node uses (outgoing dependency edges). */
     dependsOn?: IReference[];
     /** Symbols that use this node (incoming dependency edges). */
@@ -140,9 +105,7 @@ export namespace ITtscGraphDetails {
     relation: string;
     /**
      * Source span for the expression that produced this relationship. It lets
-     * an agent see why the edge exists without opening the file. When
-     * `source:true` already returned the same source span, `text` may be
-     * omitted while the coordinates remain.
+     * an agent see why the edge exists without opening the file.
      */
     evidence?: ITtscGraphEvidence;
     /**
@@ -152,11 +115,5 @@ export namespace ITtscGraphDetails {
      * the source access path.
      */
     aliases?: string[];
-  }
-
-  /** One source line with its original 1-based file line number. */
-  export interface ISourceLine {
-    line: number;
-    text: string;
   }
 }

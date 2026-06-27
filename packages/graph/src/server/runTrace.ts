@@ -4,7 +4,7 @@ import { ITtscGraphNode } from "../structures/ITtscGraphNode";
 import { ITtscGraphTrace } from "../structures/ITtscGraphTrace";
 import { accessAliasesFor } from "./accessAliases";
 import { resolveGraphHandle } from "./resolveHandle";
-import { edgeEvidenceOf, signatureOf } from "./runDetails";
+import { edgeEvidenceOf, edgeEvidenceTextOf, signatureOf } from "./runDetails";
 
 const DEFAULT_DEPTH = 6;
 const DEFAULT_MAX_NODES = 30;
@@ -124,7 +124,10 @@ export function runTrace(
         };
         const evidence = edgeEvidenceOf(edge);
         if (evidence !== undefined) hop.evidence = evidence;
-        const aliases = accessAliasesFor(graph.node(edge.to), evidence?.text);
+        const aliases = accessAliasesFor(
+          graph.node(edge.to),
+          edgeEvidenceTextOf(edge),
+        );
         if (aliases !== undefined) hop.aliases = aliases;
         // A back-edge to the start or an already-reached node: record the hop;
         // its endpoints are already represented.
@@ -184,7 +187,9 @@ function traceSteps(
     const lhs = from?.qualifiedName ?? from?.name ?? hop.from;
     const rhs = to?.qualifiedName ?? to?.name ?? hop.to;
     const evidence =
-      hop.evidence?.text === undefined ? "" : ` via ${hop.evidence.text}`;
+      hop.evidence === undefined
+        ? ""
+        : ` at ${hop.evidence.file}:${hop.evidence.startLine}`;
     const aliases =
       hop.aliases === undefined ? "" : ` aliases ${hop.aliases.join(", ")}`;
     return `${lhs} -[${hop.kind}${evidence}${aliases}]-> ${rhs}`;
@@ -208,7 +213,12 @@ function findPath(
   if (startId === targetId) return { path: [startNode], hops: [] };
   const parent = new Map<
     string,
-    { via: string; kind: string; evidence?: ITtscGraphEvidence }
+    {
+      via: string;
+      kind: string;
+      evidence?: ITtscGraphEvidence;
+      evidenceText?: string;
+    }
   >();
   const visited = new Set<string>([startId]);
   let queue: Array<{ id: string; depth: number }> = [{ id: startId, depth: 0 }];
@@ -224,7 +234,12 @@ function findPath(
         if (other === undefined || other.kind === "file") continue;
         visited.add(otherId);
         const evidence = edgeEvidenceOf(edge);
-        parent.set(otherId, { via: id, kind: edge.kind, evidence });
+        parent.set(otherId, {
+          via: id,
+          kind: edge.kind,
+          evidence,
+          evidenceText: edgeEvidenceTextOf(edge),
+        });
         if (otherId === targetId) {
           const ids: string[] = [otherId];
           let cur = otherId;
@@ -251,7 +266,7 @@ function findPath(
             };
             if (parentEdge?.evidence !== undefined)
               hop.evidence = parentEdge.evidence;
-            const aliases = accessAliasesFor(node, parentEdge?.evidence?.text);
+            const aliases = accessAliasesFor(node, parentEdge?.evidenceText);
             if (aliases !== undefined) hop.aliases = aliases;
             hops.push(hop);
           }

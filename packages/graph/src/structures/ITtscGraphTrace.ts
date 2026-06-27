@@ -132,7 +132,7 @@ export namespace ITtscGraphTrace {
 
   /** Tool-call handles suggested by this trace. */
   export interface INext {
-    /** Pass these ids to `details` for source or member details. */
+    /** Pass these ids to `details` for selected symbol details. */
     details: string[];
     /** Continue tracing from these ids when the current result is intermediate. */
     traceFrom: string[];

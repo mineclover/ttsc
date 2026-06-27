@@ -16,7 +16,8 @@
 // Flags: --family=dedicated|common|all (default dedicated, = one prompt/project),
 // --concurrency (prompts in flight, default 4), --inner-concurrency (agent runs
 // in flight inside one prompt, default = --runs), --baseline-store=<path>,
-// --out=<combined report>, --no-setup.
+// --out=<combined report>, --no-setup, --no-website,
+// --publish-suite=<combined report>.
 import cp from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -27,6 +28,13 @@ import { gradeAnswer } from "./grade.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..", "..");
 const work = path.join(repoRoot, "experimental", "benchmark", ".work");
+const websiteJson = path.join(
+  repoRoot,
+  "website",
+  "public",
+  "benchmark",
+  "graph.json",
+);
 const graphBenchmarkScript = path.join(
   repoRoot,
   "experimental",
@@ -68,6 +76,13 @@ function arg(name, fallback) {
   return hit ? hit.slice(name.length + 3) : fallback;
 }
 
+const noWebsite = process.argv.includes("--no-website");
+const publishSuitePath = arg("publish-suite");
+if (publishSuitePath) {
+  publishWebsiteReports(reportsFromSuite(path.resolve(publishSuitePath)));
+  process.exit(0);
+}
+
 const arm = arg("arm");
 if (arm !== "baseline" && arm !== "graph")
   throw new Error("--arm=baseline | graph is required");
@@ -91,6 +106,16 @@ const harnessScript = path.join(
 );
 const manifest = JSON.parse(
   fs.readFileSync(path.join(here, "questions", "manifest.json"), "utf8"),
+);
+const goldByPromptId = new Map(
+  (manifest.prompts ?? [])
+    .filter((prompt) => prompt.gold)
+    .map((prompt) => [
+      prompt.id,
+      JSON.parse(
+        fs.readFileSync(path.join(here, "questions", prompt.gold), "utf8"),
+      ),
+    ]),
 );
 // --repo limits the suite to a subset (comma-separated) for validation or for
 // targeting one project; default is every project in the family.
@@ -207,6 +232,8 @@ function runPrompt(prompt) {
       let samples = [];
       try {
         const rep = JSON.parse(fs.readFileSync(report, "utf8"));
+        gradeReportSamples(rep, prompt);
+        fs.writeFileSync(report, `${JSON.stringify(rep, null, 2)}\n`);
         samples = (rep.samples?.[arm] ?? []).filter((s) => s.ok);
       } catch {
         /* report missing — child crashed */
@@ -222,6 +249,27 @@ function runPrompt(prompt) {
       resolve({ prompt, report, samples });
     });
   });
+}
+
+function gradeReportSamples(report, prompt) {
+  const gold = goldByPromptId.get(prompt.id);
+  if (gold === undefined) return;
+  for (const sample of Object.values(report.samples ?? {}).flat()) {
+    if (sample === undefined || typeof sample !== "object") continue;
+    const quality = gradeAnswer(
+      sample.answer ?? sample.answerText ?? "",
+      gold,
+      threshold,
+    );
+    sample.quality = quality;
+    if (!quality.pass) {
+      sample.ok = false;
+      sample.invalid = sample.invalid ?? "quality-failed";
+      sample.error = sample.error
+        ? `${sample.error}; quality gate failed`
+        : "quality gate failed";
+    }
+  }
 }
 
 /** Run all prompts with at most `outer` in flight. */
@@ -246,6 +294,7 @@ console.log(
 );
 
 const results = await fanOut(prompts, runPrompt);
+publishWebsiteReports(results.map((result) => result.report));
 
 if (arm === "baseline") {
   const store = fs.existsSync(storePath)
@@ -332,4 +381,111 @@ if (arm === "baseline") {
       `${JSON.stringify({ harness, model, arm, runs, maxRunRetries, family, cells, rows }, null, 2)}\n`,
     );
   }
+}
+
+function reportsFromSuite(file) {
+  const suite = JSON.parse(fs.readFileSync(file, "utf8"));
+  const base = path.dirname(file);
+  return (suite.cells ?? [])
+    .map((cell) => cell.report)
+    .filter(Boolean)
+    .map((report) =>
+      path.isAbsolute(report) ? report : path.resolve(base, report),
+    );
+}
+
+function publishWebsiteReports(reports) {
+  if (noWebsite) return;
+  const cells = reports
+    .filter((report) => fs.existsSync(report))
+    .map((report) =>
+      websiteCellFromReport(JSON.parse(fs.readFileSync(report, "utf8"))),
+    );
+  if (cells.length === 0) return;
+  const prior = fs.existsSync(websiteJson)
+    ? JSON.parse(fs.readFileSync(websiteJson, "utf8"))
+    : null;
+  const out = {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    structural: prior?.structural ?? null,
+    agent: { cells: [...(prior?.agent?.cells ?? [])] },
+  };
+  for (const cell of cells) {
+    const key = websiteCellKey(cell);
+    const at = out.agent.cells.findIndex((old) => websiteCellKey(old) === key);
+    if (at >= 0) out.agent.cells[at] = cell;
+    else out.agent.cells.push(cell);
+  }
+  fs.mkdirSync(path.dirname(websiteJson), { recursive: true });
+  fs.writeFileSync(websiteJson, `${JSON.stringify(out, null, 2)}\n`);
+  console.log(
+    `website: upserted ${cells.length} cell(s) -> ${path.relative(repoRoot, websiteJson)}`,
+  );
+}
+
+function websiteCellFromReport(data) {
+  const resolvedModel = data.model ?? "unknown";
+  const tool = reportTool(data);
+  return {
+    harness:
+      data.harness ??
+      (resolvedModel.startsWith("gpt-") ? "codex" : "claude-code"),
+    tool,
+    repo: data.repo,
+    model: agentLabel(resolvedModel),
+    modelVersion: resolvedModel,
+    ...(data.effort ? { effort: data.effort } : {}),
+    ...(data.promptId ? { promptId: data.promptId } : {}),
+    ...(data.promptFamily ? { promptFamily: data.promptFamily } : {}),
+    ...(data.questionSha256 ? { questionSha256: data.questionSha256 } : {}),
+    ...(data.fixtureBranch ? { fixtureBranch: data.fixtureBranch } : {}),
+    daemon: data.daemon === true,
+    runs: data.runs,
+    question: data.question,
+    samples: sanitizeSamples(data.samples),
+  };
+}
+
+function reportTool(data) {
+  const baseline = data.samples?.baseline ?? [];
+  const graph = data.samples?.graph ?? [];
+  return baseline.length > 0 && graph.length === 0
+    ? "baseline"
+    : (data.tool ?? "ttsc-graph");
+}
+
+function agentLabel(resolvedModel) {
+  if (!resolvedModel.startsWith("gpt-")) return `claude-code-${resolvedModel}`;
+  const tier = resolvedModel
+    .split("-")
+    .filter((token) => token && !/^[0-9.]+$/.test(token))
+    .join("-");
+  return `codex-${tier}`;
+}
+
+function sanitizeSamples(samples) {
+  return {
+    baseline: (samples?.baseline ?? []).map(sanitizeSample),
+    graph: (samples?.graph ?? []).map(sanitizeSample),
+  };
+}
+
+function sanitizeSample(sample) {
+  const { answer, ...rest } = sample;
+  return rest;
+}
+
+function websiteCellKey(cell) {
+  return JSON.stringify([
+    cell.harness,
+    cell.tool ?? "ttsc-graph",
+    cell.repo,
+    cell.promptId ?? "",
+    cell.promptFamily ?? "project-specific",
+    cell.model,
+    cell.effort ?? "",
+    cell.fixtureBranch ?? "ttsc",
+    cell.daemon === true ? "daemon" : "single",
+  ]);
 }

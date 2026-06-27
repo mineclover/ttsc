@@ -1213,7 +1213,7 @@ function printSuite(audit) {
       s.medianEstimatedDetailsDependencyTokens,
     )} details-dependencies (${Math.round(
       s.medianEstimatedDetailsCoveredEvidenceTextTokens,
-    )} source-covered evidence), ${Math.round(
+    )} legacy inline evidence), ${Math.round(
       s.medianEstimatedTraceEvidenceTokens,
     )} trace-evidence tokens/cell`,
   );
@@ -1975,7 +1975,7 @@ function analyzeMcpOverfetch(calls) {
         exactAvoidableOutputTokens += covered;
         add(
           "coveredSourceEvidenceText",
-          "edge evidence text is already present in the returned source body",
+          "legacy edge evidence text duplicated returned implementation text",
           true,
           covered,
         );
@@ -1987,14 +1987,14 @@ function analyzeMcpOverfetch(calls) {
       if (call.args.source && call.args.neighbors && call.args.handles >= 2) {
         add(
           "batchedSourceNeighbors",
-          "source bodies and both dependency directions requested for multiple handles",
+          "legacy source bodies and both dependency directions requested for multiple handles",
           false,
           sourceNeighborCandidateTokens(call),
         );
       } else if (call.args.source && call.args.neighbors) {
         add(
           "sourceNeighbors",
-          "source body and dependency map requested together",
+          "legacy source body and dependency map requested together",
           false,
           sourceNeighborCandidateTokens(call),
         );
@@ -2155,7 +2155,7 @@ function theoreticalSavings(summary, baseline) {
       candidatePromptReplay,
   );
   return {
-    note: "Exact additional savings are deterministic output removals such as duplicate MCP calls and source-covered evidence text. The lower bound subtracts measured graph-replaceable shell output plus exact avoidable output; this is a replacement surface, not proof that a graph arm has achieved the saving. Candidate savings are output-surface estimates for MCP overfetch patterns and require a follow-up benchmark before being claimed as achieved savings. Prompt replay fields count only later Codex turns exposed by turn.completed events; intra-turn replay is not separately exposed by the stream.",
+    note: "Exact additional savings are deterministic output removals such as duplicate MCP calls and legacy inline evidence text. The lower bound subtracts measured graph-replaceable shell output plus exact avoidable output; this is a replacement surface, not proof that a graph arm has achieved the saving. Candidate savings are output-surface estimates for MCP overfetch patterns and require a follow-up benchmark before being claimed as achieved savings. Prompt replay fields count only later Codex turns exposed by turn.completed events; intra-turn replay is not separately exposed by the stream.",
     exactAdditionalOutputTokens: exactAdditional,
     graphReplacementSurfaceOutputTokens:
       summary.medianEstimatedGraphReplaceableTokens,
@@ -2521,7 +2521,7 @@ function runSelfTest() {
     cell.runsDetail[0].tools.calls.some((call) =>
       call.overfetchTypes.includes("coveredSourceEvidenceText"),
     ),
-    "source-covered evidence text should be tracked as exact output",
+    "legacy inline evidence text should be tracked as exact output",
   );
   assertSelf(
     cell.runsDetail[0].tools.replacementSurfaceOutputTokens >

@@ -1,3 +1,7 @@
+import { Tabs } from "nextra/components";
+
+import LocalSource from "../../../components/LocalSource";
+
 # Tools
 
 `@ttsc/graph` exposes one MCP tool: `query`. It is a narrowing engine over the checker-resolved graph. The model first states why graph evidence is needed, writes `draft.reason` before `draft.type`, reviews that draft for overfetch or wrong-tool use, then submits one request branch.
@@ -8,51 +12,7 @@ Use `escape` when the review shows the graph is the wrong evidence source, or th
 
 ## query
 
-```ts
-declare function query(
-  props: ITtscGraphApplication.IProps,
-): ITtscGraphApplication.IResult;
-
-namespace ITtscGraphApplication {
-  interface IProps {
-    /** User's TypeScript code question, restated for this graph call. */
-    question: string;
-    /** Why the resident graph is or is not the next evidence source. */
-    graphNeed: string;
-    /** First-pass operation choice before final arguments are filled. */
-    draft: {
-      reason: string;
-      type:
-        | ITtscGraphEntrypoints.IRequest["type"]
-        | ITtscGraphLookup.IRequest["type"]
-        | ITtscGraphTrace.IRequest["type"]
-        | ITtscGraphDetails.IRequest["type"]
-        | ITtscGraphOverview.IRequest["type"]
-        | ITtscGraphEscape.IRequest["type"];
-    };
-    /** Review the draft for overfetch, shell fallback, web lookup, or wrong scope. */
-    review: string;
-    /** Exactly one final request branch. */
-    request:
-      | ITtscGraphEntrypoints.IRequest
-      | ITtscGraphLookup.IRequest
-      | ITtscGraphTrace.IRequest
-      | ITtscGraphDetails.IRequest
-      | ITtscGraphOverview.IRequest
-      | ITtscGraphEscape.IRequest;
-  }
-
-  interface IResult {
-    result:
-      | ITtscGraphEntrypoints
-      | ITtscGraphLookup
-      | ITtscGraphTrace
-      | ITtscGraphDetails
-      | ITtscGraphOverview
-      | ITtscGraphEscape;
-  }
-}
-```
+The tool contract is `ITtscGraphApplication.ts`. Its request branches are the files listed below.
 
 ## Request Branches
 
@@ -62,130 +22,76 @@ namespace ITtscGraphApplication {
 
 `ITtscGraphTrace.IRequest` follows call, type, or dependency flow. Use `to` for "how A reaches B" questions instead of widening `maxNodes`; use `reverse` for callers and impact checks.
 
-`ITtscGraphDetails.IRequest` inspects selected handles. By default it returns signatures, members, direct calls, and direct types. Set `source: true` only for one or two decisive leaf bodies; split source reads from neighbor maps.
+`ITtscGraphDetails.IRequest` inspects selected handles. It returns signatures, members, direct calls, direct types, dependency neighbors, and sourceSpan anchors without implementation text.
 
 `ITtscGraphOverview.IRequest` returns a source-free architecture map: counts, layers, hotspots, and public API symbols.
 
 `ITtscGraphEscape.IRequest` returns a small no-op result when the review finds that no graph operation should run.
 
-```ts
-namespace ITtscGraphEntrypoints {
-  interface IRequest {
-    type: "entrypoints";
-    query: string;
-    limit?: number; // default 5
-    neighbors?: number; // default 1
-  }
-}
+## Type Sources
 
-namespace ITtscGraphLookup {
-  interface IRequest {
-    type: "lookup";
-    query: string;
-    limit?: number; // default 12
-  }
-}
+These tabs read from `packages/graph/src/structures`, so the page stays tied to the package source instead of copying type definitions.
 
-namespace ITtscGraphTrace {
-  interface IRequest {
-    type: "trace";
-    from: string;
-    to?: string;
-    direction?: "forward" | "reverse" | "impact";
-    focus?: "all" | "execution" | "types";
-    maxDepth?: number;
-    maxNodes?: number;
-  }
-}
-
-namespace ITtscGraphDetails {
-  interface IRequest {
-    type: "details";
-    handles: string[];
-    neighbors?: boolean;
-    neighborLimit?: number;
-    source?: boolean;
-    lineNumbers?: boolean;
-  }
-}
-
-namespace ITtscGraphOverview {
-  interface IRequest {
-    type: "overview";
-    aspect?: "all" | "layers" | "hotspots" | "publicApi";
-  }
-}
-
-namespace ITtscGraphEscape {
-  interface IRequest {
-    type: "escape";
-    reason: string;
-    nextStep?: string;
-  }
-}
-```
+<Tabs
+  items={[
+    <code>ITtscGraphApplication.ts</code>,
+    <code>ITtscGraphEntrypoints.ts</code>,
+    <code>ITtscGraphLookup.ts</code>,
+    <code>ITtscGraphTrace.ts</code>,
+    <code>ITtscGraphDetails.ts</code>,
+    <code>ITtscGraphOverview.ts</code>,
+    <code>ITtscGraphEscape.ts</code>,
+  ]}
+>
+  <Tabs.Tab>
+    <LocalSource
+      path="packages/graph/src/structures/ITtscGraphApplication.ts"
+      showLineNumbers
+    />
+  </Tabs.Tab>
+  <Tabs.Tab>
+    <LocalSource
+      path="packages/graph/src/structures/ITtscGraphEntrypoints.ts"
+      showLineNumbers
+    />
+  </Tabs.Tab>
+  <Tabs.Tab>
+    <LocalSource
+      path="packages/graph/src/structures/ITtscGraphLookup.ts"
+      showLineNumbers
+    />
+  </Tabs.Tab>
+  <Tabs.Tab>
+    <LocalSource
+      path="packages/graph/src/structures/ITtscGraphTrace.ts"
+      showLineNumbers
+    />
+  </Tabs.Tab>
+  <Tabs.Tab>
+    <LocalSource
+      path="packages/graph/src/structures/ITtscGraphDetails.ts"
+      showLineNumbers
+    />
+  </Tabs.Tab>
+  <Tabs.Tab>
+    <LocalSource
+      path="packages/graph/src/structures/ITtscGraphOverview.ts"
+      showLineNumbers
+    />
+  </Tabs.Tab>
+  <Tabs.Tab>
+    <LocalSource
+      path="packages/graph/src/structures/ITtscGraphEscape.ts"
+      showLineNumbers
+    />
+  </Tabs.Tab>
+</Tabs>
 
 ## Result Branches
 
 The MCP result object itself is not a union. Its `result` property is.
 
-```ts
-interface ITtscGraphApplicationResult {
-  result:
-    | ITtscGraphEntrypoints
-    | ITtscGraphLookup
-    | ITtscGraphTrace
-    | ITtscGraphDetails
-    | ITtscGraphOverview
-    | ITtscGraphEscape;
-}
-
-interface ITtscGraphEntrypoints {
-  type: "entrypoints";
-  query: string;
-  hits: EntrypointsHit[];
-  mentions: EntrypointsMention[];
-  neighborhood: EntrypointsNeighborhood[];
-  next: { details: string[]; traceFrom: string[] };
-  truncated?: boolean;
-}
-
-interface ITtscGraphLookup {
-  type: "lookup";
-  hits: LookupHit[];
-  next: { details: string[]; traceFrom: string[] };
-}
-
-interface ITtscGraphTrace {
-  type: "trace";
-  start?: TraceNode;
-  direction: string;
-  hops: TraceHop[];
-  reached: TraceNode[];
-  truncated: boolean;
-}
-
-interface ITtscGraphDetails {
-  type: "details";
-  nodes: DetailsNode[];
-  unknown: string[];
-}
-
-interface ITtscGraphOverview {
-  type: "overview";
-  project: string;
-  counts: OverviewCounts;
-}
-
-interface ITtscGraphEscape {
-  type: "escape";
-  skipped: true;
-  reason: string;
-  nextStep?: string;
-}
-```
-
-The concrete payloads carry symbol coordinates, edge evidence, sourceSpan anchors, and stable handles for follow-up graph calls.
+The concrete payloads carry symbol coordinates, edge evidence ranges, sourceSpan anchors, and stable handles for follow-up graph calls.
 
 ## Node Kinds
 

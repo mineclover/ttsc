@@ -7,7 +7,7 @@ export interface ITtscGraphLookup {
 
   hits: ITtscGraphLookup.IHit[];
 
-  /** Follow-up handles for source or member details. */
+  /** Follow-up handles for selected symbol details. */
   next: ITtscGraphLookup.INext;
 }
 export namespace ITtscGraphLookup {
@@ -53,7 +53,7 @@ export namespace ITtscGraphLookup {
 
   /** Tool-call handles suggested by this lookup result. */
   export interface INext {
-    /** Pass these ids to `details`, with `source: true` only when needed. */
+    /** Pass these ids to `details` for source-free symbol facts. */
     details: string[];
     /** Pass these ids to `trace` when following dependency flow. */
     traceFrom: string[];

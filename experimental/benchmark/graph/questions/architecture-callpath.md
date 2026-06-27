@@ -1,6 +1,6 @@
 # Task: walk a call path through the codebase
 
-Use only this checkout's TypeScript source and graph evidence; do not use web search, external documentation, package docs, or general framework memory.
+Use this checkout's graph evidence first: symbols, signatures, dependency edges, edge ranges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory.
 
 I just joined this TypeScript project and I am trying to understand how it actually works under the hood. Pick one commonly used exported API (a public function, a class method, an entry point) and walk me through what happens when it runs: how the call travels from that public entry point, through the internal layers, down to where the real work happens (the database call, the I/O, the core algorithm, whichever applies).
 

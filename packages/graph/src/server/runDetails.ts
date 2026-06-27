@@ -10,9 +10,6 @@ import { ITtscGraphNode } from "../structures/ITtscGraphNode";
 import { accessAliasesFor } from "./accessAliases";
 import { resolveGraphHandle } from "./resolveHandle";
 
-// A whole declaration body can be large, so the full source is opt-in and capped
-// when asked for; the default response carries only the declared shape.
-const MAX_SOURCE_LINES = 200;
 // A signature is the declaration head up to the body brace: a handful of lines.
 const MAX_SIGNATURE_LINES = 6;
 // Neighbor lists are a map, not a dump; keep them scannable.
@@ -22,7 +19,7 @@ const MAX_NEIGHBORS = 12;
 const MAX_MEMBERS = 80;
 // Structural relationships are navigation, not the dependency picture details is for.
 const STRUCTURAL_KINDS = new Set<string>(["contains", "exports", "imports"]);
-// Kinds whose value is their member outline, not a source body.
+// Kinds whose value is their member outline, not implementation text.
 const CONTAINER_KINDS = new Set<string>([
   "class",
   "interface",
@@ -33,24 +30,21 @@ const CONTAINER_KINDS = new Set<string>([
 ]);
 
 /**
- * Resolve each handle to its declared shape: its signature, and for a container
- * the outline of its members, and only when asked, its full source body. This
- * is the graph's edge over a plain file read: it answers from the resolved
- * structure it already holds, so the agent reads compact shape, not inlined
- * code, unless it explicitly needs a body's logic.
+ * Resolve each handle to its declared shape: sourceSpan anchors, signature,
+ * direct dependencies, and for containers, member outlines. It answers from the
+ * graph's resolved structure instead of inlining implementation bodies.
  */
 export function runDetails(
   graph: TtscGraphMemory,
   props: ITtscGraphDetails.IRequest,
 ): ITtscGraphDetails {
-  const wantSource = props.source === true;
   const neighborLimit = bound(
     props.neighborLimit,
     DEFAULT_NEIGHBORS,
     1,
     MAX_NEIGHBORS,
   );
-  const wantNeighbors = props.neighbors === true && !wantSource;
+  const wantNeighbors = props.neighbors === true;
   const nodes: ITtscGraphDetails.INode[] = [];
   const unknown: string[] = [];
   for (const handle of props.handles) {
@@ -72,43 +66,26 @@ export function runDetails(
     const signatureLiterals = literalSummaries(sig);
     const decorators = decoratorsOf(node);
     if (decorators !== undefined) detail.decorators = decorators;
-    if (node.implementation !== undefined)
-      detail.implementation = node.implementation;
-    if (!wantSource) {
-      const calls = dependencySummaries(graph, node, executionKinds, 6);
-      if (calls.length > 0) detail.calls = calls;
-      const types = dependencySummaries(graph, node, typeKinds, 6);
-      if (types.length > 0) detail.types = types;
-      if (CONTAINER_KINDS.has(node.kind)) {
-        const list = members(graph, node);
-        if (list.length > 0) detail.members = list;
-      }
+    const implementation = evidenceCoordinatesOf(node.implementation);
+    if (implementation !== undefined) detail.implementation = implementation;
+    const span = implementation ?? evidenceCoordinatesOf(node.evidence);
+    if (span !== undefined) {
+      detail.sourceSpan = {
+        file: span.file,
+        startLine: span.startLine,
+        endLine: span.endLine,
+      };
     }
-    let source:
-      | {
-          file: string;
-          text: string;
-          lines: ITtscGraphDetails.ISourceLine[];
-          truncated: boolean;
-          startLine: number;
-          endLine: number;
-        }
-      | undefined;
-    if (wantSource) {
-      source = readSource(graph.project, node);
-      if (source !== undefined) {
-        detail.source = source.text;
-        detail.sourceSpan = {
-          file: source.file,
-          startLine: source.startLine,
-          endLine: source.endLine,
-        };
-        if (props.lineNumbers === true) detail.sourceLines = source.lines;
-        if (source.truncated) detail.truncated = true;
-      }
-    } else if (signatureLiterals.length > 0) {
+    const calls = dependencySummaries(graph, node, executionKinds, 6);
+    if (calls.length > 0) detail.calls = calls;
+    const types = dependencySummaries(graph, node, typeKinds, 6);
+    if (types.length > 0) detail.types = types;
+    if (CONTAINER_KINDS.has(node.kind)) {
+      const list = members(graph, node);
+      if (list.length > 0) detail.members = list;
+    }
+    if (signatureLiterals.length > 0)
       detail.literals = signatureLiterals.slice(0, 12);
-    }
     if (wantNeighbors) {
       detail.dependsOn = refs(
         graph,
@@ -175,7 +152,7 @@ function refs(
     if (other.evidence?.startLine) ref.line = other.evidence.startLine;
     const evidence = edgeEvidenceOf(edge);
     if (evidence !== undefined) ref.evidence = evidence;
-    const aliases = accessAliasesFor(other, evidence?.text);
+    const aliases = accessAliasesFor(other, edgeEvidenceTextOf(edge));
     if (aliases !== undefined) ref.aliases = aliases;
     ranked.push({ ref, rank: refRank(ref, edge) });
   }
@@ -203,7 +180,7 @@ function dependencySummaries(
     const other = graph.node(edge.to);
     if (other === undefined || other.kind === "file") continue;
     const name = other.qualifiedName ?? other.name;
-    const aliases = accessAliasesFor(other, edge.evidence?.text);
+    const aliases = accessAliasesFor(other, edgeEvidenceTextOf(edge));
     const aliasText =
       aliases === undefined || aliases.length === 0
         ? name
@@ -318,11 +295,32 @@ export function decoratorsOf(
     : undefined;
 }
 
-/** Relationship evidence already captured on an edge, omitted when absent. */
+/** Relationship evidence as public coordinates, omitted when absent. */
 export function edgeEvidenceOf(
   edge: ITtscGraphEdge,
 ): ITtscGraphEvidence | undefined {
-  return edge.evidence;
+  return evidenceCoordinatesOf(edge.evidence);
+}
+
+function evidenceCoordinatesOf(
+  evidence: ITtscGraphEvidence | undefined,
+): ITtscGraphEvidence | undefined {
+  if (evidence === undefined) return undefined;
+  return {
+    file: evidence.file,
+    startLine: evidence.startLine,
+    ...(evidence.startCol !== undefined ? { startCol: evidence.startCol } : {}),
+    ...(evidence.endLine !== undefined ? { endLine: evidence.endLine } : {}),
+    ...(evidence.endCol !== undefined ? { endCol: evidence.endCol } : {}),
+  };
+}
+
+/** Source text is an internal alias hint, not part of the MCP evidence object. */
+export function edgeEvidenceTextOf(edge: ITtscGraphEdge): string | undefined {
+  const text = (
+    edge.evidence as (ITtscGraphEvidence & { text?: string }) | undefined
+  )?.text;
+  return typeof text === "string" && text.length > 0 ? text : undefined;
 }
 
 /** Read a file's lines once, or undefined when it cannot be read. */
@@ -362,43 +360,4 @@ export function signatureOf(
   }
   const text = out.join("\n").trim();
   return text === "" ? undefined : text;
-}
-
-/** Slice a node's full declaration source from disk, capped at MAX_SOURCE_LINES. */
-function readSource(
-  project: string,
-  node: ITtscGraphNode,
-):
-  | {
-      file: string;
-      text: string;
-      lines: ITtscGraphDetails.ISourceLine[];
-      truncated: boolean;
-      startLine: number;
-      endLine: number;
-    }
-  | undefined {
-  const evidence = node.implementation ?? node.evidence;
-  const lines =
-    evidence === undefined ? undefined : fileLines(project, evidence.file);
-  if (lines === undefined || evidence === undefined) return undefined;
-  const start = Math.max(0, evidence.startLine - 1);
-  const end = Math.min(evidence.endLine ?? evidence.startLine, lines.length);
-  let slice = lines.slice(start, Math.max(start + 1, end));
-  let truncated = false;
-  if (slice.length > MAX_SOURCE_LINES) {
-    slice = slice.slice(0, MAX_SOURCE_LINES);
-    truncated = true;
-  }
-  return {
-    file: evidence.file,
-    text: slice.join("\n"),
-    lines: slice.map((text, index) => ({
-      line: start + index + 1,
-      text,
-    })),
-    truncated,
-    startLine: start + 1,
-    endLine: start + slice.length,
-  };
 }

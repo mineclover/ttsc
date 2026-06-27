@@ -16,8 +16,8 @@ const STRUCTURAL_KINDS = new Set<string>(["contains", "exports", "imports"]);
 /**
  * Build the first source-free entrypoints list for a code question. The result
  * gives the model stable handles, declaration signatures, and direct graph
- * context. It is deliberately not a source reader; source remains opt-in
- * through details.
+ * context. It is deliberately not a source reader; details adds selected symbol
+ * shape and ranges, not implementation text.
  */
 export function runEntrypoints(
   graph: TtscGraphMemory,

@@ -110,7 +110,7 @@ export namespace ITtscGraphEntrypoints {
 
   /** Tool-call handles suggested by this first entrypoints result. */
   export interface INext {
-    /** Pass these ids to `details`, with `source: true` only when needed. */
+    /** Pass these ids to `details` for source-free symbol facts. */
     details: string[];
     /** Pass these ids to `trace` when following dependency flow. */
     traceFrom: string[];

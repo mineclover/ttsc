@@ -1,4 +1,4 @@
-Use only this checkout's TypeScript source and graph evidence; do not use web search, external documentation, package docs, or general framework memory.
+Use this checkout's graph evidence first: symbols, signatures, dependency edges, edge ranges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory.
 
 For a NestJS HTTP request reaching a controller method, trace the runtime path that applies guards, pipes, and interceptors before invoking the controller callback. Start from the route handler wrapper and follow it to where each framework concern actually runs.
 

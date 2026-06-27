@@ -1,6 +1,6 @@
 # Task: orient by exported symbols, then walk one call path
 
-Use only this checkout's TypeScript source and graph evidence; do not use web search, external documentation, package docs, or general framework memory.
+Use this checkout's graph evidence first: symbols, signatures, dependency edges, edge ranges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory.
 
 I just joined this TypeScript project. Start by building a compact map of its exported symbols and top-level folders, then pick one commonly used exported API (a public function, a class method, or an entry point) and walk me through what happens when it runs.
 

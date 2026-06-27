@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-26T18:23:01.214Z",
+  "generatedAt": "2026-06-27T16:27:46.688Z",
   "structural": null,
   "agent": {
     "cells": [
@@ -39,14 +39,20 @@
               "goldSha256": "4fdd4f4adde6bd6419a0e1e1afce69c0f4ebdc2c1997861cd20469fcd04afd1d",
               "quality": {
                 "symbolCoverage": 0.4,
-                "matchedSymbols": ["renderStaticScene", "_renderStaticScene"],
+                "matchedSymbols": [
+                  "renderStaticScene",
+                  "_renderStaticScene"
+                ],
                 "missingSymbols": [
                   "renderElement",
                   "drawElementOnCanvas",
                   "ShapeCache.generateElementShape"
                 ],
                 "edgeOrder": 0,
-                "mentionsMissing": ["roughjs", "shapecache"],
+                "mentionsMissing": [
+                  "roughjs",
+                  "shapecache"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -80,14 +86,20 @@
               "goldSha256": "4fdd4f4adde6bd6419a0e1e1afce69c0f4ebdc2c1997861cd20469fcd04afd1d",
               "quality": {
                 "symbolCoverage": 0.4,
-                "matchedSymbols": ["renderStaticScene", "_renderStaticScene"],
+                "matchedSymbols": [
+                  "renderStaticScene",
+                  "_renderStaticScene"
+                ],
                 "missingSymbols": [
                   "renderElement",
                   "drawElementOnCanvas",
                   "ShapeCache.generateElementShape"
                 ],
                 "edgeOrder": 0,
-                "mentionsMissing": ["roughjs", "shapecache"],
+                "mentionsMissing": [
+                  "roughjs",
+                  "shapecache"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -131,7 +143,10 @@
                   "ShapeCache.generateElementShape"
                 ],
                 "edgeOrder": 0.33,
-                "mentionsMissing": ["roughjs", "shapecache"],
+                "mentionsMissing": [
+                  "roughjs",
+                  "shapecache"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -175,7 +190,10 @@
                   "ShapeCache.generateElementShape"
                 ],
                 "edgeOrder": 0.33,
-                "mentionsMissing": ["roughjs", "shapecache"],
+                "mentionsMissing": [
+                  "roughjs",
+                  "shapecache"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -219,7 +237,10 @@
                   "ShapeCache.generateElementShape"
                 ],
                 "edgeOrder": 0.33,
-                "mentionsMissing": ["roughjs", "shapecache"],
+                "mentionsMissing": [
+                  "roughjs",
+                  "shapecache"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -487,7 +508,9 @@
                   "trigger",
                   "ReactiveEffect.run"
                 ],
-                "missingSymbols": ["Dep.notify"],
+                "missingSymbols": [
+                  "Dep.notify"
+                ],
                 "edgeOrder": 0,
                 "mentionsMissing": [],
                 "violatedMustNot": [],
@@ -529,7 +552,9 @@
                   "trigger",
                   "ReactiveEffect.run"
                 ],
-                "missingSymbols": ["Dep.notify"],
+                "missingSymbols": [
+                  "Dep.notify"
+                ],
                 "edgeOrder": 0,
                 "mentionsMissing": [],
                 "violatedMustNot": [],
@@ -571,7 +596,9 @@
                   "trigger",
                   "ReactiveEffect.run"
                 ],
-                "missingSymbols": ["Dep.notify"],
+                "missingSymbols": [
+                  "Dep.notify"
+                ],
                 "edgeOrder": 0,
                 "mentionsMissing": [],
                 "violatedMustNot": [],
@@ -613,7 +640,9 @@
                   "trigger",
                   "ReactiveEffect.run"
                 ],
-                "missingSymbols": ["Dep.notify"],
+                "missingSymbols": [
+                  "Dep.notify"
+                ],
                 "edgeOrder": 0,
                 "mentionsMissing": [],
                 "violatedMustNot": [],
@@ -655,7 +684,9 @@
                   "trigger",
                   "ReactiveEffect.run"
                 ],
-                "missingSymbols": ["Dep.notify"],
+                "missingSymbols": [
+                  "Dep.notify"
+                ],
                 "edgeOrder": 0,
                 "mentionsMissing": [],
                 "violatedMustNot": [],
@@ -969,7 +1000,9 @@
                   "Observable._trySubscribe",
                   "operate"
                 ],
-                "missingSymbols": ["pipeReducer"],
+                "missingSymbols": [
+                  "pipeReducer"
+                ],
                 "edgeOrder": 0.33,
                 "mentionsMissing": [],
                 "violatedMustNot": [],
@@ -1054,7 +1087,9 @@
                   "Observable._trySubscribe",
                   "operate"
                 ],
-                "missingSymbols": ["pipeReducer"],
+                "missingSymbols": [
+                  "pipeReducer"
+                ],
                 "edgeOrder": 0,
                 "mentionsMissing": [],
                 "violatedMustNot": [],
@@ -1096,7 +1131,9 @@
                   "Observable._trySubscribe",
                   "operate"
                 ],
-                "missingSymbols": ["pipeReducer"],
+                "missingSymbols": [
+                  "pipeReducer"
+                ],
                 "edgeOrder": 0.33,
                 "mentionsMissing": [],
                 "violatedMustNot": [],
@@ -1805,10 +1842,19 @@
               "goldSha256": "183c8b3be3322b3e81b656f902846e206b6042f27b968948eba1a3ab930cc3ed",
               "quality": {
                 "symbolCoverage": 0.6,
-                "matchedSymbols": ["ZodType.parse", "parse", "finalizeIssue"],
-                "missingSymbols": ["$ZodType._zod.run", "$ZodType._zod.parse"],
+                "matchedSymbols": [
+                  "ZodType.parse",
+                  "parse",
+                  "finalizeIssue"
+                ],
+                "missingSymbols": [
+                  "$ZodType._zod.run",
+                  "$ZodType._zod.parse"
+                ],
                 "edgeOrder": 0,
-                "mentionsMissing": ["ParseContextInternal"],
+                "mentionsMissing": [
+                  "ParseContextInternal"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -1842,7 +1888,9 @@
               "goldSha256": "183c8b3be3322b3e81b656f902846e206b6042f27b968948eba1a3ab930cc3ed",
               "quality": {
                 "symbolCoverage": 0.2,
-                "matchedSymbols": ["parse"],
+                "matchedSymbols": [
+                  "parse"
+                ],
                 "missingSymbols": [
                   "ZodType.parse",
                   "$ZodType._zod.run",
@@ -1850,7 +1898,9 @@
                   "finalizeIssue"
                 ],
                 "edgeOrder": 0,
-                "mentionsMissing": ["ParseContextInternal"],
+                "mentionsMissing": [
+                  "ParseContextInternal"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -1884,14 +1934,20 @@
               "goldSha256": "183c8b3be3322b3e81b656f902846e206b6042f27b968948eba1a3ab930cc3ed",
               "quality": {
                 "symbolCoverage": 0.4,
-                "matchedSymbols": ["ZodType.parse", "parse"],
+                "matchedSymbols": [
+                  "ZodType.parse",
+                  "parse"
+                ],
                 "missingSymbols": [
                   "$ZodType._zod.run",
                   "$ZodType._zod.parse",
                   "finalizeIssue"
                 ],
                 "edgeOrder": 0,
-                "mentionsMissing": ["payload", "ParseContextInternal"],
+                "mentionsMissing": [
+                  "payload",
+                  "ParseContextInternal"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -1925,7 +1981,9 @@
               "goldSha256": "183c8b3be3322b3e81b656f902846e206b6042f27b968948eba1a3ab930cc3ed",
               "quality": {
                 "symbolCoverage": 0.2,
-                "matchedSymbols": ["parse"],
+                "matchedSymbols": [
+                  "parse"
+                ],
                 "missingSymbols": [
                   "ZodType.parse",
                   "$ZodType._zod.run",
@@ -1933,7 +1991,10 @@
                   "finalizeIssue"
                 ],
                 "edgeOrder": 0,
-                "mentionsMissing": ["payload", "ParseContextInternal"],
+                "mentionsMissing": [
+                  "payload",
+                  "ParseContextInternal"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -1967,7 +2028,9 @@
               "goldSha256": "183c8b3be3322b3e81b656f902846e206b6042f27b968948eba1a3ab930cc3ed",
               "quality": {
                 "symbolCoverage": 0.2,
-                "matchedSymbols": ["parse"],
+                "matchedSymbols": [
+                  "parse"
+                ],
                 "missingSymbols": [
                   "ZodType.parse",
                   "$ZodType._zod.run",
@@ -1975,7 +2038,10 @@
                   "finalizeIssue"
                 ],
                 "edgeOrder": 0,
-                "mentionsMissing": ["payload", "ParseContextInternal"],
+                "mentionsMissing": [
+                  "payload",
+                  "ParseContextInternal"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -2681,7 +2747,9 @@
               "goldSha256": "1905353b18e15ee4d00b09b4eaff7a185c0ecf450162957298897772f82416b1",
               "quality": {
                 "symbolCoverage": 0.2,
-                "matchedSymbols": ["RPCProtocol"],
+                "matchedSymbols": [
+                  "RPCProtocol"
+                ],
                 "missingSymbols": [
                   "RPCProtocol.getProxy",
                   "RPCProtocol._remoteCall",
@@ -2689,7 +2757,10 @@
                   "MessageIO.serializeRequest"
                 ],
                 "edgeOrder": 0,
-                "mentionsMissing": ["proxy", "serialize"],
+                "mentionsMissing": [
+                  "proxy",
+                  "serialize"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -2724,14 +2795,19 @@
               "goldSha256": "1905353b18e15ee4d00b09b4eaff7a185c0ecf450162957298897772f82416b1",
               "quality": {
                 "symbolCoverage": 0.4,
-                "matchedSymbols": ["RPCProtocol", "RPCProtocol.getProxy"],
+                "matchedSymbols": [
+                  "RPCProtocol",
+                  "RPCProtocol.getProxy"
+                ],
                 "missingSymbols": [
                   "RPCProtocol._remoteCall",
                   "RPCProtocol._receiveOneMessage",
                   "MessageIO.serializeRequest"
                 ],
                 "edgeOrder": 0,
-                "mentionsMissing": ["serialize"],
+                "mentionsMissing": [
+                  "serialize"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -2774,7 +2850,11 @@
                   "MessageIO.serializeRequest"
                 ],
                 "edgeOrder": 0,
-                "mentionsMissing": ["rpc", "proxy", "serialize"],
+                "mentionsMissing": [
+                  "rpc",
+                  "proxy",
+                  "serialize"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -2808,14 +2888,19 @@
               "goldSha256": "1905353b18e15ee4d00b09b4eaff7a185c0ecf450162957298897772f82416b1",
               "quality": {
                 "symbolCoverage": 0.4,
-                "matchedSymbols": ["RPCProtocol", "RPCProtocol.getProxy"],
+                "matchedSymbols": [
+                  "RPCProtocol",
+                  "RPCProtocol.getProxy"
+                ],
                 "missingSymbols": [
                   "RPCProtocol._remoteCall",
                   "RPCProtocol._receiveOneMessage",
                   "MessageIO.serializeRequest"
                 ],
                 "edgeOrder": 0,
-                "mentionsMissing": ["serialize"],
+                "mentionsMissing": [
+                  "serialize"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -2850,7 +2935,9 @@
               "goldSha256": "1905353b18e15ee4d00b09b4eaff7a185c0ecf450162957298897772f82416b1",
               "quality": {
                 "symbolCoverage": 0.2,
-                "matchedSymbols": ["RPCProtocol"],
+                "matchedSymbols": [
+                  "RPCProtocol"
+                ],
                 "missingSymbols": [
                   "RPCProtocol.getProxy",
                   "RPCProtocol._remoteCall",
@@ -2858,7 +2945,9 @@
                   "MessageIO.serializeRequest"
                 ],
                 "edgeOrder": 0,
-                "mentionsMissing": ["serialize"],
+                "mentionsMissing": [
+                  "serialize"
+                ],
                 "violatedMustNot": [],
                 "pass": false
               },
@@ -3532,6 +3621,822 @@
             }
           ],
           "graph": []
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "excalidraw",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "excalidraw-dedicated-v1",
+        "promptFamily": "dedicated",
+        "questionSha256": "bf4ff703f3ca3ce0e83256e428f340bbc659091971ff36fc303827542dd8dc70",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use this checkout's graph evidence first: symbols, signatures, dependency edges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory. Read source bodies only when graph edges or signatures cannot decide the answer.\n\nHow does Excalidraw render and update canvas elements?",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 791915,
+              "cached": 659328,
+              "reasoning": 6323,
+              "tokensWithReasoning": 798238,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 782233,
+                  "cachedInput": 659328,
+                  "output": 9682,
+                  "reasoning": 6323
+                }
+              ],
+              "tools": 19,
+              "shell": 0,
+              "graph": 19,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 6,
+                "mcp_tool_call": 19
+              },
+              "durMs": 303522,
+              "ok": true,
+              "error": "",
+              "promptId": "excalidraw-dedicated-v1",
+              "questionSha256": "bf4ff703f3ca3ce0e83256e428f340bbc659091971ff36fc303827542dd8dc70",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "vscode",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "vscode-dedicated-v1",
+        "promptFamily": "dedicated",
+        "questionSha256": "39f5d543adcd34d2a4b41b36533484c2378ccd64944d96e8524fd5b16906bd30",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use this checkout's graph evidence first: symbols, signatures, dependency edges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory. Read source bodies only when graph edges or signatures cannot decide the answer.\n\nHow does the extension host communicate with the main process?",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 264871,
+              "cached": 214016,
+              "reasoning": 3005,
+              "tokensWithReasoning": 267876,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 259601,
+                  "cachedInput": 214016,
+                  "output": 5270,
+                  "reasoning": 3005
+                }
+              ],
+              "tools": 9,
+              "shell": 0,
+              "graph": 9,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 6,
+                "mcp_tool_call": 9
+              },
+              "durMs": 169141,
+              "ok": true,
+              "error": "",
+              "promptId": "vscode-dedicated-v1",
+              "questionSha256": "39f5d543adcd34d2a4b41b36533484c2378ccd64944d96e8524fd5b16906bd30",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "nestjs",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "nestjs-dedicated-v1",
+        "promptFamily": "dedicated",
+        "questionSha256": "2d20b09bb0b27410e3bc85bd609db37fa7a1b0c938aaa9a6eaef074ecea98909",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use this checkout's graph evidence first: symbols, signatures, dependency edges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory. Read source bodies only when graph edges or signatures cannot decide the answer.\n\nHow does NestJS execute guards, interceptors, and pipes around a controller handler when an HTTP request arrives?",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 222543,
+              "cached": 173952,
+              "reasoning": 5337,
+              "tokensWithReasoning": 227880,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 214938,
+                  "cachedInput": 173952,
+                  "output": 7605,
+                  "reasoning": 5337
+                }
+              ],
+              "tools": 7,
+              "shell": 0,
+              "graph": 7,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 7,
+                "mcp_tool_call": 7
+              },
+              "durMs": 167199,
+              "ok": true,
+              "error": "",
+              "promptId": "nestjs-dedicated-v1",
+              "questionSha256": "2d20b09bb0b27410e3bc85bd609db37fa7a1b0c938aaa9a6eaef074ecea98909",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "vue",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "vue-dedicated-v1",
+        "promptFamily": "dedicated",
+        "questionSha256": "3cfc3ae2e36a6368c089ac41bc175623d3851e29944af9fe4999ee5e9e6c5757",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use this checkout's graph evidence first: symbols, signatures, dependency edges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory. Read source bodies only when graph edges or signatures cannot decide the answer.\n\nHow does Vue track reactive dependencies when a property is read and trigger effects when that property is written?",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 320798,
+              "cached": 285952,
+              "reasoning": 2794,
+              "tokensWithReasoning": 323592,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 314828,
+                  "cachedInput": 285952,
+                  "output": 5970,
+                  "reasoning": 2794
+                }
+              ],
+              "tools": 12,
+              "shell": 0,
+              "graph": 12,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 7,
+                "mcp_tool_call": 12
+              },
+              "durMs": 155998,
+              "ok": true,
+              "error": "",
+              "promptId": "vue-dedicated-v1",
+              "questionSha256": "3cfc3ae2e36a6368c089ac41bc175623d3851e29944af9fe4999ee5e9e6c5757",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "zod",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "zod-dedicated-v1",
+        "promptFamily": "dedicated",
+        "questionSha256": "fd1fc529ca5e3e522842673e6d4bc6a8d5e8a1949841c0bc6abee602f86ce4ad",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use this checkout's graph evidence first: symbols, signatures, dependency edges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory. Read source bodies only when graph edges or signatures cannot decide the answer.\n\nHow does a Zod schema's `parse` method validate input and produce a typed result or throw a ZodError?",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 386742,
+              "cached": 327552,
+              "reasoning": 5673,
+              "tokensWithReasoning": 392415,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 377796,
+                  "cachedInput": 327552,
+                  "output": 8946,
+                  "reasoning": 5673
+                }
+              ],
+              "tools": 11,
+              "shell": 0,
+              "graph": 11,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 9,
+                "mcp_tool_call": 11
+              },
+              "durMs": 196454,
+              "ok": true,
+              "error": "",
+              "promptId": "zod-dedicated-v1",
+              "questionSha256": "fd1fc529ca5e3e522842673e6d4bc6a8d5e8a1949841c0bc6abee602f86ce4ad",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "typeorm",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "typeorm-dedicated-v1",
+        "promptFamily": "dedicated",
+        "questionSha256": "b4bf9a00bb7c3c8894fe7b5109b9f9ed05e61309741d6af11fc36541f6026b75",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use this checkout's graph evidence first: symbols, signatures, dependency edges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory. Read source bodies only when graph edges or signatures cannot decide the answer.\n\nHow does TypeORM's `Repository.find` translate `relations` find options into SQL joins via the query builder?",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 494815,
+              "cached": 438656,
+              "reasoning": 7040,
+              "tokensWithReasoning": 501855,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 483920,
+                  "cachedInput": 438656,
+                  "output": 10895,
+                  "reasoning": 7040
+                }
+              ],
+              "tools": 16,
+              "shell": 0,
+              "graph": 16,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 9,
+                "mcp_tool_call": 16
+              },
+              "durMs": 233501,
+              "ok": true,
+              "error": "",
+              "promptId": "typeorm-dedicated-v1",
+              "questionSha256": "b4bf9a00bb7c3c8894fe7b5109b9f9ed05e61309741d6af11fc36541f6026b75",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "rxjs",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "rxjs-dedicated-v1",
+        "promptFamily": "dedicated",
+        "questionSha256": "ff6aba571a65ff420c1f3ff811924f96af30e2bd4afbf57bfa47b0c17b2a652f",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use this checkout's graph evidence first: symbols, signatures, dependency edges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory. Read source bodies only when graph edges or signatures cannot decide the answer.\n\nHow does calling subscribe on an RxJS Observable invoke its operator chain and deliver values to the observer?",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 290746,
+              "cached": 236544,
+              "reasoning": 3909,
+              "tokensWithReasoning": 294655,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 284059,
+                  "cachedInput": 236544,
+                  "output": 6687,
+                  "reasoning": 3909
+                }
+              ],
+              "tools": 10,
+              "shell": 0,
+              "graph": 10,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 5,
+                "mcp_tool_call": 10
+              },
+              "durMs": 158742,
+              "ok": true,
+              "error": "",
+              "promptId": "rxjs-dedicated-v1",
+              "questionSha256": "ff6aba571a65ff420c1f3ff811924f96af30e2bd4afbf57bfa47b0c17b2a652f",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "shopping-backend",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "shopping-backend-dedicated-v1",
+        "promptFamily": "dedicated",
+        "questionSha256": "056995a01800b0b6fa987cb6a979362ffed04448b3c25d78f4f6ea4ecddf8930",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use this checkout's graph evidence first: symbols, signatures, dependency edges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory. Read source bodies only when graph edges or signatures cannot decide the answer.\n\nHow does publishing an order flow from ShoppingCustomerOrderPublishController.create through ShoppingOrderPublishProvider to the Prisma database write?",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 105875,
+              "cached": 72960,
+              "reasoning": 4363,
+              "tokensWithReasoning": 110238,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 99970,
+                  "cachedInput": 72960,
+                  "output": 5905,
+                  "reasoning": 4363
+                }
+              ],
+              "tools": 4,
+              "shell": 0,
+              "graph": 4,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 6,
+                "mcp_tool_call": 4
+              },
+              "durMs": 143921,
+              "ok": true,
+              "error": "",
+              "promptId": "shopping-backend-dedicated-v1",
+              "questionSha256": "056995a01800b0b6fa987cb6a979362ffed04448b3c25d78f4f6ea4ecddf8930",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "excalidraw",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "excalidraw-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use only this checkout's TypeScript source and graph evidence; do not use web search, external documentation, package docs, or general framework memory.\n\nI just joined this TypeScript project and want to understand how it actually works under the hood. Pick the single most central exported API or entry point and trace what happens when it runs: how the call travels from that public entry, through the internal layers, down to where the real work happens. Name the files and symbols it passes through, in order, and how each step leads to the next. Keep it a focused walk-through of that one path, not a summary of the whole project. Do not guess; report gaps.",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 505937,
+              "cached": 391808,
+              "reasoning": 8304,
+              "tokensWithReasoning": 514241,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 494148,
+                  "cachedInput": 391808,
+                  "output": 11789,
+                  "reasoning": 8304
+                }
+              ],
+              "tools": 13,
+              "shell": 0,
+              "graph": 13,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 6,
+                "mcp_tool_call": 13
+              },
+              "durMs": 282958,
+              "ok": true,
+              "error": "",
+              "promptId": "excalidraw-common-v1",
+              "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "vscode",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "vscode-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use only this checkout's TypeScript source and graph evidence; do not use web search, external documentation, package docs, or general framework memory.\n\nI just joined this TypeScript project and want to understand how it actually works under the hood. Pick the single most central exported API or entry point and trace what happens when it runs: how the call travels from that public entry, through the internal layers, down to where the real work happens. Name the files and symbols it passes through, in order, and how each step leads to the next. Keep it a focused walk-through of that one path, not a summary of the whole project. Do not guess; report gaps.",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 348239,
+              "cached": 283264,
+              "reasoning": 9921,
+              "tokensWithReasoning": 358160,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 334708,
+                  "cachedInput": 283264,
+                  "output": 13531,
+                  "reasoning": 9921
+                }
+              ],
+              "tools": 9,
+              "shell": 0,
+              "graph": 9,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 11,
+                "mcp_tool_call": 9
+              },
+              "durMs": 318407,
+              "ok": true,
+              "error": "",
+              "promptId": "vscode-common-v1",
+              "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "nestjs",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "nestjs-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use only this checkout's TypeScript source and graph evidence; do not use web search, external documentation, package docs, or general framework memory.\n\nI just joined this TypeScript project and want to understand how it actually works under the hood. Pick the single most central exported API or entry point and trace what happens when it runs: how the call travels from that public entry, through the internal layers, down to where the real work happens. Name the files and symbols it passes through, in order, and how each step leads to the next. Keep it a focused walk-through of that one path, not a summary of the whole project. Do not guess; report gaps.",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 349849,
+              "cached": 299904,
+              "reasoning": 9581,
+              "tokensWithReasoning": 359430,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 336276,
+                  "cachedInput": 299904,
+                  "output": 13573,
+                  "reasoning": 9581
+                }
+              ],
+              "tools": 11,
+              "shell": 0,
+              "graph": 11,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 13,
+                "mcp_tool_call": 11
+              },
+              "durMs": 285549,
+              "ok": true,
+              "error": "",
+              "promptId": "nestjs-common-v1",
+              "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "vue",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "vue-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use only this checkout's TypeScript source and graph evidence; do not use web search, external documentation, package docs, or general framework memory.\n\nI just joined this TypeScript project and want to understand how it actually works under the hood. Pick the single most central exported API or entry point and trace what happens when it runs: how the call travels from that public entry, through the internal layers, down to where the real work happens. Name the files and symbols it passes through, in order, and how each step leads to the next. Keep it a focused walk-through of that one path, not a summary of the whole project. Do not guess; report gaps.",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 575407,
+              "cached": 497792,
+              "reasoning": 9182,
+              "tokensWithReasoning": 584589,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 562230,
+                  "cachedInput": 497792,
+                  "output": 13177,
+                  "reasoning": 9182
+                }
+              ],
+              "tools": 13,
+              "shell": 0,
+              "graph": 13,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 14,
+                "mcp_tool_call": 13
+              },
+              "durMs": 286357,
+              "ok": true,
+              "error": "",
+              "promptId": "vue-common-v1",
+              "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "zod",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "zod-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use only this checkout's TypeScript source and graph evidence; do not use web search, external documentation, package docs, or general framework memory.\n\nI just joined this TypeScript project and want to understand how it actually works under the hood. Pick the single most central exported API or entry point and trace what happens when it runs: how the call travels from that public entry, through the internal layers, down to where the real work happens. Name the files and symbols it passes through, in order, and how each step leads to the next. Keep it a focused walk-through of that one path, not a summary of the whole project. Do not guess; report gaps.",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 313060,
+              "cached": 253952,
+              "reasoning": 5882,
+              "tokensWithReasoning": 318942,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 303929,
+                  "cachedInput": 253952,
+                  "output": 9131,
+                  "reasoning": 5882
+                }
+              ],
+              "tools": 10,
+              "shell": 0,
+              "graph": 10,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 10,
+                "mcp_tool_call": 10
+              },
+              "durMs": 222167,
+              "ok": true,
+              "error": "",
+              "promptId": "zod-common-v1",
+              "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "typeorm",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "typeorm-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use only this checkout's TypeScript source and graph evidence; do not use web search, external documentation, package docs, or general framework memory.\n\nI just joined this TypeScript project and want to understand how it actually works under the hood. Pick the single most central exported API or entry point and trace what happens when it runs: how the call travels from that public entry, through the internal layers, down to where the real work happens. Name the files and symbols it passes through, in order, and how each step leads to the next. Keep it a focused walk-through of that one path, not a summary of the whole project. Do not guess; report gaps.",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 353845,
+              "cached": 286720,
+              "reasoning": 11413,
+              "tokensWithReasoning": 365258,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 339459,
+                  "cachedInput": 286720,
+                  "output": 14386,
+                  "reasoning": 11413
+                }
+              ],
+              "tools": 10,
+              "shell": 0,
+              "graph": 10,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 11,
+                "mcp_tool_call": 10
+              },
+              "durMs": 310973,
+              "ok": true,
+              "error": "",
+              "promptId": "typeorm-common-v1",
+              "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "rxjs",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "rxjs-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use only this checkout's TypeScript source and graph evidence; do not use web search, external documentation, package docs, or general framework memory.\n\nI just joined this TypeScript project and want to understand how it actually works under the hood. Pick the single most central exported API or entry point and trace what happens when it runs: how the call travels from that public entry, through the internal layers, down to where the real work happens. Name the files and symbols it passes through, in order, and how each step leads to the next. Keep it a focused walk-through of that one path, not a summary of the whole project. Do not guess; report gaps.",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 408597,
+              "cached": 324096,
+              "reasoning": 7701,
+              "tokensWithReasoning": 416298,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 397575,
+                  "cachedInput": 324096,
+                  "output": 11022,
+                  "reasoning": 7701
+                }
+              ],
+              "tools": 14,
+              "shell": 0,
+              "graph": 14,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 10,
+                "mcp_tool_call": 14
+              },
+              "durMs": 257074,
+              "ok": true,
+              "error": "",
+              "promptId": "rxjs-common-v1",
+              "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "shopping-backend",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "shopping-backend-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "Use only this checkout's TypeScript source and graph evidence; do not use web search, external documentation, package docs, or general framework memory.\n\nI just joined this TypeScript project and want to understand how it actually works under the hood. Pick the single most central exported API or entry point and trace what happens when it runs: how the call travels from that public entry, through the internal layers, down to where the real work happens. Name the files and symbols it passes through, in order, and how each step leads to the next. Keep it a focused walk-through of that one path, not a summary of the whole project. Do not guess; report gaps.",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 385328,
+              "cached": 308480,
+              "reasoning": 7677,
+              "tokensWithReasoning": 393005,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 374135,
+                  "cachedInput": 308480,
+                  "output": 11193,
+                  "reasoning": 7677
+                }
+              ],
+              "tools": 12,
+              "shell": 0,
+              "graph": 12,
+              "web": 0,
+              "types": {
+                "error": 2,
+                "agent_message": 14,
+                "mcp_tool_call": 12
+              },
+              "durMs": 260938,
+              "ok": true,
+              "error": "",
+              "promptId": "shopping-backend-common-v1",
+              "questionSha256": "3e02d1301727dbd6d29a3eeaab5abeddfbadec36040250ba54c18adf8c54aba8",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
         }
       }
     ]

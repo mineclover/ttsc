@@ -17,17 +17,16 @@ export interface ITtscGraphApplication {
    * Query the TypeScript project graph for code evidence.
    *
    * Use this before answering TypeScript codebase questions. It returns
-   * checker-resolved symbols, dependency paths, sourceSpan anchors, and narrow
-   * bodies from the resident graph, avoiding assumptions, shell search, or file
-   * reads when graph evidence is enough.
+   * checker-resolved symbols, dependency paths, edge evidence ranges, and
+   * sourceSpan anchors from the resident graph, avoiding assumptions, shell
+   * search, or file reads when graph evidence is enough.
    *
    * Fill properties in order: question, graphNeed, draft, review, request.
    * Write `draft.reason` before `draft.type`, then choose `entrypoints`,
    * `lookup`, `trace`, `details`, `overview`, or `escape`.
    *
    * Keep slices small. Prefer defaults. Raise limits only after truncation or
-   * ambiguity. Keep dependency maps and source reads separate; use
-   * `source:true` only for decisive leaf bodies.
+   * ambiguity. Keep dependency maps compact and use `trace` for paths.
    *
    * @param props The reasoning and selected graph request
    * @returns One `result` union member matching the selected request type
@@ -51,10 +50,10 @@ export namespace ITtscGraphApplication {
     /**
      * Why the resident graph is the next evidence source.
      *
-     * State what graph evidence is needed and why assumptions, shell search, or
-     * source file reads are not the next step for this call. Name the smallest
-     * evidence that would let the agent stop. If graph is not actually the
-     * right source, say that and use `escape`.
+     * State what graph evidence is needed and why assumptions or broad shell
+     * search are not the next step for this call. Name the smallest evidence
+     * that would let the agent stop. If graph is not actually the right source,
+     * say that and use `escape`.
      */
     graphNeed: string;
 
@@ -71,12 +70,11 @@ export namespace ITtscGraphApplication {
      * Critical review of the draft request.
      *
      * Check whether the draft avoids overfetch, non-graph fallback, broad
-     * source reads, and unnecessary neighbor/source combinations. For caller or
-     * call-site questions, prefer reverse trace or details with
-     * `neighbors:true`. For exact in-body line anchors, request graph source
-     * line numbers. If the draft is wrong, choose the corrected type in
-     * `request`; if graph evidence is unnecessary or the prior graph result
-     * already answers the question, choose `escape`.
+     * reads, and unnecessary neighbor expansion. For caller or call-site
+     * questions, prefer reverse trace or details with `neighbors:true`. If the
+     * draft is wrong, choose the corrected type in `request`; if graph evidence
+     * is unnecessary or the prior graph result already answers the question,
+     * choose `escape`.
      */
     review: string;
 

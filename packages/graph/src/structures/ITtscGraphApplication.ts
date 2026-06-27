@@ -20,13 +20,28 @@ export interface ITtscGraphApplication {
    * symbols, directly mentioned handles, signatures, decorators, and a small
    * dependency orientation slice without source bodies.
    *
-   * Follow with `dependency_path` for call/type flow or `symbol_details` for
-   * selected declarations.
+   * Follow with `symbol_lookup` when a specific named symbol is missing,
+   * `dependency_path` for call/type flow, or `symbol_details` for selected
+   * declarations.
    *
    * @param props The natural code question or search phrase
    * @returns Compact graph coordinates and dependency context
    */
   question_entrypoints(props: ITtscGraphIndex.IProps): ITtscGraphIndex;
+
+  /**
+   * Find specific symbols by name or description.
+   *
+   * Use this when you need a class, function, method, property, or type and do
+   * not already have its handle. It is targeted lookup, not flow tracing.
+   *
+   * Follow with `dependency_path` for relationships or `symbol_details` for
+   * declarations and source bodies.
+   *
+   * @param props The query and result cap
+   * @returns Ranked hits with handles
+   */
+  symbol_lookup(props: ITtscGraphQuery.IProps): ITtscGraphQuery;
 
   /**
    * Trace dependency flow between or away from symbols.
@@ -58,20 +73,6 @@ export interface ITtscGraphApplication {
    * @returns The resolved nodes, and any handles that did not resolve
    */
   symbol_details(props: ITtscGraphExpand.IProps): ITtscGraphExpand;
-
-  /**
-   * Find specific symbols by name or description.
-   *
-   * Use this when you need a class, function, method, property, or type and do
-   * not already have its handle. It is targeted lookup, not flow tracing.
-   *
-   * Follow with `dependency_path` for relationships or `symbol_details` for
-   * declarations and source bodies.
-   *
-   * @param props The query and result cap
-   * @returns Ranked hits with handles
-   */
-  symbol_lookup(props: ITtscGraphQuery.IProps): ITtscGraphQuery;
 
   /**
    * Summarize the project-wide graph shape.

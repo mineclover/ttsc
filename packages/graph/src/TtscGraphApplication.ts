@@ -41,6 +41,10 @@ export class TtscGraphApplication implements ITtscGraphApplication {
     return runIndex(this.graph(), props);
   }
 
+  public symbol_lookup(props: ITtscGraphQuery.IProps): ITtscGraphQuery {
+    return runQuery(this.graph(), props);
+  }
+
   public dependency_path(
     props: ITtscGraphTrace.IProps,
   ): ITtscGraphTrace {
@@ -51,10 +55,6 @@ export class TtscGraphApplication implements ITtscGraphApplication {
     props: ITtscGraphExpand.IProps,
   ): ITtscGraphExpand {
     return runExpand(this.graph(), props);
-  }
-
-  public symbol_lookup(props: ITtscGraphQuery.IProps): ITtscGraphQuery {
-    return runQuery(this.graph(), props);
   }
 
   public project_overview(

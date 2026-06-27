@@ -92,9 +92,9 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
       names,
       [
         "question_entrypoints",
+        "symbol_lookup",
         "dependency_path",
         "symbol_details",
-        "symbol_lookup",
         "project_overview",
       ],
       `tools/list advertises the five graph tools, got ${names.join(", ")}`,

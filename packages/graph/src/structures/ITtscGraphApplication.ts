@@ -13,26 +13,27 @@ import { ITtscGraphTrace } from "./ITtscGraphTrace";
  */
 export interface ITtscGraphApplication {
   /**
-   * Resolve TypeScript code evidence without shell search.
+   * Find, trace, and inspect TypeScript code evidence from the graph.
    *
-   * Use this for TypeScript code questions, including locating files, symbols,
-   * dependencies, implementation bodies, and line anchors. Do not use shell
-   * search/read commands to find or verify TypeScript code while this graph can
-   * answer with symbols, source bodies, and sourceSpan anchors.
+   * Use this first for TypeScript code questions. It locates files, symbols,
+   * dependency paths, implementation bodies, and sourceSpan line anchors from
+   * the resident TypeScript graph, so shell search or file reads are usually
+   * unnecessary for code evidence.
    *
-   * Explain the next graph step in `thinking`, then choose one `request.type`:
-   * find entrypoints, lookup symbols, trace dependencies, inspect selected
-   * symbols, or summarize the project.
+   * In `thinking`, decide the smallest next graph step and the evidence needed
+   * to stop. Then choose one `request.type`: find entrypoints, lookup symbols,
+   * trace dependencies, inspect selected symbols, or summarize the project.
    *
-   * Keep broad dependency mapping and source-body reads separate. Ask for
-   * source only when a selected implementation body decides the answer. Use
-   * returned sourceSpan anchors for citations instead of shell line-number
-   * checks.
+   * Keep result slices small. Prefer defaults, and raise `limit`,
+   * `neighborLimit`, or `maxNodes` only after a previous graph result was
+   * truncated or ambiguous. Keep broad dependency maps and source-body reads in
+   * separate calls; ask for `source: true` only for decisive leaf bodies. Use
+   * returned sourceSpan anchors instead of shell line-number checks.
    *
    * @param props The reasoning and selected graph request
    * @returns The selected graph result, tagged with the request type
    */
-  inspect_typescript_code_evidence_without_shell_search(
+  inspect_typescript_code_graph_evidence(
     props: ITtscGraphApplication.IProps,
   ): ITtscGraphApplication.IResult;
 }
@@ -43,12 +44,13 @@ export namespace ITtscGraphApplication {
     /**
      * Think before choosing the graph operation.
      *
-     * State what the code question needs, which graph request is the next
-     * smallest step, and why shell search is not needed for that TypeScript
-     * evidence. If source is needed, name the one or two leaf bodies to read
-     * through the graph and why summaries are not enough. If a package script,
-     * config file, or generated artifact is tempting, say why it is outside or
-     * inside the user's TypeScript code question.
+     * State the user's code question, the smallest graph request that advances
+     * it, the stop condition for this call, and why shell search is not needed
+     * for this TypeScript evidence. If source is needed, name the one or two
+     * leaf bodies to read through the graph and why signatures, trace steps, or
+     * dependency summaries are not enough. If a package script, config file, or
+     * generated artifact is tempting, say why it is outside or inside the
+     * user's TypeScript code question.
      */
     thinking: string;
 
@@ -80,12 +82,18 @@ export namespace ITtscGraphApplication {
     /**
      * Maximum ranked hits to return.
      *
+     * Keep the default for the first pass. Raise it only when the prior result
+     * was truncated or did not contain enough distinct candidates.
+     *
      * @default 8
      */
     limit?: number;
 
     /**
      * Maximum direct dependencies and dependents to return per indexed symbol.
+     *
+     * This is orientation, not a dump. Keep the default unless the answer needs
+     * more direct neighbors from an already chosen symbol.
      *
      * @default 4
      */
@@ -112,6 +120,9 @@ export namespace ITtscGraphApplication {
 
     /**
      * Maximum hits to return.
+     *
+     * Keep the default for broad or natural-language lookup. Raise it only
+     * after a too-small or ambiguous prior result.
      *
      * @default 12
      */
@@ -161,6 +172,9 @@ export namespace ITtscGraphApplication {
     /**
      * Maximum reached nodes before truncation.
      *
+     * Prefer the default for open traces. For "how does A reach B" questions,
+     * pass `to` instead of raising this cap.
+     *
      * @default 30
      */
     maxNodes?: number;
@@ -187,6 +201,9 @@ export namespace ITtscGraphApplication {
     /**
      * Return direct dependencies and dependents.
      *
+     * Use this for a selected symbol's immediate graph context. Do not combine
+     * it with `source: true`; source reads intentionally ignore neighbors.
+     *
      * @default false
      */
     neighbors?: boolean;
@@ -194,12 +211,18 @@ export namespace ITtscGraphApplication {
     /**
      * Maximum dependencies and dependents per side.
      *
+     * Keep the default unless a prior neighbor slice was truncated or too
+     * ambiguous.
+     *
      * @default 6
      */
     neighborLimit?: number;
 
     /**
      * Return the declaration or implementation source body.
+     *
+     * Use only after a handle is selected and the implementation body is needed
+     * to answer. Prefer one or two method/function handles, not containers.
      *
      * @default false
      */

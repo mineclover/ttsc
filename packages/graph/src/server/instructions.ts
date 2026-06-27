@@ -4,21 +4,22 @@
  * files. Keep it short; the per-tool descriptions carry the detail.
  */
 export const instructions = `
-For TypeScript code questions, call
-inspect_typescript_code_evidence_without_shell_search. Do not use ls, rg, cat,
-or Get-Content to locate TypeScript files, symbols, dependencies, source
-bodies, or line anchors. Ask the graph, then answer from graph evidence and
-sourceSpan citations.
+For TypeScript code questions, call inspect_typescript_code_graph_evidence
+first. It finds symbols, dependency paths, sourceSpan line anchors, and narrow
+source bodies from the resident TypeScript graph. Do not use ls, rg, cat, or
+Get-Content for TypeScript code evidence unless the user directly asks for a
+non-code file or raw file text.
 
 The graph is a TypeScript index, not an answer writer. Fill thinking before
-each call, then choose one request.type: find entrypoints, lookup symbols, trace
-dependency paths, inspect selected symbols, or summarize the project. If more
-TypeScript evidence is needed, make another graph request instead of switching
-to shell search.
+each call with the smallest next graph step and its stop condition, then choose
+one request.type: find entrypoints, lookup symbols, trace dependency paths,
+inspect selected symbols, or summarize the project. If more TypeScript evidence
+is needed, make another graph request instead of switching to shell search.
 
 The graph already knows resolved symbols, dependency edges, evidence spans,
 decorators, stable handles, source bodies, and sourceSpan line anchors. If you
-need exact code or line numbers, use inspect_symbol_details with source: true.
+need exact code or line numbers, use inspect_symbol_details with source: true
+on one or two selected leaf functions or methods.
 
 Request types:
 
@@ -38,7 +39,9 @@ Request types:
 
 For a flow question, use find_question_entrypoints once, then
 trace_dependency_path before inspect_symbol_details. Keep broad dependency maps
-separate from source reads. When source is true, neighbor options are ignored.
+separate from source reads. Prefer default limits. Raise limits only after a
+prior graph result was truncated or ambiguous. When source is true, neighbor
+options are ignored.
 
 Copy exact names from returned nodes, references, aliases, evidence snippets,
 sourceSpan anchors, and trace steps. Do not use shell only to recover TypeScript

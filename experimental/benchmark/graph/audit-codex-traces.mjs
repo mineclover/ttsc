@@ -29,6 +29,7 @@ const singleGraphToolNames = new Set([
   "query_typescript_graph",
   "inspect_typescript_graph_before_shell_reading",
   "inspect_typescript_code_evidence_without_shell_search",
+  "inspect_typescript_code_graph_evidence",
 ]);
 
 if (truthy(args["self-test"])) {

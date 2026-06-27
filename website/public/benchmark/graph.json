@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-27T20:13:57.640Z",
+  "generatedAt": "2026-06-27T20:20:51.776Z",
   "structural": null,
   "agent": {
     "cells": [
@@ -1282,17 +1282,17 @@
           "baseline": [],
           "graph": [
             {
-              "tokens": 84164,
-              "cached": 59904,
-              "reasoning": 2355,
-              "tokensWithReasoning": 86519,
+              "tokens": 76486,
+              "cached": 51200,
+              "reasoning": 3643,
+              "tokensWithReasoning": 80129,
               "turns": 1,
               "usage": [
                 {
-                  "input": 80635,
-                  "cachedInput": 59904,
-                  "output": 3529,
-                  "reasoning": 2355
+                  "input": 71662,
+                  "cachedInput": 51200,
+                  "output": 4824,
+                  "reasoning": 3643
                 }
               ],
               "tools": 3,
@@ -1302,10 +1302,10 @@
               "sourceTouches": 0,
               "shellCommands": [],
               "types": {
-                "agent_message": 5,
+                "agent_message": 4,
                 "mcp_tool_call": 3
               },
-              "durMs": 108374,
+              "durMs": 103898,
               "ok": true,
               "error": "",
               "promptId": "vscode-dedicated-v1",
@@ -1386,36 +1386,36 @@
           "baseline": [],
           "graph": [
             {
-              "tokens": 159050,
-              "cached": 113664,
-              "reasoning": 5449,
-              "tokensWithReasoning": 164499,
+              "tokens": 95159,
+              "cached": 67584,
+              "reasoning": 6120,
+              "tokensWithReasoning": 101279,
               "turns": 1,
               "usage": [
                 {
-                  "input": 151672,
-                  "cachedInput": 113664,
-                  "output": 7378,
-                  "reasoning": 5449
+                  "input": 87516,
+                  "cachedInput": 67584,
+                  "output": 7643,
+                  "reasoning": 6120
                 }
               ],
-              "tools": 7,
+              "tools": 4,
               "shell": 0,
-              "graph": 7,
+              "graph": 4,
               "web": 0,
               "sourceTouches": 0,
               "shellCommands": [],
               "types": {
-                "agent_message": 6,
-                "mcp_tool_call": 7
+                "agent_message": 5,
+                "mcp_tool_call": 4
               },
-              "durMs": 144576,
+              "durMs": 118141,
               "ok": true,
               "error": "",
               "promptId": "nestjs-dedicated-v1",
               "questionSha256": "f6ec52290aaa5aa55db6d6ebc9dccbb1319cbdd2440da53a5569716d30e42675",
               "run": 1,
-              "attempts": 1
+              "attempts": 2
             }
           ]
         }
@@ -1490,17 +1490,17 @@
           "baseline": [],
           "graph": [
             {
-              "tokens": 135350,
-              "cached": 94720,
-              "reasoning": 3150,
-              "tokensWithReasoning": 138500,
+              "tokens": 135284,
+              "cached": 95232,
+              "reasoning": 3248,
+              "tokensWithReasoning": 138532,
               "turns": 1,
               "usage": [
                 {
-                  "input": 130376,
-                  "cachedInput": 94720,
-                  "output": 4974,
-                  "reasoning": 3150
+                  "input": 130240,
+                  "cachedInput": 95232,
+                  "output": 5044,
+                  "reasoning": 3248
                 }
               ],
               "tools": 6,
@@ -1513,7 +1513,7 @@
                 "agent_message": 6,
                 "mcp_tool_call": 6
               },
-              "durMs": 115383,
+              "durMs": 93008,
               "ok": true,
               "error": "",
               "promptId": "vue-dedicated-v1",
@@ -1542,30 +1542,30 @@
           "baseline": [],
           "graph": [
             {
-              "tokens": 167175,
-              "cached": 117760,
-              "reasoning": 4536,
-              "tokensWithReasoning": 171711,
+              "tokens": 161233,
+              "cached": 125952,
+              "reasoning": 3039,
+              "tokensWithReasoning": 164272,
               "turns": 1,
               "usage": [
                 {
-                  "input": 160664,
-                  "cachedInput": 117760,
-                  "output": 6511,
-                  "reasoning": 4536
+                  "input": 156599,
+                  "cachedInput": 125952,
+                  "output": 4634,
+                  "reasoning": 3039
                 }
               ],
-              "tools": 8,
+              "tools": 6,
               "shell": 0,
-              "graph": 8,
+              "graph": 6,
               "web": 0,
               "sourceTouches": 0,
               "shellCommands": [],
               "types": {
-                "agent_message": 8,
-                "mcp_tool_call": 8
+                "agent_message": 4,
+                "mcp_tool_call": 6
               },
-              "durMs": 114503,
+              "durMs": 81534,
               "ok": true,
               "error": "",
               "promptId": "zod-dedicated-v1",
@@ -1854,17 +1854,17 @@
           "baseline": [],
           "graph": [
             {
-              "tokens": 182450,
-              "cached": 132608,
-              "reasoning": 5376,
-              "tokensWithReasoning": 187826,
+              "tokens": 161143,
+              "cached": 114176,
+              "reasoning": 5145,
+              "tokensWithReasoning": 166288,
               "turns": 1,
               "usage": [
                 {
-                  "input": 175042,
-                  "cachedInput": 132608,
-                  "output": 7408,
-                  "reasoning": 5376
+                  "input": 153613,
+                  "cachedInput": 114176,
+                  "output": 7530,
+                  "reasoning": 5145
                 }
               ],
               "tools": 6,
@@ -1877,7 +1877,7 @@
                 "agent_message": 6,
                 "mcp_tool_call": 6
               },
-              "durMs": 120824,
+              "durMs": 122853,
               "ok": true,
               "error": "",
               "promptId": "typeorm-dedicated-v1",
@@ -1906,30 +1906,30 @@
           "baseline": [],
           "graph": [
             {
-              "tokens": 140359,
-              "cached": 99840,
-              "reasoning": 4178,
-              "tokensWithReasoning": 144537,
+              "tokens": 109180,
+              "cached": 65536,
+              "reasoning": 4341,
+              "tokensWithReasoning": 113521,
               "turns": 1,
               "usage": [
                 {
-                  "input": 134083,
-                  "cachedInput": 99840,
-                  "output": 6276,
-                  "reasoning": 4178
+                  "input": 103491,
+                  "cachedInput": 65536,
+                  "output": 5689,
+                  "reasoning": 4341
                 }
               ],
-              "tools": 6,
+              "tools": 4,
               "shell": 0,
-              "graph": 6,
+              "graph": 4,
               "web": 0,
               "sourceTouches": 0,
               "shellCommands": [],
               "types": {
-                "agent_message": 5,
-                "mcp_tool_call": 6
+                "agent_message": 4,
+                "mcp_tool_call": 4
               },
-              "durMs": 111411,
+              "durMs": 94949,
               "ok": true,
               "error": "",
               "promptId": "shopping-backend-dedicated-v1",

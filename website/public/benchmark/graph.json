@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-27T19:42:16.254Z",
+  "generatedAt": "2026-06-27T19:57:35.533Z",
   "structural": null,
   "agent": {
     "cells": [
@@ -1958,30 +1958,30 @@
           "baseline": [],
           "graph": [
             {
-              "tokens": 1028038,
-              "cached": 919552,
-              "reasoning": 19941,
-              "tokensWithReasoning": 1047979,
+              "tokens": 613100,
+              "cached": 532480,
+              "reasoning": 17793,
+              "tokensWithReasoning": 630893,
               "turns": 1,
               "usage": [
                 {
-                  "input": 1001829,
-                  "cachedInput": 919552,
-                  "output": 26209,
-                  "reasoning": 19941
+                  "input": 590553,
+                  "cachedInput": 532480,
+                  "output": 22547,
+                  "reasoning": 17793
                 }
               ],
-              "tools": 22,
+              "tools": 17,
               "shell": 0,
-              "graph": 22,
+              "graph": 17,
               "web": 0,
               "sourceTouches": 0,
               "shellCommands": [],
               "types": {
-                "agent_message": 15,
-                "mcp_tool_call": 22
+                "agent_message": 9,
+                "mcp_tool_call": 17
               },
-              "durMs": 420824,
+              "durMs": 374883,
               "ok": true,
               "error": "",
               "promptId": "vue-common-v1",

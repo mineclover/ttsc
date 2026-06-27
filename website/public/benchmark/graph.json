@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-27T20:20:51.776Z",
+  "generatedAt": "2026-06-27T20:38:20.514Z",
   "structural": null,
   "agent": {
     "cells": [
@@ -1230,30 +1230,30 @@
           "baseline": [],
           "graph": [
             {
-              "tokens": 660484,
-              "cached": 523776,
-              "reasoning": 19160,
-              "tokensWithReasoning": 679644,
+              "tokens": 520389,
+              "cached": 436224,
+              "reasoning": 15504,
+              "tokensWithReasoning": 535893,
               "turns": 1,
               "usage": [
                 {
-                  "input": 632307,
-                  "cachedInput": 523776,
-                  "output": 28177,
-                  "reasoning": 19160
+                  "input": 499356,
+                  "cachedInput": 436224,
+                  "output": 21033,
+                  "reasoning": 15504
                 }
               ],
-              "tools": 38,
+              "tools": 17,
               "shell": 0,
-              "graph": 38,
+              "graph": 17,
               "web": 0,
               "sourceTouches": 0,
               "shellCommands": [],
               "types": {
                 "agent_message": 13,
-                "mcp_tool_call": 38
+                "mcp_tool_call": 17
               },
-              "durMs": 467727,
+              "durMs": 339346,
               "ok": true,
               "error": "",
               "promptId": "excalidraw-common-v1",
@@ -1334,30 +1334,30 @@
           "baseline": [],
           "graph": [
             {
-              "tokens": 442056,
-              "cached": 364032,
-              "reasoning": 12695,
-              "tokensWithReasoning": 454751,
+              "tokens": 388533,
+              "cached": 318464,
+              "reasoning": 14627,
+              "tokensWithReasoning": 403160,
               "turns": 1,
               "usage": [
                 {
-                  "input": 424466,
-                  "cachedInput": 364032,
-                  "output": 17590,
-                  "reasoning": 12695
+                  "input": 368911,
+                  "cachedInput": 318464,
+                  "output": 19622,
+                  "reasoning": 14627
                 }
               ],
-              "tools": 13,
+              "tools": 11,
               "shell": 0,
-              "graph": 13,
+              "graph": 11,
               "web": 0,
               "sourceTouches": 0,
               "shellCommands": [],
               "types": {
-                "agent_message": 7,
-                "mcp_tool_call": 13
+                "agent_message": 13,
+                "mcp_tool_call": 11
               },
-              "durMs": 334164,
+              "durMs": 340346,
               "ok": true,
               "error": "",
               "promptId": "vscode-common-v1",
@@ -1594,36 +1594,36 @@
           "baseline": [],
           "graph": [
             {
-              "tokens": 359381,
-              "cached": 258560,
-              "reasoning": 18851,
-              "tokensWithReasoning": 378232,
+              "tokens": 349074,
+              "cached": 268288,
+              "reasoning": 14502,
+              "tokensWithReasoning": 363576,
               "turns": 1,
               "usage": [
                 {
-                  "input": 336866,
-                  "cachedInput": 258560,
-                  "output": 22515,
-                  "reasoning": 18851
+                  "input": 329897,
+                  "cachedInput": 268288,
+                  "output": 19177,
+                  "reasoning": 14502
                 }
               ],
-              "tools": 10,
+              "tools": 16,
               "shell": 0,
-              "graph": 10,
+              "graph": 16,
               "web": 0,
               "sourceTouches": 0,
               "shellCommands": [],
               "types": {
-                "agent_message": 5,
-                "mcp_tool_call": 10
+                "agent_message": 9,
+                "mcp_tool_call": 16
               },
-              "durMs": 338921,
+              "durMs": 308480,
               "ok": true,
               "error": "",
               "promptId": "zod-common-v1",
               "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
               "run": 1,
-              "attempts": 2
+              "attempts": 1
             }
           ]
         }

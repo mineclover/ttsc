@@ -523,6 +523,8 @@ async function runCodex(question, codexHome, armName, runNumber) {
     [
       "exec",
       "--json",
+      "-c",
+      "tools.web_search=false",
       "--disable",
       "browser_use",
       "--disable",
@@ -679,15 +681,15 @@ function validateArmSample(sample, armName) {
     sample.invalid = "graph-web-used";
     sample.error = "graph arm used web search instead of graph tools";
   }
-  if (armName === "graph" && sample.ok && sample.graph === 0) {
-    sample.ok = false;
-    sample.invalid = "graph-mcp-not-used";
-    sample.error = "graph arm completed without MCP tool calls";
-  }
   if (armName === "graph" && sample.ok && sample.shell > 0) {
     sample.ok = false;
     sample.invalid = "graph-shell-used";
     sample.error = "graph arm used shell commands instead of graph tools";
+  }
+  if (armName === "graph" && sample.ok && sample.graph === 0) {
+    sample.ok = false;
+    sample.invalid = "graph-mcp-not-used";
+    sample.error = "graph arm completed without MCP tool calls";
   }
   return sample;
 }

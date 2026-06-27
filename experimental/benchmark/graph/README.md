@@ -56,8 +56,8 @@ node experimental/benchmark/graph/agent-ab.mjs --repo=typeorm --repo-dir=/abs/pa
 `questions/manifest.json` is the source of truth for benchmark prompts: each entry pins a question `.md`, the repo, fixture branch, tsconfig, and the question's SHA-256. Select one with `--prompt-id=<id>` (or `--prompt-family=<family>`, scoped to `--repo` when given); the harness loads that `.md` as the user prompt, verifies the SHA against the manifest, and records `promptId` and `questionSha256` on each sample and on the report.
 
 ```bash
-node experimental/benchmark/graph/agent-ab.mjs --prompt-id=typeorm-overview-v1 --runs=4
-node experimental/benchmark/graph/agent-ab.mjs --prompt-family=overview --repo=typeorm --runs=4
+node experimental/benchmark/graph/agent-ab.mjs --prompt-id=typeorm-dedicated-v1 --runs=4
+node experimental/benchmark/graph/agent-ab.mjs --prompt-family=common --repo=typeorm --runs=4
 ```
 
 Each sample captures the agent's final answer text (`answer`) — for Claude the `result` event's `result` string, falling back to the last assistant prose; for codex the last `agent_message`. The runner records that text for manual review, but it does not score answers in-process. A baseline cell is accepted only after its raw logs and final answer are inspected against the task.
@@ -68,7 +68,7 @@ A cross-model companion, `agent-ab-codex.mjs`, drives OpenAI's codex through a m
 
 ```bash
 node experimental/benchmark/graph/agent-ab-codex.mjs --repo=excalidraw --runs=4
-node experimental/benchmark/graph/agent-ab-codex.mjs --prompt-id=typeorm-overview-v1 --runs=4
+node experimental/benchmark/graph/agent-ab-codex.mjs --prompt-id=typeorm-dedicated-v1 --runs=4
 ```
 
 ## Publish (`publish.mjs`)

@@ -42,23 +42,11 @@ const prompt = (repo, family, file, meta) => ({
 
 const prompts = [];
 for (const [repo, meta] of Object.entries(REPOS)) {
-  const dedicated = `${repo}/dedicated.md`;
+  const dedicated = `${repo}.md`;
   if (has(dedicated)) prompts.push(prompt(repo, "dedicated", dedicated, meta));
-  else console.warn(`warning: ${repo} has no dedicated.md; skipped`);
+  else console.warn(`warning: ${repo} has no ${dedicated}; skipped`);
 
   prompts.push(prompt(repo, "common", "common.md", meta));
-}
-
-if (has("typeorm/overview.md")) {
-  prompts.push({
-    id: "typeorm-overview-v1",
-    repo: "typeorm",
-    family: "overview",
-    file: "typeorm/overview.md",
-    fixtureBranch: "ttsc",
-    tsconfig: "tsconfig.json",
-    questionSha256: sha("typeorm/overview.md"),
-  });
 }
 
 const manifest = { schemaVersion: 1, prompts };

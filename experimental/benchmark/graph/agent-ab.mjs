@@ -26,10 +26,9 @@
 // `claude` and `go` on PATH, and a built `@ttsc/graph` (packages/graph/lib).
 //
 // Usage:
-//   node experimental/benchmark/graph/agent-ab.mjs --repo=excalidraw --runs=2
-//   node experimental/benchmark/graph/agent-ab.mjs --repo=vscode --runs=4 --model=opus
-//   node experimental/benchmark/graph/agent-ab.mjs --prompt-id=typeorm-overview-v1 --runs=2
-//   node experimental/benchmark/graph/agent-ab.mjs --repo=typeorm --repo-dir=experimental/benchmark/.work/ttsc-benchmark-typeorm@ttsc
+//   node experimental/benchmark/graph/agent-ab.mjs --prompt-family=dedicated --repo=excalidraw --runs=2
+//   node experimental/benchmark/graph/agent-ab.mjs --prompt-family=common --repo=vscode --runs=4 --model=opus
+//   node experimental/benchmark/graph/agent-ab.mjs --prompt-id=typeorm-dedicated-v1 --runs=2
 import cp from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -40,19 +39,6 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..", "..");
 const ttscDir = path.join(repoRoot, "packages", "ttsc");
 const graphLauncher = path.join(repoRoot, "packages", "graph", "lib", "bin.js");
-// The question per repo, in codegraph's agent-eval style: a specific "how does
-// this concrete mechanism work" trace that names a real public API. A narrow,
-// mechanism-level question is what makes the comparison bite: a reader must dig
-// deep through the layers to answer it, while one targeted graph query pins the
-// cluster. resolveQuestion prefers an explicit --prompt-id (manifest-driven),
-// then an explicit override, then a per-repo file (questions/<repo>.md), then the
-// generic fallback.
-const ARCHITECTURE_QUESTION = fs
-  .readFileSync(
-    path.join(here, "questions", "architecture-callpath.md"),
-    "utf8",
-  )
-  .trim();
 
 // The manifest (questions/manifest.json) selects reusable prompt files. The
 // benchmark records runtime metrics only: tokens, tools, cost, and time.
@@ -93,64 +79,48 @@ function resolveManifestPrompt(args) {
   };
 }
 
-function resolveQuestion(repoKey) {
-  if (process.env.TTSC_BENCH_QUESTION_FILE)
-    return fs.readFileSync(process.env.TTSC_BENCH_QUESTION_FILE, "utf8").trim();
-  const perRepo = path.join(here, "questions", `${repoKey}.md`);
-  if (fs.existsSync(perRepo)) return fs.readFileSync(perRepo, "utf8").trim();
-  return ARCHITECTURE_QUESTION;
-}
-
-// TypeScript benchmark repos and their medium-difficulty questions.
+// TypeScript benchmark repos and their fixture metadata.
 const REPOS = {
   excalidraw: {
     url: "https://github.com/excalidraw/excalidraw",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-excalidraw.git",
     fixtureBranch: "ttsc",
     tsconfig: "tsconfig.json",
-    question: ARCHITECTURE_QUESTION,
   },
   vscode: {
     url: "https://github.com/microsoft/vscode",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-vscode.git",
     tsconfig: "src/tsconfig.json",
-    question: ARCHITECTURE_QUESTION,
   },
   nestjs: {
     url: "https://github.com/nestjs/nest",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-nestjs.git",
     tsconfig: "tsconfig.json",
-    question: ARCHITECTURE_QUESTION,
   },
   vue: {
     url: "https://github.com/vuejs/core",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-vue.git",
     tsconfig: "tsconfig.json",
-    question: ARCHITECTURE_QUESTION,
   },
   zod: {
     url: "https://github.com/colinhacks/zod",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-zod.git",
     tsconfig: "tsconfig.json",
-    question: ARCHITECTURE_QUESTION,
   },
   typeorm: {
     url: "https://github.com/typeorm/typeorm",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-typeorm.git",
     tsconfig: "tsconfig.json",
-    question: ARCHITECTURE_QUESTION,
   },
   rxjs: {
     url: "https://github.com/ReactiveX/rxjs",
     fixtureUrl: "https://github.com/samchon/ttsc-benchmark-rxjs.git",
     tsconfig: "tsconfig.json",
-    question: ARCHITECTURE_QUESTION,
   },
   "shopping-backend": {
     url: "https://github.com/samchon/shopping-backend",
     fixtureUrl: "https://github.com/samchon/shopping-backend.git",
     tsconfig: "tsconfig.json",
-    question: ARCHITECTURE_QUESTION,
   },
 };
 
@@ -169,14 +139,15 @@ const runs = Number(args.runs ?? 2);
 const model = args.model ?? "sonnet";
 const tsconfig =
   args.tsconfig ?? manifestPrompt?.entry.tsconfig ?? spec.tsconfig;
-const question =
-  args.question ?? manifestPrompt?.text ?? resolveQuestion(repoKey);
+const question = args.question ?? manifestPrompt?.text;
 const promptId = manifestPrompt?.entry.id;
 const promptFamily =
-  manifestPrompt?.entry.family ??
-  args["prompt-family"] ??
-  (args.question ? "custom" : "project-specific");
-if (!question) throw new Error(`repo ${repoKey} has no benchmark question`);
+  manifestPrompt?.entry.family ?? (args.question ? "custom" : undefined);
+if (!question) {
+  throw new Error(
+    "benchmark question required; pass --prompt-id, --prompt-family, or --question",
+  );
+}
 
 const fixtureBranch =
   args["fixture-branch"] ??

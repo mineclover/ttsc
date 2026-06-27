@@ -12,8 +12,7 @@
 //
 // The MCP server is the @ttsc/graph TypeScript launcher (packages/graph/lib/bin.js),
 // which runs `ttscgraph dump` once for the project (the Go binary is dump-only now)
-// and serves graph_index / graph_overview / graph_query / graph_trace /
-// graph_expand over stdio.
+// and serves one planned graph-inspection tool over stdio.
 // Tool guidance comes from the server's MCP descriptions; the user prompt is the
 // manifest question verbatim, tool-neutral, so the token comparison stays honest —
 // no graph-specific instruction is prepended.
@@ -367,7 +366,7 @@ const thunks = arms.flatMap((arm) =>
       `  ${arm.name.padEnd(8)} run ${r + 1}: ${m.tokens} tok` +
         (m.reasoning ? ` (+${m.reasoning} reasoning)` : "") +
         `, ${m.tools} tools ` +
-        `(shell ${m.shell}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
+        `(shell ${m.shell}, graph ${m.graph}, web ${m.web ?? 0}), ${(m.durMs / 1000).toFixed(0)}s` +
         (m.ok ? "" : `  [FAILED${m.error ? `: ${m.error}` : ""}]`),
     );
   }),
@@ -524,6 +523,18 @@ async function runCodex(question, codexHome, armName, runNumber) {
     [
       "exec",
       "--json",
+      "-c",
+      "tools.web_search=false",
+      "--disable",
+      "browser_use",
+      "--disable",
+      "browser_use_external",
+      "--disable",
+      "standalone_web_search",
+      "--disable",
+      "web_search_request",
+      "--disable",
+      "web_search_cached",
       "--dangerously-bypass-approvals-and-sandbox",
       "--skip-git-repo-check",
       "--ephemeral",
@@ -592,6 +603,7 @@ function parseStream(text, durMs) {
     tools = 0,
     shell = 0,
     graph = 0,
+    web = 0,
     completed = false,
     answered = false,
     answer = "";
@@ -629,6 +641,9 @@ function parseStream(text, durMs) {
       } else if (t === "command_execution") {
         tools++;
         shell++;
+      } else if (t === "web_search") {
+        tools++;
+        web++;
       } else if (t === "agent_message") {
         answered = true;
         // codex emits intermediate agent_message items; the last one carrying
@@ -647,6 +662,7 @@ function parseStream(text, durMs) {
     tools,
     shell,
     graph,
+    web,
     types,
     durMs,
     ok: completed && answered,
@@ -660,15 +676,20 @@ function parseStream(text, durMs) {
 }
 
 function validateArmSample(sample, armName) {
-  if (armName === "graph" && sample.ok && sample.graph === 0) {
+  if (armName === "graph" && sample.ok && sample.web > 0) {
     sample.ok = false;
-    sample.invalid = "graph-mcp-not-used";
-    sample.error = "graph arm completed without MCP tool calls";
+    sample.invalid = "graph-web-used";
+    sample.error = "graph arm used web search instead of graph tools";
   }
   if (armName === "graph" && sample.ok && sample.shell > 0) {
     sample.ok = false;
     sample.invalid = "graph-shell-used";
     sample.error = "graph arm used shell commands instead of graph tools";
+  }
+  if (armName === "graph" && sample.ok && sample.graph === 0) {
+    sample.ok = false;
+    sample.invalid = "graph-mcp-not-used";
+    sample.error = "graph arm completed without MCP tool calls";
   }
   return sample;
 }

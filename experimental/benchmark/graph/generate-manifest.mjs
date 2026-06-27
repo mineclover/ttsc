@@ -19,13 +19,13 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const qDir = path.join(here, "questions");
 
-// Per-repo build metadata. excalidraw runs upstream (codegraph's own repo, no
-// @ttsc fixture); the rest use the samchon ttsc-branch fixture.
+// Per-repo build metadata. Each graph fixture uses the samchon ttsc branch
+// fixture so graph runs share the prepared benchmark repos.
 // Each fixture's tsconfig for the graph dump. rxjs ships only a graph-tuned
 // `tsconfig.graph.json`; vscode's program root is `src/tsconfig.json`; the rest
 // load from the root `tsconfig.json`.
 const REPOS = {
-  excalidraw: { tsconfig: "tsconfig.json" },
+  excalidraw: { tsconfig: "tsconfig.json", fixtureBranch: "ttsc" },
   vscode: { tsconfig: "src/tsconfig.json", fixtureBranch: "ttsc" },
   nestjs: { tsconfig: "tsconfig.json", fixtureBranch: "ttsc" },
   vue: { tsconfig: "tsconfig.json", fixtureBranch: "ttsc" },

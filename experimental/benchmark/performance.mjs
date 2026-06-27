@@ -655,13 +655,26 @@ function pnpmProjectCommand(root, command) {
 }
 
 function yarnCommand(args) {
-  return `${process.platform === "win32" ? "corepack yarn" : "yarn"} ${args}`;
+  return `${yarnExecutable()} ${args}`;
+}
+
+function yarnExecutable() {
+  return process.platform === "win32" ? "corepack yarn" : "yarn";
+}
+
+function resolveYarnCommand(cmd) {
+  if (process.platform !== "win32" || !/^yarn\b/.test(cmd)) return cmd;
+  return cmd.replace(/^yarn\b/, yarnExecutable());
 }
 
 function commandForProject(cmd, root) {
-  if (!/^pnpm\b/.test(cmd) || ownsPnpmWorkspace(root)) return cmd;
-  if (/^pnpm\s+--ignore-workspace\b/.test(cmd)) return cmd;
-  return cmd.replace(/^pnpm\b/, "pnpm --ignore-workspace");
+  let resolved = cmd;
+  if (/^pnpm\b/.test(resolved) && !ownsPnpmWorkspace(root)) {
+    if (!/^pnpm\s+--ignore-workspace\b/.test(resolved)) {
+      resolved = resolved.replace(/^pnpm\b/, "pnpm --ignore-workspace");
+    }
+  }
+  return resolveYarnCommand(resolved);
 }
 
 function hrtimeMs(start) {
@@ -909,10 +922,12 @@ function setupClone(project, branch) {
       }
 
       for (const step of normalizeSteps(project.prerequisites ?? [])) {
+        const cwd = path.resolve(dir, step.cwd ?? ".");
+        const cmd = commandForProject(step.cmd, dir);
         process.stdout.write(
-          `${project.repoName}@${branch}: prerequisite ${step.cmd}\n`,
+          `${project.repoName}@${branch}: prerequisite ${cmd}\n`,
         );
-        sh(step.cmd, path.resolve(dir, step.cwd ?? "."), {
+        sh(cmd, cwd, {
           env: step.env ? { ...process.env, ...step.env } : process.env,
           quiet: true,
           label: `prerequisite ${project.repoName}@${branch}`,

@@ -4,25 +4,41 @@
  * files. Keep it short; the per-tool descriptions carry the detail.
  */
 export const instructions = `
-This TypeScript project is indexed by the compiler. Use the graph as the first
-source of codebase coordinates: it has already resolved symbols and the
-relationships between them.
+Use the graph tools as a staged TypeScript index, not as an answer writer. Get
+handles with question_entrypoints or symbol_lookup, trace relationships with
+dependency_path, inspect selected symbols with symbol_details, and read source
+only for the few bodies whose logic decides the answer. Keep source reads
+separate from dependency maps. Use shell reads only when the graph lacks the
+needed non-TypeScript file, generated output, or literal text.
 
-- graph_index: first call for source questions. It returns ranked symbols,
-  declaration signatures, directly mentioned code handles, and nearby dependency
-  context without source bodies.
-- graph_overview: the architecture, layers, hotspots, and public API.
-- graph_query: find any symbol by name or description; each hit carries its
-  signature, usually enough to answer without expanding. Use next.expand when
-  you need bodies.
-- graph_trace: follow a flow forward, reverse, or to its impact; or give dotted
-  from/to names for the path between two symbols, how A reaches B, in one call.
-- graph_expand: a symbol's declared shape, its signature, and a container's
-  members; source:true to read a specific TypeScript body after graph_index,
-  graph_query, or graph_trace has located it.
+The graph already knows resolved symbols, edges, evidence spans, decorators,
+and stable handles. Prefer it before shell-reading TypeScript source.
 
-Answer in as few calls as you can. For TypeScript declarations, read source with
-graph_expand(source:true) on the resolved handles. Use shell or file reads only
-for a non-TypeScript file, generated output, or an exact literal text search that
-is not represented as symbols or edges.
+- question_entrypoints: first call for a natural-language code question. Use it
+  once to get ranked starting symbols, direct mentions, and a small dependency
+  orientation slice without source bodies.
+- symbol_lookup: targeted symbol search. Use when you need a specific class,
+  method, function, property, or type and do not already have its handle.
+- dependency_path: dependency and call/type flow. Use it for "how A reaches B",
+  lifecycle, request-flow, rendering-flow, validation-flow, and impact questions.
+- symbol_details: selected symbol details. Use it for signatures, members,
+  direct calls, direct types, dependency neighbors, and the few source bodies
+  whose implementation decides the answer. It does not write answer text.
+- project_overview: project-wide architecture map. Use for layers, hotspots,
+  counts, and public API; not for a specific code question.
+
+For a flow question, call question_entrypoints once, then dependency_path before
+symbol_details. Read source only for the one or two leaf bodies whose logic is
+needed.
+
+Do not batch source:true across a path. Use symbol_details(neighbors:true)
+without source to map dependencies; use symbol_details(source:true) without
+neighbors to read bodies. When source is true, neighbor options are ignored.
+
+Copy exact names from returned nodes, references, aliases, evidence snippets,
+and trace steps. Prefer graph evidence and sourceSpan line anchors over shell
+reads for citations.
+
+Package scripts, config files, generated output, and exact text searches remain
+valid shell/file-read cases because they are outside the symbol graph.
 `.trim();

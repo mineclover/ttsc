@@ -17,7 +17,7 @@
       "file": "common.md",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
+      "questionSha256": "6f1150d95e978c5539569f0a3ba8d9f9ab800491c2e3541c5589e2ac4e83c355"
     },
     {
       "id": "vscode-dedicated-v1",
@@ -35,7 +35,7 @@
       "file": "common.md",
       "fixtureBranch": "ttsc",
       "tsconfig": "src/tsconfig.json",
-      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
+      "questionSha256": "6f1150d95e978c5539569f0a3ba8d9f9ab800491c2e3541c5589e2ac4e83c355"
     },
     {
       "id": "nestjs-dedicated-v1",
@@ -53,7 +53,7 @@
       "file": "common.md",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
+      "questionSha256": "6f1150d95e978c5539569f0a3ba8d9f9ab800491c2e3541c5589e2ac4e83c355"
     },
     {
       "id": "vue-dedicated-v1",
@@ -71,7 +71,7 @@
       "file": "common.md",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
+      "questionSha256": "6f1150d95e978c5539569f0a3ba8d9f9ab800491c2e3541c5589e2ac4e83c355"
     },
     {
       "id": "zod-dedicated-v1",
@@ -89,7 +89,7 @@
       "file": "common.md",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
+      "questionSha256": "6f1150d95e978c5539569f0a3ba8d9f9ab800491c2e3541c5589e2ac4e83c355"
     },
     {
       "id": "typeorm-dedicated-v1",
@@ -107,7 +107,7 @@
       "file": "common.md",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
+      "questionSha256": "6f1150d95e978c5539569f0a3ba8d9f9ab800491c2e3541c5589e2ac4e83c355"
     },
     {
       "id": "rxjs-dedicated-v1",
@@ -125,7 +125,7 @@
       "file": "common.md",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.graph.json",
-      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
+      "questionSha256": "6f1150d95e978c5539569f0a3ba8d9f9ab800491c2e3541c5589e2ac4e83c355"
     },
     {
       "id": "shopping-backend-dedicated-v1",
@@ -143,7 +143,7 @@
       "file": "common.md",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
+      "questionSha256": "6f1150d95e978c5539569f0a3ba8d9f9ab800491c2e3541c5589e2ac4e83c355"
     },
     {
       "id": "typeorm-overview-v1",

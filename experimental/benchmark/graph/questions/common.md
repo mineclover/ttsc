@@ -1,7 +1,5 @@
-I just joined this TypeScript project and want to understand how it actually works under the hood.
+I just joined this TypeScript project and need to make a cross-cutting change without breaking the main runtime path.
 
-Pick the single most central exported API or entry point and trace what happens when it runs: how the call travels from that public entry, through the internal layers, down to where the real work happens.
+First identify the public entry points and the internal modules that appear to be reused most across the project. From that, choose the central user-facing operation whose implementation crosses the important layers, and trace it end to end down to the lowest layer where real work happens.
 
-Name the files and symbols it passes through, in order, and how each step leads to the next.
-
-Keep it a focused walk-through of that one path, not a summary of the whole project. Do not guess; report gaps.
+Name concrete files and symbols for the entry point, each hop, each layer boundary, and two plausible paths you considered but ruled out. Keep it concise; do not guess, report gaps.

@@ -353,7 +353,8 @@ function publishWebsiteReports(reports) {
     .filter((report) => fs.existsSync(report))
     .map((report) =>
       websiteCellFromReport(JSON.parse(fs.readFileSync(report, "utf8"))),
-    );
+    )
+    .filter(Boolean);
   if (cells.length === 0) return;
   const prior = fs.existsSync(websiteJson)
     ? JSON.parse(fs.readFileSync(websiteJson, "utf8"))
@@ -380,6 +381,8 @@ function publishWebsiteReports(reports) {
 function websiteCellFromReport(data) {
   const resolvedModel = data.model ?? "unknown";
   const tool = reportTool(data);
+  const samples = sanitizeSamples(data.samples);
+  if (samples.baseline.length === 0 && samples.graph.length === 0) return null;
   return {
     harness:
       data.harness ??
@@ -396,7 +399,7 @@ function websiteCellFromReport(data) {
     daemon: data.daemon === true,
     runs: data.runs,
     question: data.question,
-    samples: sanitizeSamples(data.samples),
+    samples,
   };
 }
 
@@ -419,9 +422,15 @@ function agentLabel(resolvedModel) {
 
 function sanitizeSamples(samples) {
   return {
-    baseline: (samples?.baseline ?? []).map(sanitizeSample),
-    graph: (samples?.graph ?? []).map(sanitizeSample),
+    baseline: (samples?.baseline ?? [])
+      .filter(validSample)
+      .map(sanitizeSample),
+    graph: (samples?.graph ?? []).filter(validSample).map(sanitizeSample),
   };
+}
+
+function validSample(sample) {
+  return sample?.ok !== false;
 }
 
 function sanitizeSample(sample) {

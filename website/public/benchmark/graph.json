@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-27T19:18:45.915Z",
+  "generatedAt": "2026-06-27T19:42:16.254Z",
   "structural": null,
   "agent": {
     "cells": [
@@ -1829,6 +1829,162 @@
               "ok": true,
               "error": "",
               "promptId": "shopping-backend-common-v1",
+              "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "typeorm",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "typeorm-dedicated-v1",
+        "promptFamily": "dedicated",
+        "questionSha256": "5ebd172c576bf445ef2b7efb80e41e299704deb12c177231c985d5385d25ff57",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "How does TypeORM's `Repository.find` translate `relations` find options into SQL joins via the query builder?",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 182450,
+              "cached": 132608,
+              "reasoning": 5376,
+              "tokensWithReasoning": 187826,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 175042,
+                  "cachedInput": 132608,
+                  "output": 7408,
+                  "reasoning": 5376
+                }
+              ],
+              "tools": 6,
+              "shell": 0,
+              "graph": 6,
+              "web": 0,
+              "sourceTouches": 0,
+              "shellCommands": [],
+              "types": {
+                "agent_message": 6,
+                "mcp_tool_call": 6
+              },
+              "durMs": 120824,
+              "ok": true,
+              "error": "",
+              "promptId": "typeorm-dedicated-v1",
+              "questionSha256": "5ebd172c576bf445ef2b7efb80e41e299704deb12c177231c985d5385d25ff57",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "shopping-backend",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "shopping-backend-dedicated-v1",
+        "promptFamily": "dedicated",
+        "questionSha256": "4235cabedc0c64497d9207c8f8e6b090344a27c505fbe281d303ebb1782bf4c4",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "How does publishing an order flow from ShoppingCustomerOrderPublishController.create through ShoppingOrderPublishProvider to the Prisma database write?",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 140359,
+              "cached": 99840,
+              "reasoning": 4178,
+              "tokensWithReasoning": 144537,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 134083,
+                  "cachedInput": 99840,
+                  "output": 6276,
+                  "reasoning": 4178
+                }
+              ],
+              "tools": 6,
+              "shell": 0,
+              "graph": 6,
+              "web": 0,
+              "sourceTouches": 0,
+              "shellCommands": [],
+              "types": {
+                "agent_message": 5,
+                "mcp_tool_call": 6
+              },
+              "durMs": 111411,
+              "ok": true,
+              "error": "",
+              "promptId": "shopping-backend-dedicated-v1",
+              "questionSha256": "4235cabedc0c64497d9207c8f8e6b090344a27c505fbe281d303ebb1782bf4c4",
+              "run": 1,
+              "attempts": 1
+            }
+          ]
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "ttsc-graph",
+        "repo": "vue",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "vue-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "I just joined this TypeScript project and have been asked to change behavior on the busiest user-facing path, but I do not yet know which exported API or entry point is the right place to start.\n\nOrient me from the code before choosing the path: identify the public entry points that look user-facing, the internal modules or types they converge on, and the symbols that appear to be reused by several parts of the project. From that evidence, choose one central runtime operation whose implementation crosses the important layers.\n\nTrace that operation in order from the public entry point through the orchestration, state/model, adapter, or engine layers down to the lowest layer where real work happens. For each hop, name the file and symbol, and say how it reaches the next hop: direct call, callback, dependency injection, inheritance, dispatch, or data flow.\n\nAlso name two plausible entry points or modules you considered but ruled out, and explain why they are adjacent but not the main path. End with the smallest set of source ranges I should read before editing and one risk that would be easy to miss if I only followed direct calls.\n\nDo not guess; report gaps.",
+        "samples": {
+          "baseline": [],
+          "graph": [
+            {
+              "tokens": 1028038,
+              "cached": 919552,
+              "reasoning": 19941,
+              "tokensWithReasoning": 1047979,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 1001829,
+                  "cachedInput": 919552,
+                  "output": 26209,
+                  "reasoning": 19941
+                }
+              ],
+              "tools": 22,
+              "shell": 0,
+              "graph": 22,
+              "web": 0,
+              "sourceTouches": 0,
+              "shellCommands": [],
+              "types": {
+                "agent_message": 15,
+                "mcp_tool_call": 22
+              },
+              "durMs": 420824,
+              "ok": true,
+              "error": "",
+              "promptId": "vue-common-v1",
               "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
               "run": 1,
               "attempts": 1

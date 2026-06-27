@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-27T18:25:12.206Z",
+  "generatedAt": "2026-06-27T18:39:22.563Z",
   "structural": null,
   "agent": {
     "cells": [
@@ -571,6 +571,590 @@
               "questionSha256": "f6ec52290aaa5aa55db6d6ebc9dccbb1319cbdd2440da53a5569716d30e42675",
               "run": 1,
               "attempts": 2
+            }
+          ],
+          "graph": []
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "baseline",
+        "repo": "excalidraw",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "excalidraw-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "I just joined this TypeScript project and have been asked to change behavior on the busiest user-facing path, but I do not yet know which exported API or entry point is the right place to start.\n\nOrient me from the code before choosing the path: identify the public entry points that look user-facing, the internal modules or types they converge on, and the symbols that appear to be reused by several parts of the project. From that evidence, choose one central runtime operation whose implementation crosses the important layers.\n\nTrace that operation in order from the public entry point through the orchestration, state/model, adapter, or engine layers down to the lowest layer where real work happens. For each hop, name the file and symbol, and say how it reaches the next hop: direct call, callback, dependency injection, inheritance, dispatch, or data flow.\n\nAlso name two plausible entry points or modules you considered but ruled out, and explain why they are adjacent but not the main path. End with the smallest set of source ranges I should read before editing and one risk that would be easy to miss if I only followed direct calls.\n\nDo not guess; report gaps.",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 2464263,
+              "cached": 2200064,
+              "reasoning": 19115,
+              "tokensWithReasoning": 2483378,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 2435170,
+                  "cachedInput": 2200064,
+                  "output": 29093,
+                  "reasoning": 19115
+                }
+              ],
+              "tools": 78,
+              "shell": 78,
+              "graph": 0,
+              "web": 0,
+              "sourceTouches": 77,
+              "shellCommands": [
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export const ExcalidrawAPIProvider|const ExcalidrawBase|export const Excalidraw =|export \\\\{\\\\s*getSceneVersion|export function useExcalidrawStateValue|export \\\\{ _useOnAppStateChange as useOnExcalidrawStateChange \\\\}\\\" packages\\\\excalidraw\\\\index.tsx\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export const InitializeApp\\\" packages\\\\excalidraw\\\\components\\\\InitializeApp.tsx\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export class Store|public commit\\\\(|public scheduleAction\\\\(|public scheduleMicroAction\\\\(|public clear\\\\(|export class StoreDelta|export class StoreSnapshot\\\" packages\\\\element\\\\src\\\\store.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class App extends React.Component|public updateScene = withBatchedUpdates|public syncActionResult = withBatchedUpdates|private onPointerMoveFromPointerDownHandler|private maybeDragNewGenericElement|private maybeHandleResize|private onPointerUpFromPointerDownHandler\\\" packages\\\\excalidraw\\\\components\\\\App.tsx\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export const mutateElement|export const newElementWith|export const bumpVersion\\\" packages\\\\element\\\\src\\\\mutateElement.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export class Scene|replaceAllElements\\\\(|mutateElement\\\\(\\\" packages\\\\element\\\\src\\\\Scene.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export const transformElements\\\" packages\\\\element\\\\src\\\\resizeElements.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export const dragSelectedElements|export const dragNewElement\\\" packages\\\\element\\\\src\\\\dragElements.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export class ActionManager|handleKeyDown\\\\(|executeAction\\\\(|renderAction\\\" packages\\\\excalidraw\\\\actions\\\\manager.tsx\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export class History|public record\\\\(|public undo\\\\(|public redo\\\\(|private perform\\\\(\\\" packages\\\\excalidraw\\\\history.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"this\\\\.store\\\\.commit\\\\(|this\\\\.store\\\\.onDurableIncrementEmitter\\\\.on\\\\(|this\\\\.scene\\\\.onUpdate\\\\(|componentDidUpdate\\\\(\\\" packages\\\\excalidraw\\\\components\\\\App.tsx\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"constructor\\\\(props: AppProps\\\\)|this\\\\.actionManager = new ActionManager|this\\\\.scene = new Scene\\\\(|this\\\\.store = new Store\\\\(|this\\\\.history = new History\\\\(|this\\\\.renderer = new Renderer\\\\(\\\" packages\\\\excalidraw\\\\components\\\\App.tsx\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"scene\\\\.mutateElement\\\\(|bindOrUnbindBindingElement\\\\(|LinearElementEditor\\\\.handlePointerUp\\\\(|captureUpdate: CaptureUpdateAction.IMMEDIATELY\\\" packages\\\\excalidraw\\\\actions\\\\actionFinalize.tsx\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"ReactDOM|createRoot|<Excalidraw|App\\\" excalidraw-app\\\\index.tsx excalidraw-app\\\\App.tsx\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content excalidraw-app\\\\index.tsx\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content excalidraw-app\\\\App.tsx | Select-Object -First 200\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"const ExcalidrawApp =|<Excalidraw |<ExcalidrawAPIProvider|export default ExcalidrawApp\\\" excalidraw-app\\\\App.tsx\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"createRoot\\\\(|<ExcalidrawApp />|registerSW\\\\(\\\" excalidraw-app\\\\index.tsx\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"<Excalidraw\\\" excalidraw-app\\\\App.tsx\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"executeAction<T extends Action>\\\" packages\\\\excalidraw\\\\actions\\\\manager.tsx\""
+              ],
+              "types": {
+                "agent_message": 13,
+                "command_execution": 78
+              },
+              "durMs": 490710,
+              "ok": true,
+              "error": "",
+              "promptId": "excalidraw-common-v1",
+              "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+              "run": 1,
+              "attempts": 1
+            }
+          ],
+          "graph": []
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "baseline",
+        "repo": "vscode",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "vscode-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "I just joined this TypeScript project and have been asked to change behavior on the busiest user-facing path, but I do not yet know which exported API or entry point is the right place to start.\n\nOrient me from the code before choosing the path: identify the public entry points that look user-facing, the internal modules or types they converge on, and the symbols that appear to be reused by several parts of the project. From that evidence, choose one central runtime operation whose implementation crosses the important layers.\n\nTrace that operation in order from the public entry point through the orchestration, state/model, adapter, or engine layers down to the lowest layer where real work happens. For each hop, name the file and symbol, and say how it reaches the next hop: direct call, callback, dependency injection, inheritance, dispatch, or data flow.\n\nAlso name two plausible entry points or modules you considered but ruled out, and explain why they are adjacent but not the main path. End with the smallest set of source ranges I should read before editing and one risk that would be easy to miss if I only followed direct calls.\n\nDo not guess; report gaps.",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 2394694,
+              "cached": 1897984,
+              "reasoning": 23457,
+              "tokensWithReasoning": 2418151,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 2357927,
+                  "cachedInput": 1897984,
+                  "output": 36767,
+                  "reasoning": 23457
+                }
+              ],
+              "tools": 80,
+              "shell": 80,
+              "graph": 0,
+              "web": 0,
+              "sourceTouches": 79,
+              "shellCommands": [
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/platform/windows/electron-main/windowsMainService.ts'\n\"'$lines = Get-Content $path\nfor($i=726; $i -le 741; $i++){ '\"'{0}:{1}' -f \"'$i, $lines[$i-1] }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/workbench/services/textfile/common/textFileEditorModel.ts'\n\"'$lines = Get-Content $path\nforeach($i in 286,287,292,301,453,675){ '\"'{0}:{1}' -f \"'$i, $lines[$i-1] }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/workbench/services/textfile/common/textEditorService.ts'\n\"'$lines = Get-Content $path\nfor($i=109; $i -le 183; $i++){ '\"'{0}:{1}' -f \"'$i, $lines[$i-1] }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/platform/files/common/diskFileSystemProviderClient.ts'\n\"'$lines = Get-Content $path\nforeach($i in 26,95,101){ '\"'{0}:{1}' -f \"'$i, $lines[$i-1] }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/workbench/services/textfile/common/textFileEditorModelManager.ts'\n\"'$lines = Get-Content $path\nfor($i=353; $i -le 423; $i++){ '\"'{0}:{1}' -f \"'$i, $lines[$i-1] }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/platform/files/electron-main/diskFileSystemProviderServer.ts'\n\"'$lines = Get-Content $path\nforeach($i in 21,27,76){ '\"'{0}:{1}' -f \"'$i, $lines[$i-1] }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/platform/files/node/diskFileSystemProvider.ts'\n\"'$lines = Get-Content $path\nforeach($i in 205,219,233,236){ '\"'{0}:{1}' -f \"'$i, $lines[$i-1] }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"registerSingleton|SyncDescriptor|export \\\\{ main as workbenchMain \\\\}|export \\\\* from\\\" src/vs/workbench/workbench.desktop.main.ts src/vs/workbench/workbench.common.main.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/workbench/workbench.desktop.main.ts'\n\"'$lines = Get-Content $path\nfor($i=1; $i -le 130; $i++){ '\"'{0}:{1}' -f \"'$i, $lines[$i-1] }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/workbench/workbench.common.main.ts'\n\"'$lines = Get-Content $path\nfor($i=1; $i -le 260; $i++){ if($lines[$i-1] -match '\"'registerSingleton|SyncDescriptor') { '{0}:{1}' -f \"'$i, $lines[$i-1] } }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/workbench/workbench.desktop.main.ts'\n\"'$lines = Get-Content $path\nfor($i=1; $i -le 140; $i++){ if($lines[$i-1] -match '\"'registerSingleton|SyncDescriptor|main as') { '{0}:{1}' -f \"'$i, $lines[$i-1] } }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/code/node/cli.ts'\n\"'$lines = Get-Content $path\nfor($i=43; $i -le 150; $i++){ if($i -le 70 -or $i -ge 124 -and $i -le 148) { '\"'{0}:{1}' -f \"'$i, $lines[$i-1] } }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/workbench/workbench.desktop.main.ts'\n\"'$lines = Get-Content $path\nfor($i=1; $i -le 30; $i++){ '\"'{0}:{1}' -f \"'$i, $lines[$i-1] }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"registerProvider\\\\(Schemas\\\\.file|DiskFileSystemProvider\\\" src/vs/workbench/electron-browser/desktop.main.ts src/vs/workbench/services/files/electron-browser/diskFileSystemProvider.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/workbench/electron-browser/desktop.main.ts'\n\"'$lines = Get-Content $path\nfor($i=1; $i -le 220; $i++){ if($lines[$i-1] -match '\"'registerProvider\\\\(Schemas\\\\.file|DiskFileSystemProvider|fileService') { '{0}:{1}' -f \"'$i, $lines[$i-1] } }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/workbench/services/files/electron-browser/diskFileSystemProvider.ts'\n\"'$lines = Get-Content $path\nfor($i=1; $i -le 120; $i++){ if($lines[$i-1] -match '\"'class DiskFileSystemProvider|registerProvider|DiskFileSystemProviderClient|readFile\\\\(|readFileStream\\\\(') { '{0}:{1}' -f \"'$i, $lines[$i-1] } }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"LOCAL_FILE_SYSTEM_CHANNEL_NAME|DiskFileSystemProviderChannel|registerChannel|register\\\\(.*localFilesystem\\\" src/vs/code/electron-main/app.ts src/vs/platform/files/electron-main/diskFileSystemProviderServer.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/code/electron-main/app.ts'\n\"'$lines = Get-Content $path\nfor($i=1260; $i -le 1280; $i++){ '\"'{0}:{1}' -f \"'$i, $lines[$i-1] }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/platform/files/electron-main/diskFileSystemProviderServer.ts'\n\"'$lines = Get-Content $path\nfor($i=1; $i -le 80; $i++){ '\"'{0}:{1}' -f \"'$i, $lines[$i-1] }\n'\"'@ | powershell -NoProfile -Command -\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"@'\n\"'$path = '\"'src/vs/platform/files/common/diskFileSystemProviderClient.ts'\n\"'$lines = Get-Content $path\nfor($i=1; $i -le 120; $i++){ '\"'{0}:{1}' -f \"'$i, $lines[$i-1] }\n'\"'@ | powershell -NoProfile -Command -\""
+              ],
+              "types": {
+                "agent_message": 17,
+                "command_execution": 80
+              },
+              "durMs": 655143,
+              "ok": true,
+              "error": "",
+              "promptId": "vscode-common-v1",
+              "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+              "run": 1,
+              "attempts": 1
+            }
+          ],
+          "graph": []
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "baseline",
+        "repo": "nestjs",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "nestjs-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "I just joined this TypeScript project and have been asked to change behavior on the busiest user-facing path, but I do not yet know which exported API or entry point is the right place to start.\n\nOrient me from the code before choosing the path: identify the public entry points that look user-facing, the internal modules or types they converge on, and the symbols that appear to be reused by several parts of the project. From that evidence, choose one central runtime operation whose implementation crosses the important layers.\n\nTrace that operation in order from the public entry point through the orchestration, state/model, adapter, or engine layers down to the lowest layer where real work happens. For each hop, name the file and symbol, and say how it reaches the next hop: direct call, callback, dependency injection, inheritance, dispatch, or data flow.\n\nAlso name two plausible entry points or modules you considered but ruled out, and explain why they are adjacent but not the main path. End with the smallest set of source ranges I should read before editing and one risk that would be easy to miss if I only followed direct calls.\n\nDo not guess; report gaps.",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 1734838,
+              "cached": 1534976,
+              "reasoning": 22742,
+              "tokensWithReasoning": 1757580,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 1701746,
+                  "cachedInput": 1534976,
+                  "output": 33092,
+                  "reasoning": 22742
+                }
+              ],
+              "tools": 84,
+              "shell": 84,
+              "graph": 0,
+              "web": 0,
+              "sourceTouches": 84,
+              "shellCommands": [
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"new NestContainer\\\\(|new ApplicationConfig\\\\(|new NestApplication\\\\(|new NestApplicationContext\\\\(\\\" packages\\\\core\\\\nest-factory.ts packages\\\\core\\\\nest-application.ts packages\\\\core\\\\nest-application-context.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class ApplicationConfig|setGlobalPrefix\\\\(|getGlobalPrefix\\\\(|enableVersioning\\\\(|getVersioning\\\\(\\\" packages\\\\core\\\\application-config.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export function Controller\\\\(|Reflect\\\\.defineMetadata\\\\(CONTROLLER_WATERMARK|Reflect\\\\.defineMetadata\\\\(PATH_METADATA\\\" packages\\\\common\\\\decorators\\\\core\\\\controller.decorator.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export const RequestMapping|export const Post|export const Get|export const Body|export const Param|export const Response\\\" packages\\\\common\\\\decorators\\\\http\\\\request-mapping.decorator.ts packages\\\\common\\\\decorators\\\\http\\\\route-params.decorator.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"loadPerContext\\\\(\\\" packages\\\\core\\\\injector\\\\injector.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class Injector\\\" packages\\\\core\\\\injector\\\\injector.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"loadPerContext\\\\(\\\" packages\\\\core\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content sample\\\\01-cats-app\\\\src\\\\main.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content sample\\\\10-fastify\\\\src\\\\main.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"public create\\\\(|public getMetadata\\\\(|public createHandleResponseFn\\\\(|public exchangeKeysForValues\\\\(\\\" packages\\\\core\\\\router\\\\router-execution-context.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"private applyCallbackToRouter\\\\(|public explore\\\\(|public extractRouterPath\\\\(|public applyPathsToRouterProxy\\\\(\\\" packages\\\\core\\\\router\\\\router-explorer.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"public scanForPaths\\\\(|public exploreMethodMetadata\\\\(\\\" packages\\\\core\\\\router\\\\paths-explorer.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"public reply\\\\(|public status\\\\(|public end\\\\(|public setHeader\\\\(\\\" packages\\\\platform-express\\\\adapters\\\\express-adapter.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"public apply\\\\(|public redirect\\\\(|public render\\\\(|public sse\\\\(\\\" packages\\\\core\\\\router\\\\router-response-controller.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"public explore\\\\(\\\" packages\\\\core\\\\router\\\\router-explorer.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"explore<|applyCallbackToRouter|createRequestScopedHandler|createCallbackProxy|routerMethodRef\\\" packages\\\\core\\\\router\\\\router-explorer.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class RoutePathFactory|public create\\\\(|public getVersion\\\\(\\\" packages\\\\core\\\\router\\\\route-path-factory.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class RouterMethodFactory|new RouterMethodFactory|get\\\\(\\\" packages\\\\core\\\\helpers\\\\router-method-factory.ts packages\\\\platform-express\\\\adapters\\\\express-adapter.ts packages\\\\core\\\\router\\\\router-explorer.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\core\\\\router\\\\route-path-factory.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\core\\\\helpers\\\\router-method-factory.ts\""
+              ],
+              "types": {
+                "agent_message": 13,
+                "command_execution": 84
+              },
+              "durMs": 543656,
+              "ok": true,
+              "error": "",
+              "promptId": "nestjs-common-v1",
+              "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+              "run": 1,
+              "attempts": 1
+            }
+          ],
+          "graph": []
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "baseline",
+        "repo": "vue",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "vue-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "I just joined this TypeScript project and have been asked to change behavior on the busiest user-facing path, but I do not yet know which exported API or entry point is the right place to start.\n\nOrient me from the code before choosing the path: identify the public entry points that look user-facing, the internal modules or types they converge on, and the symbols that appear to be reused by several parts of the project. From that evidence, choose one central runtime operation whose implementation crosses the important layers.\n\nTrace that operation in order from the public entry point through the orchestration, state/model, adapter, or engine layers down to the lowest layer where real work happens. For each hop, name the file and symbol, and say how it reaches the next hop: direct call, callback, dependency injection, inheritance, dispatch, or data flow.\n\nAlso name two plausible entry points or modules you considered but ruled out, and explain why they are adjacent but not the main path. End with the smallest set of source ranges I should read before editing and one risk that would be easy to miss if I only followed direct calls.\n\nDo not guess; report gaps.",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 1189041,
+              "cached": 1056768,
+              "reasoning": 19901,
+              "tokensWithReasoning": 1208942,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 1161919,
+                  "cachedInput": 1056768,
+                  "output": 27122,
+                  "reasoning": 19901
+                }
+              ],
+              "tools": 56,
+              "shell": 56,
+              "graph": 0,
+              "web": 0,
+              "sourceTouches": 56,
+              "shellCommands": [
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\runtime-core\\\\src\\\\renderer.ts | Select-Object -Skip 1560 -First 90\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\runtime-core\\\\src\\\\renderer.ts | Select-Object -Skip 1380 -First 170\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\runtime-core\\\\src\\\\renderer.ts | Select-Object -Skip 1000 -First 120\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\runtime-core\\\\src\\\\renderer.ts | Select-Object -Skip 820 -First 120\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\server-renderer\\\\src\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export .*renderToString|export .*renderToWebStream|renderToString|renderToStream|pipeToWebWritable\\\" packages\\\\server-renderer\\\\src\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\runtime-test\\\\src\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\vue\\\\package.json | Select-String -Pattern 'exports|server-renderer|compiler-sfc|jsx-runtime|index.mjs|index.js' -Context 0,2\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export \\\\{ renderToString|renderToWebStream|pipeToWebWritable|export type \\\\{ SSRContext \\\\}\\\" packages\\\\server-renderer\\\\src\\\\index.ts packages\\\\server-renderer\\\\src\\\\renderToString.ts packages\\\\server-renderer\\\\src\\\\renderToStream.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export \\\\* from '@vue/runtime-dom'|export const compile|registerRuntimeCompiler|compileToFunction\\\" packages\\\\vue\\\\src\\\\index.ts packages\\\\vue\\\\src\\\\runtime.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export const render|export const createApp|renderToString\\\\(|createRenderer\\\\(\\\" packages\\\\runtime-test\\\\src\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export const nodeOps|insertStaticContent\\\\(|createElement:|insert:|remove:\\\" packages\\\\runtime-dom\\\\src\\\\nodeOps.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export function patchDOMProp|export function patchAttr|export function patchClass|export function patchStyle|export function patchEvent\\\" packages\\\\runtime-dom\\\\src\\\\modules\\\\props.ts packages\\\\runtime-dom\\\\src\\\\modules\\\\attrs.ts packages\\\\runtime-dom\\\\src\\\\modules\\\\class.ts packages\\\\runtime-dom\\\\src\\\\modules\\\\style.ts packages\\\\runtime-dom\\\\src\\\\modules\\\\events.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export function createVNode|export const createVNode\\\" packages\\\\runtime-core\\\\src\\\\vnode.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export function renderComponentRoot|export function shouldUpdateComponent\\\" packages\\\\runtime-core\\\\src\\\\componentRenderUtils.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export class ReactiveEffect|queueJob|effect.scheduler\\\" packages\\\\reactivity\\\\src\\\\effect.ts packages\\\\runtime-core\\\\src\\\\renderer.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"createRenderer|createHydrationRenderer|RootRenderFunction|RendererOptions|ComponentInternalInstance|VNode\\\" packages\\\\runtime-core\\\\src\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"createRenderer|createApp|render|patchProp|nodeOps\\\" packages\\\\runtime-test\\\\src\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export function renderComponentRoot|export function shouldUpdateComponent\\\" packages\\\\runtime-core\\\\src\\\\componentRenderUtils.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export function queueJob|export function render|export function nextTick\\\" packages\\\\runtime-core\\\\src\\\\scheduler.ts\""
+              ],
+              "types": {
+                "agent_message": 10,
+                "command_execution": 56
+              },
+              "durMs": 437325,
+              "ok": true,
+              "error": "",
+              "promptId": "vue-common-v1",
+              "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+              "run": 1,
+              "attempts": 1
+            }
+          ],
+          "graph": []
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "baseline",
+        "repo": "zod",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "zod-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "I just joined this TypeScript project and have been asked to change behavior on the busiest user-facing path, but I do not yet know which exported API or entry point is the right place to start.\n\nOrient me from the code before choosing the path: identify the public entry points that look user-facing, the internal modules or types they converge on, and the symbols that appear to be reused by several parts of the project. From that evidence, choose one central runtime operation whose implementation crosses the important layers.\n\nTrace that operation in order from the public entry point through the orchestration, state/model, adapter, or engine layers down to the lowest layer where real work happens. For each hop, name the file and symbol, and say how it reaches the next hop: direct call, callback, dependency injection, inheritance, dispatch, or data flow.\n\nAlso name two plausible entry points or modules you considered but ruled out, and explain why they are adjacent but not the main path. End with the smallest set of source ranges I should read before editing and one risk that would be easy to miss if I only followed direct calls.\n\nDo not guess; report gaps.",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 1877557,
+              "cached": 1729536,
+              "reasoning": 20237,
+              "tokensWithReasoning": 1897794,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 1848920,
+                  "cachedInput": 1729536,
+                  "output": 28637,
+                  "reasoning": 20237
+                }
+              ],
+              "tools": 63,
+              "shell": 63,
+              "graph": 0,
+              "web": 0,
+              "sourceTouches": 62,
+              "shellCommands": [
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\core\\\\checks.ts | Select-Object -Skip 720 -First 180\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n 'import \\\\* as z from \\\"\\\\.\\\\/v4\\\\/classic\\\\/external\\\\.js\\\"|export \\\\* from \\\"\\\\.\\\\/v4\\\\/classic\\\\/external\\\\.js\\\"|export \\\\{ z \\\\};|export default z' packages\\\\zod\\\\src\\\\index.ts packages\\\\zod\\\\src\\\\v4\\\\index.ts packages\\\\zod\\\\src\\\\v4\\\\classic\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n 'export \\\\* as core from \\\"\\\\.\\\\.\\\\/core\\\\/index\\\\.js\\\"|export \\\\* from \\\"\\\\.\\\\/parse\\\\.js\\\"|config\\\\(en\\\\(\\\\)\\\\)' packages\\\\zod\\\\src\\\\v4\\\\classic\\\\external.ts packages\\\\zod\\\\src\\\\v4\\\\mini\\\\external.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n 'export function string\\\\(|export function number\\\\(|export function object\\\\(|export function array\\\\(|export const ZodString:|export const ZodObject:|export const ZodArray:' packages\\\\zod\\\\src\\\\v4\\\\classic\\\\schemas.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\classic\\\\schemas.ts | Select-Object -Skip 430 -First 80\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\classic\\\\schemas.ts | Select-Object -Skip 730 -First 40\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\classic\\\\schemas.ts | Select-Object -Skip 655 -First 20\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\classic\\\\schemas.ts | Select-Object -Skip 1735 -First 50\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\classic\\\\schemas.ts | Select-Object -Skip 286 -First 45\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\core\\\\schemas.ts | Select-Object -Skip 203 -First 130\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\core\\\\schemas.ts | Select-Object -Skip 382 -First 28\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n 'export function minLength|export function maxLength|export function length|export function regex|export function includes|export function startsWith|export function endsWith|export function string\\\\(|export function number\\\\(' packages\\\\zod\\\\src\\\\v4\\\\core\\\\api.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\core\\\\api.ts | Select-Object -Skip 620 -First 150\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\core\\\\api.ts | Select-Object -Skip 930 -First 140\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n 'export function _minLength|export function _maxLength|export function _length|export function _minSize|export function _maxSize|export function _size' packages\\\\zod\\\\src\\\\v4\\\\core\\\\api.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\core\\\\api.ts | Select-Object -Skip 1210 -First 60\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\core\\\\checks.ts | Select-Object -Skip 690 -First 70\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n 'export \\\\* from \\\"\\\\.\\\\/core\\\\/index\\\\.js\\\"|export \\\\* from \\\"\\\\.\\\\/parse\\\\.js\\\"|export \\\\* from \\\"\\\\.\\\\/schemas\\\\.js\\\"|export default z|export \\\\{ z \\\\}' packages\\\\zod\\\\src\\\\v4\\\\core\\\\index.ts packages\\\\zod\\\\src\\\\v4\\\\mini\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\core\\\\index.ts | Select-Object -First 30\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\zod\\\\src\\\\v4\\\\mini\\\\index.ts | Select-Object -First 20\""
+              ],
+              "types": {
+                "agent_message": 11,
+                "command_execution": 63
+              },
+              "durMs": 478889,
+              "ok": true,
+              "error": "",
+              "promptId": "zod-common-v1",
+              "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+              "run": 1,
+              "attempts": 1
+            }
+          ],
+          "graph": []
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "baseline",
+        "repo": "typeorm",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "typeorm-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "I just joined this TypeScript project and have been asked to change behavior on the busiest user-facing path, but I do not yet know which exported API or entry point is the right place to start.\n\nOrient me from the code before choosing the path: identify the public entry points that look user-facing, the internal modules or types they converge on, and the symbols that appear to be reused by several parts of the project. From that evidence, choose one central runtime operation whose implementation crosses the important layers.\n\nTrace that operation in order from the public entry point through the orchestration, state/model, adapter, or engine layers down to the lowest layer where real work happens. For each hop, name the file and symbol, and say how it reaches the next hop: direct call, callback, dependency injection, inheritance, dispatch, or data flow.\n\nAlso name two plausible entry points or modules you considered but ruled out, and explain why they are adjacent but not the main path. End with the smallest set of source ranges I should read before editing and one risk that would be easy to miss if I only followed direct calls.\n\nDo not guess; report gaps.",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 1219858,
+              "cached": 998400,
+              "reasoning": 24535,
+              "tokensWithReasoning": 1244393,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 1187537,
+                  "cachedInput": 998400,
+                  "output": 32321,
+                  "reasoning": 24535
+                }
+              ],
+              "tools": 59,
+              "shell": 59,
+              "graph": 0,
+              "web": 0,
+              "sourceTouches": 58,
+              "shellCommands": [
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n 'export \\\\* from \\\"\\\\.\\\\/entity-manager\\\\/EntityManager\\\"|export \\\\* from \\\"\\\\.\\\\/repository\\\\/Repository\\\"|export \\\\{ DataSource \\\\}|export \\\\{ ConnectionOptionsReader \\\\}' src\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n 'class BaseEntity|save\\\\(options\\\\?: SaveOptions\\\\)|static getRepository|static save<T extends BaseEntity>' src\\\\repository\\\\BaseEntity.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n 'save<T extends DeepPartial<Entity>>|return new EntityPersistExecutor|remove<Entity extends ObjectLiteral>|softRemove<Entity extends ObjectLiteral>|recover<Entity extends ObjectLiteral>' src\\\\entity-manager\\\\EntityManager.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n 'save<T extends DeepPartial<Entity>>|remove\\\\(|find\\\\(|findOne\\\\(|insert\\\\(|update\\\\(|upsert\\\\(' src\\\\repository\\\\Repository.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n 'getRepository<Entity extends ObjectLiteral>|createQueryRunner\\\\(|createEntityManager\\\\(' src\\\\data-source\\\\DataSource.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class Subject\\\\b|constructor\\\\(|mustBeInserted|mustBeUpdated|mustBeRemoved|mustBeSoftRemoved|mustBeRecovered\\\" src\\\\persistence\\\\Subject.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"executeInsertOperations\\\\(|executeUpdateOperations\\\\(|executeRemoveOperations\\\\(|executeSoftRemoveOperations\\\\(|executeRecoverOperations\\\\(\\\" src\\\\persistence\\\\SubjectExecutor.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"new Subject\\\\(|new CascadesSubjectBuilder|new SubjectDatabaseEntityLoader|new OneToManySubjectBuilder|new OneToOneInverseSideSubjectBuilder|new ManyToManySubjectBuilder|new SubjectExecutor\\\" src\\\\persistence\\\\EntityPersistExecutor.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content src\\\\persistence\\\\SubjectExecutor.ts | Select-Object -Skip 350 -First 300\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content src\\\\query-builder\\\\InsertQueryBuilder.ts -TotalCount 240\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content src\\\\persistence\\\\Subject.ts | Select-Object -Skip 130 -First 90\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content src\\\\cli-ts-node-commonjs.ts -TotalCount 120\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content src\\\\cli.ts -TotalCount 200\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content src\\\\cli-ts-node-esm.ts -TotalCount 120\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"save<Entity extends ObjectLiteral>|return new EntityPersistExecutor\\\\(|remove<Entity extends ObjectLiteral>|softRemove<Entity extends ObjectLiteral>|recover<Entity extends ObjectLiteral>\\\" src\\\\entity-manager\\\\EntityManager.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class EntityPersistExecutor|async execute\\\\(|new Subject\\\\(|new SubjectExecutor\\\\(|new SubjectDatabaseEntityLoader\\\\(|new CascadesSubjectBuilder\\\\(\\\" src\\\\persistence\\\\EntityPersistExecutor.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class SubjectExecutor|async execute\\\\(|executeInsertOperations\\\\(|queryRunner\\\\.manager\\\\.createQueryBuilder\\\\(|queryRunner\\\\.query\\\\(\\\" src\\\\persistence\\\\SubjectExecutor.ts src\\\\query-builder\\\\InsertQueryBuilder.ts src\\\\query-builder\\\\UpdateQueryBuilder.ts src\\\\query-builder\\\\DeleteQueryBuilder.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"static save<T extends BaseEntity>|getRepository\\\\(\\\\): Repository|getRepository\\\\(\\\\)\\\\.save|getRepository\\\\(\\\\)\\\\.remove\\\" src\\\\repository\\\\BaseEntity.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"createEntityManager\\\\(|getRepository\\\\(|getTreeRepository\\\\(|getCustomRepository\\\\(\\\" src\\\\entity-manager\\\\EntityManager.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content src\\\\entity-manager\\\\EntityManager.ts | Select-Object -Skip 1528 -First 40\""
+              ],
+              "types": {
+                "agent_message": 7,
+                "command_execution": 59
+              },
+              "durMs": 516194,
+              "ok": true,
+              "error": "",
+              "promptId": "typeorm-common-v1",
+              "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+              "run": 1,
+              "attempts": 1
+            }
+          ],
+          "graph": []
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "baseline",
+        "repo": "rxjs",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "rxjs-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "I just joined this TypeScript project and have been asked to change behavior on the busiest user-facing path, but I do not yet know which exported API or entry point is the right place to start.\n\nOrient me from the code before choosing the path: identify the public entry points that look user-facing, the internal modules or types they converge on, and the symbols that appear to be reused by several parts of the project. From that evidence, choose one central runtime operation whose implementation crosses the important layers.\n\nTrace that operation in order from the public entry point through the orchestration, state/model, adapter, or engine layers down to the lowest layer where real work happens. For each hop, name the file and symbol, and say how it reaches the next hop: direct call, callback, dependency injection, inheritance, dispatch, or data flow.\n\nAlso name two plausible entry points or modules you considered but ruled out, and explain why they are adjacent but not the main path. End with the smallest set of source ranges I should read before editing and one risk that would be easy to miss if I only followed direct calls.\n\nDo not guess; report gaps.",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 641702,
+              "cached": 479744,
+              "reasoning": 15624,
+              "tokensWithReasoning": 657326,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 619246,
+                  "cachedInput": 479744,
+                  "output": 22456,
+                  "reasoning": 15624
+                }
+              ],
+              "tools": 50,
+              "shell": 50,
+              "graph": 0,
+              "web": 0,
+              "sourceTouches": 49,
+              "shellCommands": [
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class DocViewerComponent|@Input\\\\(\\\\)|render\\\\(|loadContainedCustomElements|swapViews\\\\(|docReady|docRendered\\\" apps\\\\rxjs.dev\\\\src\\\\app\\\\layout\\\\doc-viewer\\\\doc-viewer.component.ts apps\\\\rxjs.dev\\\\src\\\\app\\\\custom-elements\\\\elements-loader.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"bootstrap:|providers:|export class AppModule\\\" apps\\\\rxjs.dev\\\\src\\\\app\\\\app.module.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"locationService\\\\.handleAnchorClick|doSearch\\\\(|hideSearchResults\\\\(|currentDocument.subscribe|currentNodes.subscribe|navigationViews.subscribe|versionInfo.subscribe|combineLatest\\\\(\\\" apps\\\\rxjs.dev\\\\src\\\\app\\\\app.component.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"constructor\\\\(|@Input\\\\(|render\\\\(|swapViews\\\\(|loadContainedCustomElements|docReady\\\\.emit|docRendered\\\\.emit\\\" apps\\\\rxjs.dev\\\\src\\\\app\\\\layout\\\\doc-viewer\\\\doc-viewer.component.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"constructor\\\\(|loadContainedCustomElements\\\\(|loadCustomElement\\\\(|createCustomElement|customElements\\\\.define\\\" apps\\\\rxjs.dev\\\\src\\\\app\\\\custom-elements\\\\elements-loader.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"constructor\\\\(|this\\\\.navigationViews =|this\\\\.currentNodes =|this\\\\.versionInfo =|fetchNavigationInfo\\\\(|getCurrentNodes\\\\(\\\" apps\\\\rxjs.dev\\\\src\\\\app\\\\navigation\\\\navigation.service.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"constructor\\\\(|this\\\\.urlSubject\\\\.next|this\\\\.location\\\\.subscribe|go\\\\(|handleAnchorClick\\\\(\\\" apps\\\\rxjs.dev\\\\src\\\\app\\\\shared\\\\location.service.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"constructor\\\\(|this\\\\.currentDocument =|this\\\\.cache\\\\.set|this\\\\.http\\\\.get|catchError\\\\(|getFileNotFoundDoc|getErrorDoc\\\" apps\\\\rxjs.dev\\\\src\\\\app\\\\documents\\\\document.service.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export \\\\{|export type \\\\{|from '@rxjs/observable'|internal/Observable|operate|Subscription|Subscriber\\\" packages\\\\rxjs\\\\src\\\\index.ts packages\\\\rxjs\\\\src\\\\operators\\\\index.ts packages\\\\rxjs\\\\src\\\\testing\\\\index.ts packages\\\\rxjs\\\\src\\\\webSocket\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\rxjs\\\\src\\\\testing\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\rxjs\\\\src\\\\operators\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content packages\\\\rxjs\\\\src\\\\webSocket\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export \\\\{ Observable|export class Observable|operate|Subscriber|Subscription\\\" packages\\\\rxjs\\\\src packages\\\\observable -g \\\"*.ts\\\"\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'rg --files packages | rg \"observable\"'",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export class Observable|export class Subscriber|export class Subscription|export function operate|export interface OperateConfig\\\" packages\\\\observable\\\\src\\\\observable.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export \\\\{ Observable|export \\\\{ Subscriber|export \\\\{ Subscription|export \\\\{ operate\\\" packages\\\\observable\\\\src\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class SearchService|initWorker\\\\(|search\\\\(\\\" apps\\\\rxjs.dev\\\\src\\\\app\\\\search\\\\search.service.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class SearchBoxComponent|ngOnInit\\\\(|doSearch\\\\(|doFocus\\\\(|focus\\\\(\\\" apps\\\\rxjs.dev\\\\src\\\\app\\\\search\\\\search-box\\\\search-box.component.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class WebWorkerClient|sendMessage\\\\(\\\" apps\\\\rxjs.dev\\\\src\\\\app\\\\shared\\\\web-worker.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"handleMessage|load-index|query-index|makeRequest|queryIndex\\\" apps\\\\rxjs.dev\\\\src\\\\app\\\\search\\\\search.worker.ts\""
+              ],
+              "types": {
+                "agent_message": 10,
+                "command_execution": 50
+              },
+              "durMs": 361366,
+              "ok": true,
+              "error": "",
+              "promptId": "rxjs-common-v1",
+              "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+              "run": 1,
+              "attempts": 1
+            }
+          ],
+          "graph": []
+        }
+      },
+      {
+        "harness": "codex",
+        "tool": "baseline",
+        "repo": "shopping-backend",
+        "model": "codex-gpt-mini",
+        "modelVersion": "gpt-5.4-mini",
+        "effort": "high",
+        "promptId": "shopping-backend-common-v1",
+        "promptFamily": "common",
+        "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+        "fixtureBranch": "ttsc",
+        "daemon": false,
+        "runs": 1,
+        "question": "I just joined this TypeScript project and have been asked to change behavior on the busiest user-facing path, but I do not yet know which exported API or entry point is the right place to start.\n\nOrient me from the code before choosing the path: identify the public entry points that look user-facing, the internal modules or types they converge on, and the symbols that appear to be reused by several parts of the project. From that evidence, choose one central runtime operation whose implementation crosses the important layers.\n\nTrace that operation in order from the public entry point through the orchestration, state/model, adapter, or engine layers down to the lowest layer where real work happens. For each hop, name the file and symbol, and say how it reaches the next hop: direct call, callback, dependency injection, inheritance, dispatch, or data flow.\n\nAlso name two plausible entry points or modules you considered but ruled out, and explain why they are adjacent but not the main path. End with the smallest set of source ranges I should read before editing and one risk that would be easy to miss if I only followed direct calls.\n\nDo not guess; report gaps.",
+        "samples": {
+          "baseline": [
+            {
+              "tokens": 895277,
+              "cached": 774144,
+              "reasoning": 22604,
+              "tokensWithReasoning": 917881,
+              "turns": 1,
+              "usage": [
+                {
+                  "input": 865135,
+                  "cachedInput": 774144,
+                  "output": 30142,
+                  "reasoning": 22604
+                }
+              ],
+              "tools": 62,
+              "shell": 62,
+              "graph": 0,
+              "web": 0,
+              "sourceTouches": 61,
+              "shellCommands": [
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export \\\\* from \\\\\\\"\\\\.\\\\/module\\\\\\\"|export default ShoppingApi\\\" src\\\\api\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"controllers:|ShoppingCustomerOrderController|ShoppingCustomerOrderGoodController|ShoppingCustomerOrderPublishController\\\" src\\\\controllers\\\\shoppings\\\\customers\\\\orders\\\\ShoppingCustomerOrderModule.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"imports:|MonitorModule|ShoppingAdminModule|ShoppingCustomerModule|ShoppingSellerModule\\\" src\\\\ShoppingModule.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"imports:|ShoppingCustomerAuthenticateModule|ShoppingCustomerDiscountModule|ShoppingCustomerOrderModule|ShoppingCustomerSaleModule|ShoppingCustomerSystematicModule\\\" src\\\\controllers\\\\shoppings\\\\customers\\\\ShoppingCustomerModule.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"import \\\\* as ShoppingApi|export \\\\* from \\\\\\\"\\\\.\\\\/module\\\\\\\"|export default ShoppingApi\\\" src\\\\api\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class ShoppingCustomerCartCommodityController|public async index|public async at|public async create|public async update|public async replica|public async erase|public async discountable\\\" src\\\\controllers\\\\shoppings\\\\customers\\\\orders\\\\ShoppingCustomerCartCommodityController.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class ShoppingCustomerOrderController|public async create|public async direct|public async erase|public async price|public async discountable|public async discount\\\" src\\\\controllers\\\\shoppings\\\\customers\\\\orders\\\\ShoppingCustomerOrderController.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class ShoppingOrderController|public async index|public async at\\\" src\\\\controllers\\\\shoppings\\\\base\\\\orders\\\\ShoppingOrderController.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content src\\\\api\\\\index.ts | Select-Object -First 20\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class ShoppingGlobal|static readonly prisma|static get env|static get mode|setMode\\\" src\\\\ShoppingGlobal.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export \\\\* from \\\\\\\"\\\\.\\\\/module\\\\\\\"|export default ShoppingApi|import \\\\* as ShoppingApi\\\" src\\\\api\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"namespace PaymentService|export const enroll\\\" src\\\\services\\\\PaymentService.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export namespace json|export const index|export const at|export const where|const search|const orderBy\\\" src\\\\providers\\\\shoppings\\\\orders\\\\ShoppingOrderProvider.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"class ShoppingAdminOrderController|class ShoppingSellerOrderController|extends ShoppingOrderController\\\" src\\\\controllers\\\\shoppings\\\\admins\\\\orders\\\\ShoppingAdminOrderController.ts src\\\\controllers\\\\shoppings\\\\sellers\\\\orders\\\\ShoppingSellerOrderController.ts src\\\\controllers\\\\shoppings\\\\customers\\\\orders\\\\ShoppingCustomerOrderController.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content src\\\\controllers\\\\shoppings\\\\admins\\\\orders\\\\ShoppingAdminOrderController.ts | Select-Object -First 80\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Get-Content src\\\\controllers\\\\shoppings\\\\sellers\\\\orders\\\\ShoppingSellerOrderController.ts | Select-Object -First 80\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export async function index|@path PATCH /shoppings/customers/orders|accessor api\\\\.functional\\\\.shoppings\\\\.customers\\\\.orders\\\\.index\\\" src\\\\api\\\\functional\\\\shoppings\\\\customers\\\\orders\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"export async function index|@path PATCH /shoppings/(customers|sellers|admins)/orders|accessor api\\\\.functional\\\\.shoppings\\\\..*\\\\.orders\\\\.index\\\" src\\\\api\\\\functional\\\\shoppings\\\\customers\\\\orders\\\\index.ts src\\\\api\\\\functional\\\\shoppings\\\\sellers\\\\orders\\\\index.ts src\\\\api\\\\functional\\\\shoppings\\\\admins\\\\orders\\\\index.ts\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"PaginationUtil\\\\.(paginate|orderBy)\\\" src -g \\\"*.ts\\\"\"",
+                "\"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"rg -n \\\"ShoppingSaleSnapshotProvider\\\\.searchInvert|ShoppingCustomerProvider\\\\.where|ShoppingOrderPublishProvider\\\\.json|ShoppingOrderGoodProvider\\\\.json\\\" src\\\\providers\\\\shoppings\\\\orders\\\\ShoppingOrderProvider.ts\""
+              ],
+              "types": {
+                "agent_message": 11,
+                "command_execution": 62
+              },
+              "durMs": 480137,
+              "ok": true,
+              "error": "",
+              "promptId": "shopping-backend-common-v1",
+              "questionSha256": "fac7997c0467b4322ad1f9c45dfc48b90b4feb70866d836d5e27fadf03118c01",
+              "run": 1,
+              "attempts": 1
             }
           ],
           "graph": []

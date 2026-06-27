@@ -54,9 +54,8 @@ const ARCHITECTURE_QUESTION = fs
   )
   .trim();
 
-// The manifest (questions/manifest.json) selects reusable prompt files. It does
-// not grade answers; benchmark scoring is limited to tokens, tools, cost, and
-// time.
+// The manifest (questions/manifest.json) selects reusable prompt files. The
+// benchmark records runtime metrics only: tokens, tools, cost, and time.
 function loadManifest() {
   const manifestPath = path.join(here, "questions", "manifest.json");
   if (!fs.existsSync(manifestPath)) return { prompts: [] };
@@ -369,7 +368,7 @@ const thunks = arms.flatMap((arm) =>
     spent += m.cost;
     console.log(
       `  ${arm.name.padEnd(8)} run ${r + 1}: $${m.cost.toFixed(3)}, ${m.tokens} tok, ${m.tools} tools ` +
-        `(read ${m.reads}, grep ${m.grep}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
+        `(read ${m.reads}, grep ${m.grep}, shell ${m.shell ?? 0}, source ${m.sourceTouches ?? 0}, graph ${m.graph}, web ${m.web ?? 0}), ${(m.durMs / 1000).toFixed(0)}s` +
         (m.ok ? "" : `  [FAILED${m.error ? `: ${m.error}` : ""}]`) +
         `  [running $${spent.toFixed(2)}]`,
     );
@@ -572,6 +571,27 @@ function parseNonNegativeInteger(value, label) {
   return out;
 }
 
+const SOURCE_FILE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/i;
+
+function sourceInspectionCommand(command) {
+  return (
+    /\b(git\s+grep|rg|grep|Select-String|findstr)\b/i.test(command) ||
+    /\b(Get-Content|gc|cat|type|sed|awk|head|tail)\b/i.test(command) ||
+    (/\b(git\s+ls-files|Get-ChildItem|gci|ls|dir)\b/i.test(command) &&
+      /\b(src|packages|apps|lib|server|client|test|\.[cm]?[tj]sx?)\b/i.test(
+        command,
+      ))
+  );
+}
+
+function sourceToolUse(name, input) {
+  if (name === "Read") return SOURCE_FILE.test(input.file_path ?? "");
+  if (name === "Grep" || name === "Glob") return true;
+  if (name === "Bash" || name === "PowerShell" || name === "Shell")
+    return sourceInspectionCommand(input.command ?? "");
+  return false;
+}
+
 // parseStream mirrors codegraph's parse-bench-readme.mjs: tokens are summed over
 // every assistant turn's usage (not the last-turn result.usage), and tool calls
 // are counted across assistant events (ToolSearch excluded). It also captures the
@@ -583,10 +603,15 @@ function parseStream(text) {
     tools = 0,
     reads = 0,
     grep = 0,
+    shell = 0,
+    web = 0,
     graph = 0,
     other = 0,
+    sourceTouches = 0,
+    shellSource = 0,
     result = null,
     lastAssistantText = "";
+  const shellCommands = [];
   for (const raw of text.split("\n")) {
     if (!raw.trim()) continue;
     let e;
@@ -612,9 +637,16 @@ function parseStream(text) {
         if (b.type !== "tool_use") continue;
         if (b.name === "ToolSearch") continue;
         tools++;
+        const input = b.input || {};
+        if (sourceToolUse(b.name, input)) sourceTouches++;
         if (b.name === "Read") reads++;
         else if (b.name === "Grep" || b.name === "Glob") grep++;
-        else if (/graph|ttsc/i.test(b.name)) graph++;
+        else if (b.name === "Bash" || b.name === "PowerShell" || b.name === "Shell") {
+          shell++;
+          shellCommands.push(input.command ?? "");
+          if (sourceInspectionCommand(input.command ?? "")) shellSource++;
+        } else if (/graph|ttsc/i.test(b.name)) graph++;
+        else if (/web/i.test(b.name)) web++;
         else other++;
       }
       // Keep the last assistant turn that carried prose, so a trailing tool-only
@@ -637,8 +669,13 @@ function parseStream(text) {
     tools,
     reads,
     grep,
+    shell,
+    web,
     graph,
     other,
+    sourceTouches,
+    shellSource,
+    shellCommands: shellCommands.slice(-20),
     cost: result?.total_cost_usd || 0,
     durMs: result?.duration_ms || 0,
     // A 529-overloaded run still reports subtype "success" while carrying
@@ -651,6 +688,16 @@ function parseStream(text) {
 }
 
 function validateArmSample(sample, armName) {
+  if (armName === "baseline" && sample.ok && sample.web > 0) {
+    sample.ok = false;
+    sample.invalid = "baseline-web-used";
+    sample.error = "baseline arm used web search";
+  }
+  if (armName === "baseline" && sample.ok && sample.sourceTouches === 0) {
+    sample.ok = false;
+    sample.invalid = "baseline-source-not-inspected";
+    sample.error = "baseline arm completed without source search/read tools";
+  }
   if (armName === "graph" && sample.ok && sample.graph === 0) {
     sample.ok = false;
     sample.invalid = "graph-mcp-not-used";
@@ -659,7 +706,9 @@ function validateArmSample(sample, armName) {
   if (
     armName === "graph" &&
     sample.ok &&
-    ((sample.reads ?? 0) > 0 || (sample.grep ?? 0) > 0)
+    ((sample.reads ?? 0) > 0 ||
+      (sample.grep ?? 0) > 0 ||
+      (sample.shellSource ?? 0) > 0)
   ) {
     sample.ok = false;
     sample.invalid = "graph-shell-used";

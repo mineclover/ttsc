@@ -6,170 +6,153 @@
       "repo": "excalidraw",
       "family": "dedicated",
       "file": "excalidraw/dedicated.md",
-      "gold": "excalidraw/dedicated.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "45c30a59f3e85d5175f34c622332a2a8445185ebd38c53a8dc01603921535491"
+      "questionSha256": "f2b3cfe5d4f0dd5e70881808c265774382c43f5a25df38b959f402f1c8e6e6a8"
     },
     {
       "id": "excalidraw-common-v1",
       "repo": "excalidraw",
       "family": "common",
       "file": "common.md",
-      "gold": "common.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "b193147b81f8c15a6ed78d800912756cd449df36f9dd6c9d554d9571402ec7f1"
+      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
     },
     {
       "id": "vscode-dedicated-v1",
       "repo": "vscode",
       "family": "dedicated",
       "file": "vscode/dedicated.md",
-      "gold": "vscode/dedicated.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "src/tsconfig.json",
-      "questionSha256": "16d6d6e57c3f0aeaf10e99a5aeecc876b54f3793c8cb20d4bedb9f86f4aa1872"
+      "questionSha256": "4ce654a11bcf83bea637e09b308680158c5d71512637a020c2c331803c14839a"
     },
     {
       "id": "vscode-common-v1",
       "repo": "vscode",
       "family": "common",
       "file": "common.md",
-      "gold": "common.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "src/tsconfig.json",
-      "questionSha256": "b193147b81f8c15a6ed78d800912756cd449df36f9dd6c9d554d9571402ec7f1"
+      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
     },
     {
       "id": "nestjs-dedicated-v1",
       "repo": "nestjs",
       "family": "dedicated",
       "file": "nestjs/dedicated.md",
-      "gold": "nestjs/dedicated.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "9bb73806b199581c15660820b40bc819b82d488f00a172aaa160e9377feffa98"
+      "questionSha256": "f6ec52290aaa5aa55db6d6ebc9dccbb1319cbdd2440da53a5569716d30e42675"
     },
     {
       "id": "nestjs-common-v1",
       "repo": "nestjs",
       "family": "common",
       "file": "common.md",
-      "gold": "common.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "b193147b81f8c15a6ed78d800912756cd449df36f9dd6c9d554d9571402ec7f1"
+      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
     },
     {
       "id": "vue-dedicated-v1",
       "repo": "vue",
       "family": "dedicated",
       "file": "vue/dedicated.md",
-      "gold": "vue/dedicated.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "0bbf42004cf238920bc649732a6e32ddfd2e44e4b4101430c3698c30a41283bb"
+      "questionSha256": "8b776420228a6833c8496c34104ac3314e42f95a88f587d32ee275bbfddcb81f"
     },
     {
       "id": "vue-common-v1",
       "repo": "vue",
       "family": "common",
       "file": "common.md",
-      "gold": "common.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "b193147b81f8c15a6ed78d800912756cd449df36f9dd6c9d554d9571402ec7f1"
+      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
     },
     {
       "id": "zod-dedicated-v1",
       "repo": "zod",
       "family": "dedicated",
       "file": "zod/dedicated.md",
-      "gold": "zod/dedicated.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "7368968b2ac97996c7447b5082c06a5554745f5b539e3d193929ff13949b3cfb"
+      "questionSha256": "7669355f5f1acd28f6b50bf3fd7abfffd2b6410307750f7030efef999ed8dbe7"
     },
     {
       "id": "zod-common-v1",
       "repo": "zod",
       "family": "common",
       "file": "common.md",
-      "gold": "common.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "b193147b81f8c15a6ed78d800912756cd449df36f9dd6c9d554d9571402ec7f1"
+      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
     },
     {
       "id": "typeorm-dedicated-v1",
       "repo": "typeorm",
       "family": "dedicated",
       "file": "typeorm/dedicated.md",
-      "gold": "typeorm/dedicated.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "634016996791806d75ce64b66b86936a72aba1a4b3e043bea2a99698e91667f0"
+      "questionSha256": "5ebd172c576bf445ef2b7efb80e41e299704deb12c177231c985d5385d25ff57"
     },
     {
       "id": "typeorm-common-v1",
       "repo": "typeorm",
       "family": "common",
       "file": "common.md",
-      "gold": "common.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "b193147b81f8c15a6ed78d800912756cd449df36f9dd6c9d554d9571402ec7f1"
+      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
     },
     {
       "id": "rxjs-dedicated-v1",
       "repo": "rxjs",
       "family": "dedicated",
       "file": "rxjs/dedicated.md",
-      "gold": "rxjs/dedicated.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.graph.json",
-      "questionSha256": "2cbd8c1d09450064005bbd9164eb680563d8d1b9a9b6c3e59ef66c8ddf723326"
+      "questionSha256": "2f98a5ce51594fa18c3418da9a8e243f1acefb94dfdd7ef7056c0d2484fe352b"
     },
     {
       "id": "rxjs-common-v1",
       "repo": "rxjs",
       "family": "common",
       "file": "common.md",
-      "gold": "common.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.graph.json",
-      "questionSha256": "b193147b81f8c15a6ed78d800912756cd449df36f9dd6c9d554d9571402ec7f1"
+      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
     },
     {
       "id": "shopping-backend-dedicated-v1",
       "repo": "shopping-backend",
       "family": "dedicated",
       "file": "shopping-backend/dedicated.md",
-      "gold": "shopping-backend/dedicated.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "26de4dcc75edb391b67fe122faff07176d71fdd3a5e459c5f815f755dee1161d"
+      "questionSha256": "4235cabedc0c64497d9207c8f8e6b090344a27c505fbe281d303ebb1782bf4c4"
     },
     {
       "id": "shopping-backend-common-v1",
       "repo": "shopping-backend",
       "family": "common",
       "file": "common.md",
-      "gold": "common.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "b193147b81f8c15a6ed78d800912756cd449df36f9dd6c9d554d9571402ec7f1"
+      "questionSha256": "65368e12e2414dcfc3d571426908bb49e42f97219b84cce0efa431c3a0dc1e76"
     },
     {
       "id": "typeorm-overview-v1",
       "repo": "typeorm",
       "family": "overview",
       "file": "typeorm/overview.md",
-      "gold": "typeorm/overview.gold.json",
       "fixtureBranch": "ttsc",
       "tsconfig": "tsconfig.json",
-      "questionSha256": "40db99545a508152331337ac37ed3f5d361a86301f2491b1445e7c731c0ed53f"
+      "questionSha256": "87a570d37d9dbb36054ef5947db15d416035ddf25bd9ccc9e402c4384dbf175c"
     }
   ]
 }

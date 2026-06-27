@@ -1,1 +1,1 @@
-In shopping-backend, what ordered call path takes `POST /shoppings/sellers/sales` from `ShoppingSellerSaleController.create()` to the database write for the sale and its first snapshot? Include the steps through `ShoppingSaleProvider.create`, `ShoppingSaleSnapshotProvider.collect`, and the Prisma `shopping_sales.create` call that persists the nested snapshot.
+How does publishing an order flow from ShoppingCustomerOrderPublishController.create through ShoppingOrderPublishProvider to the Prisma database write?

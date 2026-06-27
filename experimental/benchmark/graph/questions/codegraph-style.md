@@ -1,3 +1,1 @@
-Use this checkout's graph evidence first: symbols, signatures, dependency edges, edge ranges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory.
-
 How does calling the high-level Repository.find() method get turned into a SQL query that is built and run against the database through the connection driver? Trace the call path from the public repository API down to where the query executes.

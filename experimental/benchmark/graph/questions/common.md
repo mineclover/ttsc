@@ -1,3 +1,7 @@
-Use this checkout's graph evidence first: symbols, signatures, dependency edges, edge ranges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory.
+I just joined this TypeScript project and want to understand how it actually works under the hood.
 
-I just joined this TypeScript project and want to understand how it actually works under the hood. Pick the single most central exported API or entry point and trace what happens when it runs: how the call travels from that public entry, through the internal layers, down to where the real work happens. Name the files and symbols it passes through, in order, and how each step leads to the next. Keep it a focused walk-through of that one path, not a summary of the whole project. Do not guess; report gaps.
+Pick the single most central exported API or entry point and trace what happens when it runs: how the call travels from that public entry, through the internal layers, down to where the real work happens.
+
+Name the files and symbols it passes through, in order, and how each step leads to the next.
+
+Keep it a focused walk-through of that one path, not a summary of the whole project. Do not guess; report gaps.

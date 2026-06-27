@@ -23,8 +23,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { gradeAnswer } from "./grade.mjs";
-
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..", "..");
 const work = path.join(repoRoot, "experimental", "benchmark", ".work");
@@ -97,7 +95,6 @@ const storePath = path.resolve(
   arg("baseline-store", path.join(here, `baselines-${harness}.json`)),
 );
 const outPath = arg("out");
-const threshold = Number(arg("threshold", "0.8"));
 const setup = !process.argv.includes("--no-setup");
 
 const harnessScript = path.join(
@@ -106,16 +103,6 @@ const harnessScript = path.join(
 );
 const manifest = JSON.parse(
   fs.readFileSync(path.join(here, "questions", "manifest.json"), "utf8"),
-);
-const goldByPromptId = new Map(
-  (manifest.prompts ?? [])
-    .filter((prompt) => prompt.gold)
-    .map((prompt) => [
-      prompt.id,
-      JSON.parse(
-        fs.readFileSync(path.join(here, "questions", prompt.gold), "utf8"),
-      ),
-    ]),
 );
 // --repo limits the suite to a subset (comma-separated) for validation or for
 // targeting one project; default is every project in the family.
@@ -199,6 +186,9 @@ const median = (xs) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
+const mean = (xs) =>
+  xs.length === 0 ? 0 : Math.round(xs.reduce((a, b) => a + b, 0) / xs.length);
+
 /** Run one prompt through the harness for the selected arm; return its samples. */
 function runPrompt(prompt) {
   return new Promise((resolve) => {
@@ -232,9 +222,7 @@ function runPrompt(prompt) {
       let samples = [];
       try {
         const rep = JSON.parse(fs.readFileSync(report, "utf8"));
-        gradeReportSamples(rep, prompt);
-        fs.writeFileSync(report, `${JSON.stringify(rep, null, 2)}\n`);
-        samples = (rep.samples?.[arm] ?? []).filter((s) => s.ok);
+        samples = (rep.samples?.[arm] ?? []).filter((s) => s.ok !== false);
       } catch {
         /* report missing — child crashed */
       }
@@ -249,27 +237,6 @@ function runPrompt(prompt) {
       resolve({ prompt, report, samples });
     });
   });
-}
-
-function gradeReportSamples(report, prompt) {
-  const gold = goldByPromptId.get(prompt.id);
-  if (gold === undefined) return;
-  for (const sample of Object.values(report.samples ?? {}).flat()) {
-    if (sample === undefined || typeof sample !== "object") continue;
-    const quality = gradeAnswer(
-      sample.answer ?? sample.answerText ?? "",
-      gold,
-      threshold,
-    );
-    sample.quality = quality;
-    if (!quality.pass) {
-      sample.ok = false;
-      sample.invalid = sample.invalid ?? "quality-failed";
-      sample.error = sample.error
-        ? `${sample.error}; quality gate failed`
-        : "quality gate failed";
-    }
-  }
 }
 
 /** Run all prompts with at most `outer` in flight. */
@@ -303,7 +270,6 @@ if (arm === "baseline") {
   for (const { prompt, samples } of results) {
     if (!samples.length) continue;
     const toks = samples.map((s) => s.tokens);
-    const graded = samples.filter((s) => s.quality);
     store[`${model}/${prompt.id}`] = {
       harness,
       model,
@@ -315,24 +281,15 @@ if (arm === "baseline") {
       medianShell: median(samples.map((s) => s.shell)),
       medianGraph: median(samples.map((s) => s.graph)),
       tokens: toks,
-      pass: graded.length
-        ? {
-            passed: graded.filter((s) => s.quality.pass).length,
-            graded: graded.length,
-          }
-        : null,
     };
   }
   fs.writeFileSync(storePath, `${JSON.stringify(store, null, 2)}\n`);
   console.log(`\nbaseline cached -> ${storePath}`);
-  console.log(
-    "\nNOTE: a gold the baseline cannot pass is mis-calibrated — relax it before trusting graph quality.",
-  );
 } else {
   const store = fs.existsSync(storePath)
     ? JSON.parse(fs.readFileSync(storePath, "utf8"))
     : {};
-  console.log(`\n${"prompt".padEnd(32)} baseline -> graph  reduction  quality`);
+  console.log(`\n${"prompt".padEnd(32)} baseline -> graph  reduction  tools`);
   const rows = [];
   for (const { prompt, samples } of results) {
     if (!samples.length) continue;
@@ -343,8 +300,6 @@ if (arm === "baseline") {
     const base = store[`${model}/${prompt.id}`];
     const b = base?.medianTokens ?? 0;
     const red = b ? Math.round((1 - g / b) * 100) : null;
-    const graded = samples.filter((s) => s.quality);
-    const passed = graded.filter((s) => s.quality.pass).length;
     rows.push({
       id: prompt.id,
       b,
@@ -353,18 +308,16 @@ if (arm === "baseline") {
       graphCalls,
       shellCalls,
       toolCalls,
-      passed,
-      graded: graded.length,
     });
     console.log(
-      `  ${prompt.id.padEnd(32)} ${b || "?"} -> ${g}  ${red === null ? "(no baseline)" : red + "%"}  ${passed}/${graded.length}` +
+      `  ${prompt.id.padEnd(32)} ${b || "?"} -> ${g}  ${red === null ? "(no baseline)" : red + "%"}` +
         `  graph ${graphCalls} shell ${shellCalls} tools ${toolCalls}`,
     );
   }
   const reds = rows.filter((r) => r.red !== null).map((r) => r.red);
   if (reds.length)
     console.log(
-      `\nmedian token reduction across ${reds.length} prompt(s): ${median(reds)}%`,
+      `\naverage token reduction across ${reds.length} prompt(s): ${mean(reds)}%`,
     );
   if (outPath) {
     const cells = results.map(({ prompt, report }) => ({

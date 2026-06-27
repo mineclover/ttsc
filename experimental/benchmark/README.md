@@ -32,7 +32,7 @@ The graph harnesses now live under `graph/` with the performance runner:
 - `graph/agent-ab.mjs`: Claude Code agent-cost A/B.
 - `graph/agent-ab-codex.mjs`: Codex/GPT agent-cost A/B.
 - `graph/run-suite.mjs`: multi-project suite runner over prepared `.work` fixtures.
-- `graph/questions/manifest.json`: graded prompt registry.
+- `graph/questions/manifest.json`: prompt registry.
 
 The prompt is tool-neutral. No graph-specific guidance is appended to the user prompt; tool guidance belongs in the MCP server descriptions so both arms pose the same question and the token comparison stays honest. Each sample captures the final answer for manual inspection, but the benchmark itself measures runtime behavior only: tokens, tool calls, and wall time. A graph-arm sample that completes without any MCP tool call, or that falls back to shell source reads/searches, is invalid for graph measurement and is retried before it can enter the median. If an arm has samples but no valid sample, `graph.mjs` leaves the report/audit on disk and fails instead of publishing that cell.
 

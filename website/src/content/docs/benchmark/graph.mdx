@@ -6,8 +6,6 @@ import GraphBenchmark from "../../../components/benchmark/GraphBenchmark";
 
 It asks two questions: how completely the graph resolves a real TypeScript codebase, and whether an agent spends fewer tokens and tool calls when a graph MCP server is available. The agent-cost runner can measure `@ttsc/graph` and the `codegraph` comparator against the same empty-MCP baseline.
 
-The current refresh starts from a clean agent-cost grid. It records only **Codex / GPT-5.4 mini** empty-MCP baseline cells at N=5. `@ttsc/graph` and `codegraph` comparator measurements are intentionally absent until those arms are run, so the dashboard shows baseline rows without savings bars for this slice.
-
 Prompt families are stored in `graph.json`. The `dedicated` family uses project-specific mechanism questions. The `common` family asks the same onboarding-style question across projects.
 
 The graph fuses static structure and live diagnostics into one checker-resolved ontology. An agent can see a change's reach over what is currently broken before it edits. See [Code Graph](/docs/graph).

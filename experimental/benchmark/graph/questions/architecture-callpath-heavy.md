@@ -1,7 +1,5 @@
 # Task: trace an exported API end to end
 
-Use this checkout's graph evidence first: symbols, signatures, dependency edges, edge ranges, trace steps, and sourceSpan anchors. Do not use web search, external documentation, package docs, or general framework memory.
-
 You are onboarding to this TypeScript project. Pick one commonly used exported API (a public function, a class method, or an entry point) and trace its real call path from the public entry point down to where the underlying work actually happens: the database call, the I/O, the core algorithm, whichever applies for the API you chose.
 
 ## What the answer must contain

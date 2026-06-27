@@ -59,8 +59,8 @@ const ARCHITECTURE_QUESTION = fs
   )
   .trim();
 
-// The manifest (questions/manifest.json) selects reusable prompt files. It does
-// not grade answers; benchmark scoring is limited to tokens, tools, and time.
+// The manifest (questions/manifest.json) selects reusable prompt files. The
+// benchmark records runtime metrics only: tokens, tools, and time.
 function loadManifest() {
   const manifestPath = path.join(here, "questions", "manifest.json");
   if (!fs.existsSync(manifestPath)) return { prompts: [] };
@@ -366,7 +366,7 @@ const thunks = arms.flatMap((arm) =>
       `  ${arm.name.padEnd(8)} run ${r + 1}: ${m.tokens} tok` +
         (m.reasoning ? ` (+${m.reasoning} reasoning)` : "") +
         `, ${m.tools} tools ` +
-        `(shell ${m.shell}, graph ${m.graph}, web ${m.web ?? 0}), ${(m.durMs / 1000).toFixed(0)}s` +
+        `(shell ${m.shell}, source ${m.sourceTouches ?? 0}, graph ${m.graph}, web ${m.web ?? 0}), ${(m.durMs / 1000).toFixed(0)}s` +
         (m.ok ? "" : `  [FAILED${m.error ? `: ${m.error}` : ""}]`),
     );
   }),
@@ -516,6 +516,17 @@ function parseNonNegativeInteger(value, label) {
   return out;
 }
 
+function sourceInspectionCommand(command) {
+  return (
+    /\b(git\s+grep|rg|grep|Select-String|findstr)\b/i.test(command) ||
+    /\b(Get-Content|gc|cat|type|sed|awk|head|tail)\b/i.test(command) ||
+    (/\b(git\s+ls-files|Get-ChildItem|gci|ls|dir)\b/i.test(command) &&
+      /\b(src|packages|apps|lib|server|client|test|\.tsx?|\.jsx?)\b/i.test(
+        command,
+      ))
+  );
+}
+
 async function runCodex(question, codexHome, armName, runNumber) {
   const start = Date.now();
   const result = await spawnAsync(
@@ -604,11 +615,13 @@ function parseStream(text, durMs) {
     shell = 0,
     graph = 0,
     web = 0,
+    sourceTouches = 0,
     completed = false,
     answered = false,
     answer = "";
   const usage = [];
   const types = {};
+  const shellCommands = [];
   for (const raw of text.split("\n")) {
     if (!raw.trim()) continue;
     let e;
@@ -641,6 +654,9 @@ function parseStream(text, durMs) {
       } else if (t === "command_execution") {
         tools++;
         shell++;
+        const command = it.command ?? "";
+        shellCommands.push(command);
+        if (sourceInspectionCommand(command)) sourceTouches++;
       } else if (t === "web_search") {
         tools++;
         web++;
@@ -663,6 +679,8 @@ function parseStream(text, durMs) {
     shell,
     graph,
     web,
+    sourceTouches,
+    shellCommands: shellCommands.slice(-20),
     types,
     durMs,
     ok: completed && answered,
@@ -676,6 +694,16 @@ function parseStream(text, durMs) {
 }
 
 function validateArmSample(sample, armName) {
+  if (armName === "baseline" && sample.ok && sample.web > 0) {
+    sample.ok = false;
+    sample.invalid = "baseline-web-used";
+    sample.error = "baseline arm used web search";
+  }
+  if (armName === "baseline" && sample.ok && sample.sourceTouches === 0) {
+    sample.ok = false;
+    sample.invalid = "baseline-source-not-inspected";
+    sample.error = "baseline arm completed without source search/read commands";
+  }
   if (armName === "graph" && sample.ok && sample.web > 0) {
     sample.ok = false;
     sample.invalid = "graph-web-used";

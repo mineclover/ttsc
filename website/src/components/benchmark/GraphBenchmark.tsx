@@ -89,7 +89,7 @@ function fmtSecs(ms: number): string {
  * display string. The harness is the AI coding agent (Claude Code vs Codex);
  * the model tier comes from `model` and its version from `modelVersion`. The
  * version falls back to a sensible default when `modelVersion` is missing on
- * old data, and an unrecognized model degrades to `model (harness)`.
+ * old data, and an unrecognized model falls back to `model (harness)`.
  */
 function modelLabel(cell: AgentCell): string {
   const version = cell.modelVersion;

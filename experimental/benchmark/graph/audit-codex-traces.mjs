@@ -7,11 +7,11 @@
 // counts and marks reasoning text as unavailable instead of inventing it.
 //
 // Usage:
-//   node experimental/graph-bench/audit-codex-traces.mjs --dir=experimental/benchmark/.work/graph/<timestamp> --out=audit.json
-//   node experimental/graph-bench/audit-codex-traces.mjs --report=experimental/benchmark/.work/graph/<timestamp>/report.json
-//   node experimental/graph-bench/audit-codex-traces.mjs --dir=... --baseline=website/public/benchmark/graph.json
-//   node experimental/graph-bench/audit-codex-traces.mjs --compare=before/codex-trace-audit.json,after/report.json
-//   node experimental/graph-bench/audit-codex-traces.mjs --self-test
+//   node experimental/benchmark/graph/audit-codex-traces.mjs --dir=experimental/benchmark/.work/graph/<timestamp> --out=audit.json
+//   node experimental/benchmark/graph/audit-codex-traces.mjs --report=experimental/benchmark/.work/graph/<timestamp>/report.json
+//   node experimental/benchmark/graph/audit-codex-traces.mjs --dir=... --baseline=website/public/benchmark/graph.json
+//   node experimental/benchmark/graph/audit-codex-traces.mjs --compare=before/codex-trace-audit.json,after/report.json
+//   node experimental/benchmark/graph/audit-codex-traces.mjs --self-test
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";

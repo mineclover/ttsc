@@ -1,39 +1,35 @@
-// Agent-cost A/B for @ttsc/graph driven by OpenAI's `codex` CLI, the
-// cross-model companion to agent-ab.mjs (which drives Claude). Same codegraph
-// methodology: one structural question per repo, run twice — once with the
-// @ttsc/graph MCP server, once with no MCP — and report tokens (summed per turn),
-// tool calls, and wall time, median over N runs.
+// Agent-cost A/B for @ttsc/graph, a faithful port of codegraph's agent-cost
+// benchmark (scripts/agent-eval/run-all.sh + parse-bench-readme.mjs). For one
+// structural question per repo it runs the Claude Code CLI headless twice, once
+// with the @ttsc/graph MCP server and once with an empty MCP config, both under
+// --strict-mcp-config, and reports the codegraph metrics: total tokens summed
+// per assistant turn, tool-call count, cost, and wall time, median over N runs.
 //
-// codex is configured through a MINIMAL temp CODEX_HOME per arm (a copied
-// auth.json plus a generated config.toml) so the user's real AGENTS.md / hooks /
-// personality do not leak into the measurement and the only difference between
-// the two arms is the MCP server. The default model is gpt-5.4-mini, and
-// reasoning effort is pinned high.
+// Only codegraph's TWO TypeScript repos are runnable by a checker-resolved graph:
+// excalidraw and vscode (the other five are Python/Rust/Java/Go/Swift). The
+// questions are intentionally medium difficulty so the benchmark measures
+// navigation behavior rather than open-ended architecture spelunking.
 //
 // The MCP server is the @ttsc/graph TypeScript launcher (packages/graph/lib/bin.js),
-// which runs `ttscgraph dump` once for the project (the Go binary is dump-only now)
+// which runs `ttscgraph dump` once for the project (the Go binary is now dump-only)
 // and serves graph_index / graph_overview / graph_query / graph_trace /
 // graph_expand over stdio.
-// Tool guidance comes from the server's MCP descriptions; the user prompt is the
-// manifest question verbatim, tool-neutral, so the token comparison stays honest —
-// no graph-specific instruction is prepended.
+// All tool guidance comes from the server's MCP initialize/tool descriptions; the
+// user prompt is the manifest question verbatim, tool-neutral, so the token
+// comparison stays honest. No graph-specific instruction is appended.
 //
-// codex --json has no cost field, so this reports tokens + tool calls + wall
-// time (not dollars). A "tool call" is a codex command_execution (shell read or
-// grep) or an mcp_tool_call (a graph_* tool); "graph" counts only the latter.
+// Each sample also captures the agent's final answer text for manual
+// inspection. The benchmark itself measures runtime behavior only: tokens, tool
+// calls, cost, and wall time.
 //
-// Each sample also captures the agent's final answer text (the last
-// agent_message) for manual inspection. The benchmark itself measures runtime
-// behavior only: tokens, tool calls, and wall time.
-//
-// Spends real codex credits; non-deterministic; not wired into CI. Requires
-// `codex` (logged in) and `go` on PATH, and a built `@ttsc/graph` (packages/graph/lib).
+// Spends real Claude credits; non-deterministic; not wired into CI. Requires
+// `claude` and `go` on PATH, and a built `@ttsc/graph` (packages/graph/lib).
 //
 // Usage:
-//   node experimental/graph-bench/agent-ab-codex.mjs --repo=excalidraw --runs=4
-//   node experimental/graph-bench/agent-ab-codex.mjs --repo=vscode --runs=4
-//   node experimental/graph-bench/agent-ab-codex.mjs --prompt-id=typeorm-overview-v1 --runs=4
-//   node experimental/graph-bench/agent-ab-codex.mjs --repo=typeorm --repo-dir=experimental/benchmark/.work/ttsc-benchmark-typeorm@ttsc
+//   node experimental/benchmark/graph/agent-ab.mjs --repo=excalidraw --runs=2
+//   node experimental/benchmark/graph/agent-ab.mjs --repo=vscode --runs=4 --model=opus
+//   node experimental/benchmark/graph/agent-ab.mjs --prompt-id=typeorm-overview-v1 --runs=2
+//   node experimental/benchmark/graph/agent-ab.mjs --repo=typeorm --repo-dir=experimental/benchmark/.work/ttsc-benchmark-typeorm@ttsc
 import cp from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -41,18 +37,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, "..", "..");
+const repoRoot = path.resolve(here, "..", "..", "..");
 const ttscDir = path.join(repoRoot, "packages", "ttsc");
 const graphLauncher = path.join(repoRoot, "packages", "graph", "lib", "bin.js");
-// The shared structural question, kept as a markdown task spec so both harnesses
-// pose an identical prompt. It aims for the middle: a real call-path briefing that
-// reaches past the public facade to the real work (so a shallow answer does not
-// pass), built by inference from symbol names and relationships the way a
-// developer reads code (so it does not force re-reading every file). It is
-// tool-neutral, naming no output shape, so neither grep nor the graph is handed
-// the format and the token comparison stays honest.
-// resolveQuestion prefers an explicit --prompt-id (manifest-driven), then an
-// explicit override, then questions/<repo>.md, then the generic fallback.
+// The question per repo, in codegraph's agent-eval style: a specific "how does
+// this concrete mechanism work" trace that names a real public API. A narrow,
+// mechanism-level question is what makes the comparison bite: a reader must dig
+// deep through the layers to answer it, while one targeted graph query pins the
+// cluster. resolveQuestion prefers an explicit --prompt-id (manifest-driven),
+// then an explicit override, then a per-repo file (questions/<repo>.md), then the
+// generic fallback.
 const ARCHITECTURE_QUESTION = fs
   .readFileSync(
     path.join(here, "questions", "architecture-callpath.md"),
@@ -61,7 +55,8 @@ const ARCHITECTURE_QUESTION = fs
   .trim();
 
 // The manifest (questions/manifest.json) selects reusable prompt files. It does
-// not grade answers; benchmark scoring is limited to tokens, tools, and time.
+// not grade answers; benchmark scoring is limited to tokens, tools, cost, and
+// time.
 function loadManifest() {
   const manifestPath = path.join(here, "questions", "manifest.json");
   if (!fs.existsSync(manifestPath)) return { prompts: [] };
@@ -69,8 +64,8 @@ function loadManifest() {
 }
 
 // Resolve a manifest prompt by --prompt-id (exact), else the first prompt of a
-// --prompt-family, scoped to --repo when given. Returns the prompt entry and its
-// question text, or null when neither flag was passed.
+// --prompt-family, scoped to --repo when given. Returns the prompt entry plus
+// the loaded question text, or null when neither flag was passed.
 function resolveManifestPrompt(args) {
   const id = args["prompt-id"];
   const family = args["prompt-family"];
@@ -111,6 +106,8 @@ function resolveQuestion(repoKey) {
 const REPOS = {
   excalidraw: {
     url: "https://github.com/excalidraw/excalidraw",
+    fixtureUrl: "https://github.com/samchon/ttsc-benchmark-excalidraw.git",
+    fixtureBranch: "ttsc",
     tsconfig: "tsconfig.json",
     question: ARCHITECTURE_QUESTION,
   },
@@ -160,8 +157,8 @@ const REPOS = {
 
 const args = parseArgs(process.argv.slice(2));
 // A manifest prompt (--prompt-id / --prompt-family) overrides the per-repo
-// question and pins the repo, fixtureBranch, and tsconfig. Resolve it first so it
-// can fill --repo when only --prompt-id is given.
+// question and pins the repo, fixtureBranch, and tsconfig. Resolve it first so
+// it can fill --repo when only --prompt-id is given.
 const manifestPrompt = resolveManifestPrompt(args);
 const repoKey = args.repo ?? manifestPrompt?.entry.repo ?? "excalidraw";
 const spec = REPOS[repoKey];
@@ -170,8 +167,7 @@ if (!spec)
     `unknown --repo ${repoKey}; choose ${Object.keys(REPOS).join(" | ")}`,
   );
 const runs = Number(args.runs ?? 2);
-const model = args.model ?? "gpt-5.4-mini";
-const effort = "high";
+const model = args.model ?? "sonnet";
 const tsconfig =
   args.tsconfig ?? manifestPrompt?.entry.tsconfig ?? spec.tsconfig;
 const question =
@@ -184,7 +180,9 @@ const promptFamily =
 if (!question) throw new Error(`repo ${repoKey} has no benchmark question`);
 
 const fixtureBranch =
-  args["fixture-branch"] ?? manifestPrompt?.entry.fixtureBranch;
+  args["fixture-branch"] ??
+  manifestPrompt?.entry.fixtureBranch ??
+  spec.fixtureBranch;
 if (
   fixtureBranch &&
   fixtureBranch !== "ttsc" &&
@@ -207,8 +205,9 @@ const toolSetupMs =
   args["tool-setup-ms"] === undefined
     ? undefined
     : Number(args["tool-setup-ms"]);
-// --cg points the graph arm at codegraph instead of @ttsc/graph (repo must be
-// indexed with `codegraph init`), for an apples-to-apples comparison on codex.
+// --cg points the "graph" arm at codegraph (colbymchenry/codegraph) instead of
+// @ttsc/graph, so the exact same A/B can be run against the tool we ported, for an
+// apples-to-apples comparison. The repo must already be indexed (`codegraph init`).
 const cg = args.cg === "1" || args.cg === "true";
 // --arm selects which arms to run: `baseline` and `graph` can be measured
 // separately so a fixed baseline is cached once and later graph iterations only
@@ -230,11 +229,11 @@ const goEnv = {
 };
 
 // 1. Build the native ttscgraph dump binary, which the @ttsc/graph launcher runs
-// once to build the resident graph. The Go binary is dump-only now; the MCP server
-// is the Node launcher.
+// once to build the resident graph (skipped for codegraph, which is a global CLI).
+// The Go binary is dump-only now; the MCP server itself is the Node launcher.
 const binary = path.join(
   os.tmpdir(),
-  `ttscgraph-codex-${process.pid}${process.platform === "win32" ? ".exe" : ""}`,
+  `ttscgraph-ab-${process.pid}${process.platform === "win32" ? ".exe" : ""}`,
 );
 if (armsRequested.graph && !cg) {
   if (!fs.existsSync(graphLauncher)) {
@@ -279,35 +278,43 @@ if (
 }
 if (armsRequested.graph && !cg) ensureInstalled(repoDir);
 
-// 3. The graph server is the Node launcher run over stdio; it shells out to the
-// dump binary (pointed at via TTSC_GRAPH_BINARY) on the first tool call, then
-// answers later tool calls from the resident graph. The launcher has no
-// daemon/port mode — its single type-check stays inside the measured cell — so
-// there is no --daemon path.
-const launcherArgs = [graphLauncher, "--cwd", repoDir, "--tsconfig", tsconfig];
-
-// 4. Two minimal CODEX_HOMEs: identical except the graph one configures the MCP
-// server. Both copy the real auth.json so codex stays logged in.
-const realHome = path.join(os.homedir(), ".codex");
-const withHome = armsRequested.graph
-  ? makeCodexHome("with", cg ? [] : launcherArgs)
+// 3. WITH = @ttsc/graph; WITHOUT = empty config. Both --strict-mcp-config. The
+// graph server is the Node launcher run over stdio; it shells out to the dump
+// binary (pointed at via TTSC_GRAPH_BINARY) once at startup, then answers tool
+// calls from the resident graph. The launcher has no daemon/port mode; its
+// single type-check stays inside the measured cell, so there is no daemon path.
+const withCfg = armsRequested.graph
+  ? path.join(os.tmpdir(), `mcp-graph-${process.pid}.json`)
   : null;
-const withoutHome = armsRequested.baseline
-  ? makeCodexHome("without", null)
+const emptyCfg = armsRequested.baseline
+  ? path.join(os.tmpdir(), `mcp-empty-${process.pid}.json`)
   : null;
+if (withCfg) {
+  const serverCfg = cg
+    ? { codegraph: codegraphServerConfig(repoDir) }
+    : {
+        "ttsc-graph": {
+          command: process.execPath,
+          args: [graphLauncher, "--cwd", repoDir, "--tsconfig", tsconfig],
+          env: { TTSC_GRAPH_BINARY: binary },
+        },
+      };
+  fs.writeFileSync(withCfg, JSON.stringify({ mcpServers: serverCfg }));
+}
+if (emptyCfg) fs.writeFileSync(emptyCfg, JSON.stringify({ mcpServers: {} }));
 const arms = [
-  { name: "baseline", home: withoutHome },
-  { name: "graph", home: withHome },
-].filter((a) => a.home);
+  { name: "baseline", cfg: emptyCfg },
+  { name: "graph", cfg: withCfg },
+].filter((a) => a.cfg);
 
 console.log(
-  `\ncodegraph A/B on ${repoKey} via codex — model ${model} (effort ${effort}), ${runs} run(s) x ${arms.length} arms` +
+  `\ncodegraph A/B on ${repoKey} - model ${model}, ${runs} run(s) x ${arms.length} arms` +
     (promptId ? `, prompt ${promptId}` : "") +
     (fixtureBranch ? `, fixture ${fixtureBranch}` : ""),
 );
 console.log(`Q: ${question}\n`);
 
-const reportName = "agent-ab-codex-report.json";
+const reportName = "agent-ab-report.json";
 const reportPath = args.report
   ? path.resolve(args.report)
   : path.join(here, reportName);
@@ -319,35 +326,35 @@ const traceDir = args["trace-dir"]
     );
 fs.mkdirSync(traceDir, { recursive: true });
 
+const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
+let spent = 0;
 const MAX_RUN_RETRIES = parseNonNegativeInteger(
   args["max-run-retries"] ?? "4",
   "--max-run-retries",
 );
-const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
 // Launch arms x runs concurrently, capped at TTSC_BENCH_CONCURRENCY (default
-// unlimited). A high cap is fastest for experiment iteration; a low cap keeps the
-// host quiet enough that per-run timings and token counts settle. Each invocation
-// is its own codex process with its own CODEX_HOME and trace file.
+// unlimited). A high cap is fastest for experiment iteration; a low cap (a handful)
+// keeps the host quiet enough that per-run timings and token counts settle, which
+// matters when comparing close conditions. Each invocation is its own process with
+// its own MCP server and trace file, so they never share state.
 const concurrency = Number(process.env.TTSC_BENCH_CONCURRENCY) || Infinity;
 const thunks = arms.flatMap((arm) =>
   Array.from({ length: runs }, (_, r) => async () => {
-    // A failed run (rate limit or an incomplete turn) carries no usable sample, so
-    // retry it in place rather than letting it thin the median. The trace file is
-    // keyed by run number, so a retry overwrites the attempt.
+    // A failed run (a 529 overload, mostly) carries no usable sample, so retry it
+    // in place rather than letting it thin the median. The trace file is keyed by
+    // run number, so a successful retry overwrites the failed attempt.
     let m;
     let attempts = 0;
     for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
       attempts = attempt + 1;
-      // Both arms get the identical user prompt — no graph-specific preamble.
-      // Tool guidance comes from the @ttsc/graph MCP server descriptions.
       m = validateArmSample(
-        await runCodex(question, arm.home, arm.name, r + 1),
+        await runClaude(question, arm.cfg, arm.name, r + 1),
         arm.name,
       );
       if (m.ok) break;
       if (attempt < MAX_RUN_RETRIES)
         console.log(
-          `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED]${m.error ? ` ${m.error}` : ""} retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
+          `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED] ${m.error || ""} retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
         );
     }
     // Tag the sample with prompt provenance only. The benchmark does not judge
@@ -359,12 +366,12 @@ const thunks = arms.flatMap((arm) =>
     m.run = r + 1;
     m.attempts = attempts;
     samples[arm.name].push(m);
+    spent += m.cost;
     console.log(
-      `  ${arm.name.padEnd(8)} run ${r + 1}: ${m.tokens} tok` +
-        (m.reasoning ? ` (+${m.reasoning} reasoning)` : "") +
-        `, ${m.tools} tools ` +
-        `(shell ${m.shell}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
-        (m.ok ? "" : `  [FAILED${m.error ? `: ${m.error}` : ""}]`),
+      `  ${arm.name.padEnd(8)} run ${r + 1}: $${m.cost.toFixed(3)}, ${m.tokens} tok, ${m.tools} tools ` +
+        `(read ${m.reads}, grep ${m.grep}, graph ${m.graph}), ${(m.durMs / 1000).toFixed(0)}s` +
+        (m.ok ? "" : `  [FAILED${m.error ? `: ${m.error}` : ""}]`) +
+        `  [running $${spent.toFixed(2)}]`,
     );
   }),
 );
@@ -397,7 +404,7 @@ const printComparisonLine = (label, k, fmt = (x) => x) => {
   );
 };
 
-console.log(`\nMedian of ${runs} run(s), codegraph metrics, codex/${model}:`);
+console.log(`\nMedian of ${runs} run(s), codegraph metrics:`);
 const printLine =
   armsRequested.baseline && armsRequested.graph
     ? printComparisonLine
@@ -406,50 +413,102 @@ const printLine =
       : printGraphLine;
 printLine("tokens", "tokens");
 printLine("tool calls", "tools");
+printLine("cost", "cost", (x) => `$${x.toFixed(3)}`);
 printLine("wall time", "durMs", (x) => `${(x / 1000).toFixed(0)}s`);
+
+console.log(`\nTotal spend this run: $${spent.toFixed(2)}`);
 
 fs.mkdirSync(path.dirname(reportPath), { recursive: true });
 fs.writeFileSync(
   reportPath,
-  `${JSON.stringify({ tool: cg ? "codegraph" : "ttsc-graph", ...(toolSetupMs !== undefined ? { toolSetupMs } : {}), repo: repoKey, fixtureBranch, repoDir, model, effort, ...(promptId ? { promptId } : {}), promptFamily, ...(manifestPrompt?.questionSha256 ? { questionSha256: manifestPrompt.questionSha256 } : {}), daemon: false, runs, question, traceDir, samples }, null, 2)}\n`,
+  `${JSON.stringify({ tool: cg ? "codegraph" : "ttsc-graph", ...(toolSetupMs !== undefined ? { toolSetupMs } : {}), repo: repoKey, fixtureBranch, repoDir, model, ...(promptId ? { promptId } : {}), promptFamily, ...(manifestPrompt?.questionSha256 ? { questionSha256: manifestPrompt.questionSha256 } : {}), daemon: false, runs, question, traceDir, samples }, null, 2)}\n`,
 );
-cleanup([binary, withHome, withoutHome].filter(Boolean));
-
-// makeCodexHome builds a throwaway CODEX_HOME: the real auth.json plus a minimal
-// config.toml pinning the model and effort, and (for the graph arm) the
-// @ttsc/graph MCP server. The server is `node <launcher> --cwd ... --tsconfig ...`
-// with TTSC_GRAPH_BINARY pointing at the dump binary, so codex spawns the same
-// launcher the Claude harness configures. TOML literal strings ('...') carry
-// Windows paths verbatim with no escaping.
-function makeCodexHome(tag, serverArgs) {
-  const home = path.join(os.tmpdir(), `codex-home-${tag}-${process.pid}`);
-  fs.mkdirSync(home, { recursive: true });
-  fs.copyFileSync(
-    path.join(realHome, "auth.json"),
-    path.join(home, "auth.json"),
-  );
-  let toml = `model = '${model}'\nmodel_reasoning_effort = '${effort}'\n`;
-  if (serverArgs) {
-    if (cg) {
-      const command = process.platform === "win32" ? "cmd.exe" : "codegraph";
-      const a = codegraphServerArgs(repoDir)
-        .map((x) => `'${x}'`)
-        .join(", ");
-      toml += `\n[mcp_servers.codegraph]\ncommand = '${command}'\nargs = [${a}]\nenv = { CODEGRAPH_NO_DAEMON = "1" }\nrequired = true\n`;
-    } else {
-      const argList = serverArgs.map((a) => `'${a}'`).join(", ");
-      toml += `\n[mcp_servers.ttscgraph]\ncommand = '${process.execPath}'\nargs = [${argList}]\nenv = { TTSC_GRAPH_BINARY = '${binary}' }\nrequired = true\n`;
-    }
-  }
-  fs.writeFileSync(path.join(home, "config.toml"), toml);
-  return home;
+try {
+  fs.rmSync(binary, { force: true });
+  if (withCfg) fs.rmSync(withCfg, { force: true });
+  if (emptyCfg) fs.rmSync(emptyCfg, { force: true });
+} catch {
+  /* best effort */
 }
 
-function codegraphServerArgs(targetRepoDir) {
+async function runClaude(question, cfg, armName, runNumber) {
+  // Prevent Claude's built-in Agent tool from turning an MCP benchmark into
+  // subagent IO. Do not use --bare here: it disables OAuth/keychain auth.
+  // No --append-system-prompt: tool guidance is tool-neutral now and comes from
+  // the @ttsc/graph MCP initialize/tool descriptions, so both arms get the same
+  // user prompt and the token comparison stays honest. armName only keys the
+  // trace file; it no longer changes the prompt.
+  const claudeArgs = [
+    "-p",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "bypassPermissions",
+    "--disallowedTools",
+    "Agent",
+    "--model",
+    model,
+    "--effort",
+    "high",
+    "--max-budget-usd",
+    "4",
+    "--strict-mcp-config",
+    "--mcp-config",
+    cfg,
+  ];
+  const result = await spawnAsync("claude", claudeArgs, {
+    cwd: repoDir,
+    input: question,
+    windowsHide: true,
+    shell: true,
+    timeout: 900_000,
+  });
+  if (result.error) throw result.error;
+  const stdout = result.stdout ?? "";
+  const stderr = result.stderr ?? "";
+  const base = `${armName}-run-${runNumber}`;
+  fs.writeFileSync(path.join(traceDir, `${base}.stream.jsonl`), stdout);
+  if (stderr)
+    fs.writeFileSync(path.join(traceDir, `${base}.stderr.log`), stderr);
+  return parseStream(stdout);
+}
+
+// spawnAsync runs a child to completion and resolves its captured stdout/stderr,
+// so many runs can be in flight at once via Promise.all. An async spawn never
+// blocks the loop the way spawnSync would, which is what lets every arm and run
+// fire concurrently.
+function spawnAsync(command, commandArgs, { input, ...spawnOpts }) {
+  return new Promise((resolve) => {
+    const child = cp.spawn(command, commandArgs, spawnOpts);
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (d) => (stdout += d));
+    child.stderr?.on("data", (d) => (stderr += d));
+    child.on("error", (error) => resolve({ error, stdout, stderr }));
+    child.on("close", () => resolve({ stdout, stderr }));
+    if (input) {
+      child.stdin?.write(input);
+      child.stdin?.end();
+    }
+  });
+}
+
+function codegraphServerConfig(targetRepoDir) {
   const args = ["serve", "--mcp", "--path", targetRepoDir];
   return process.platform === "win32"
-    ? ["/d", "/s", "/c", "codegraph", ...args]
-    : args;
+    ? {
+        command: "cmd.exe",
+        args: ["/d", "/s", "/c", "codegraph", ...args],
+        env: { CODEGRAPH_NO_DAEMON: "1" },
+      }
+    : {
+        command: "codegraph",
+        args,
+        env: { CODEGRAPH_NO_DAEMON: "1" },
+      };
 }
 
 function ensureInstalled(targetRepoDir) {
@@ -513,86 +572,21 @@ function parseNonNegativeInteger(value, label) {
   return out;
 }
 
-async function runCodex(question, codexHome, armName, runNumber) {
-  const start = Date.now();
-  const result = await spawnAsync(
-    "codex",
-    [
-      "exec",
-      "--json",
-      "--dangerously-bypass-approvals-and-sandbox",
-      "--skip-git-repo-check",
-      "--ephemeral",
-      "--strict-config",
-      "-C",
-      repoDir,
-    ],
-    {
-      input: question,
-      windowsHide: true,
-      shell: true,
-      env: { ...process.env, CODEX_HOME: codexHome },
-      timeout: 1_200_000,
-    },
-  );
-  if (result.error) throw result.error;
-  const stdout = result.stdout ?? "";
-  const stderr = result.stderr ?? "";
-  const base = `${armName}-run-${runNumber}`;
-  fs.writeFileSync(path.join(traceDir, `${base}.stream.jsonl`), stdout);
-  if (stderr)
-    fs.writeFileSync(path.join(traceDir, `${base}.stderr.log`), stderr);
-  const parsed = parseStream(stdout, Date.now() - start);
-  if (result.status && result.status !== 0) {
-    parsed.ok = false;
-    parsed.error = `codex exited ${result.status}${stderr ? `: ${oneLine(stderr).slice(0, 160)}` : ""}`;
-  } else if (!parsed.ok && stderr && !parsed.error) {
-    parsed.error = oneLine(stderr).slice(0, 160);
-  }
-  return parsed;
-}
-
-// spawnAsync runs a child to completion and resolves its captured stdout/stderr,
-// so many runs can be in flight at once via Promise.all instead of blocking the
-// loop the way spawnSync would.
-function spawnAsync(command, commandArgs, { input, ...spawnOpts }) {
-  return new Promise((resolve) => {
-    const child = cp.spawn(command, commandArgs, spawnOpts);
-    let stdout = "";
-    let stderr = "";
-    child.stdout?.setEncoding("utf8");
-    child.stderr?.setEncoding("utf8");
-    child.stdout?.on("data", (d) => (stdout += d));
-    child.stderr?.on("data", (d) => (stderr += d));
-    child.on("error", (error) => resolve({ error, stdout, stderr }));
-    child.on("close", (status, signal) =>
-      resolve({ stdout, stderr, status, signal }),
-    );
-    if (input) {
-      child.stdin?.write(input);
-      child.stdin?.end();
-    }
-  });
-}
-
-// parseStream sums per-turn usage (input + output) across turn.completed events,
-// and counts tool calls from item.completed events: command_execution (shell
-// reads/greps) and mcp_tool_call (graph). It records the item-type histogram so
-// the classification can be verified against a real run. It also captures the
-// agent's final answer: the text of the LAST agent_message item.
-function parseStream(text, durMs) {
+// parseStream mirrors codegraph's parse-bench-readme.mjs: tokens are summed over
+// every assistant turn's usage (not the last-turn result.usage), and tool calls
+// are counted across assistant events (ToolSearch excluded). It also captures the
+// agent's final answer text: the `result` event's `result` string is the canonical
+// final answer; the concatenated text of the last assistant turn is the fallback
+// for a stream that ends without a result event.
+function parseStream(text) {
   let tokens = 0,
-    cached = 0,
-    reasoning = 0,
-    turns = 0,
     tools = 0,
-    shell = 0,
+    reads = 0,
+    grep = 0,
     graph = 0,
-    completed = false,
-    answered = false,
-    answer = "";
-  const usage = [];
-  const types = {};
+    other = 0,
+    result = null,
+    lastAssistantText = "";
   for (const raw of text.split("\n")) {
     if (!raw.trim()) continue;
     let e;
@@ -601,57 +595,58 @@ function parseStream(text, durMs) {
     } catch {
       continue;
     }
-    if (e.type === "turn.completed") {
-      completed = true;
-      const u = e.usage || {};
-      const turn = {
-        input: u.input_tokens || 0,
-        cachedInput: u.cached_input_tokens || 0,
-        output: u.output_tokens || 0,
-        reasoning: u.reasoning_output_tokens || 0,
-      };
-      tokens += turn.input + turn.output;
-      cached += turn.cachedInput;
-      reasoning += turn.reasoning;
-      usage.push(turn);
-      turns++;
-    } else if (e.type === "item.completed") {
-      const it = e.item || {};
-      const t = it.type || "?";
-      types[t] = (types[t] || 0) + 1;
-      if (t === "mcp_tool_call") {
+    if (e.type === "assistant") {
+      const u = e.message?.usage;
+      if (u)
+        tokens +=
+          (u.input_tokens || 0) +
+          (u.output_tokens || 0) +
+          (u.cache_read_input_tokens || 0) +
+          (u.cache_creation_input_tokens || 0);
+      const textBlocks = [];
+      for (const b of e.message?.content || []) {
+        if (b.type === "text" && typeof b.text === "string") {
+          textBlocks.push(b.text);
+          continue;
+        }
+        if (b.type !== "tool_use") continue;
+        if (b.name === "ToolSearch") continue;
         tools++;
-        graph++;
-      } else if (t === "command_execution") {
-        tools++;
-        shell++;
-      } else if (t === "agent_message") {
-        answered = true;
-        // codex emits intermediate agent_message items; the last one carrying
-        // text is the final answer, so overwrite as they arrive.
-        if (typeof it.text === "string" && it.text.trim()) answer = it.text;
+        if (b.name === "Read") reads++;
+        else if (b.name === "Grep" || b.name === "Glob") grep++;
+        else if (/graph|ttsc/i.test(b.name)) graph++;
+        else other++;
       }
+      // Keep the last assistant turn that carried prose, so a trailing tool-only
+      // turn does not blank the fallback answer.
+      if (textBlocks.length) lastAssistantText = textBlocks.join("\n");
+    } else if (e.type === "result") {
+      result = e;
     }
   }
+  const ok = result?.subtype === "success" && !result?.is_error;
+  // The result event's `result` is the agent's final answer on success; on a
+  // 529-overload (is_error) it is the error message, so fall back to the last
+  // assistant prose for the answer either way.
+  const answer =
+    ok && typeof result?.result === "string" && result.result.trim()
+      ? result.result
+      : lastAssistantText;
   return {
     tokens,
-    cached,
-    reasoning,
-    tokensWithReasoning: tokens + reasoning,
-    turns,
-    usage,
     tools,
-    shell,
+    reads,
+    grep,
     graph,
-    types,
-    durMs,
-    ok: completed && answered,
+    other,
+    cost: result?.total_cost_usd || 0,
+    durMs: result?.duration_ms || 0,
+    // A 529-overloaded run still reports subtype "success" while carrying
+    // is_error: true and zero token usage, so it must be excluded explicitly or
+    // its empty sample drags the median down and the comparison goes garbage.
+    ok,
     answer,
-    error: completed
-      ? answered
-        ? ""
-        : "codex completed without an agent answer"
-      : "codex turn did not complete",
+    error: result?.is_error ? String(result?.result || "").slice(0, 80) : "",
   };
 }
 
@@ -661,10 +656,14 @@ function validateArmSample(sample, armName) {
     sample.invalid = "graph-mcp-not-used";
     sample.error = "graph arm completed without MCP tool calls";
   }
-  if (armName === "graph" && sample.ok && sample.shell > 0) {
+  if (
+    armName === "graph" &&
+    sample.ok &&
+    ((sample.reads ?? 0) > 0 || (sample.grep ?? 0) > 0)
+  ) {
     sample.ok = false;
     sample.invalid = "graph-shell-used";
-    sample.error = "graph arm used shell commands instead of graph tools";
+    sample.error = "graph arm used shell reads/searches instead of graph tools";
   }
   return sample;
 }
@@ -675,7 +674,7 @@ function runOrThrow(command, commandArgs, cwd, env) {
     env,
     encoding: "utf8",
     windowsHide: true,
-    shell: command === "codex",
+    shell: command === "claude",
   });
   if (result.error) throw result.error;
   if (result.status !== 0)
@@ -690,20 +689,6 @@ function median(values) {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
-function oneLine(value) {
-  return String(value).replace(/\s+/g, " ").trim();
-}
-
-function cleanup(paths) {
-  for (const p of paths) {
-    try {
-      fs.rmSync(p, { recursive: true, force: true });
-    } catch {
-      /* best effort */
-    }
-  }
 }
 
 function parseArgs(argv) {

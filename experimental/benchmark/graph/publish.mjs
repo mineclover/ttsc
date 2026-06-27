@@ -20,14 +20,14 @@
 // https://ttsc.dev/docs/benchmark#code-graph-mcp.
 //
 // Usage:
-//   node experimental/graph-bench/publish.mjs            # fold every report found
-//   node experimental/graph-bench/publish.mjs --reset    # drop prior cells first
+//   node experimental/benchmark/graph/publish.mjs            # fold every report found
+//   node experimental/benchmark/graph/publish.mjs --reset    # drop prior cells first
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, "..", "..");
+const repoRoot = path.resolve(here, "..", "..", "..");
 const websiteJson = path.resolve(
   repoRoot,
   "website",

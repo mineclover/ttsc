@@ -28,9 +28,9 @@ const websiteJson = path.join(
   "benchmark",
   "graph.json",
 );
-const graphBenchDir = path.join(repoRoot, "experimental", "graph-bench");
-const claudeHarness = path.join(graphBenchDir, "agent-ab.mjs");
-const codexHarness = path.join(graphBenchDir, "agent-ab-codex.mjs");
+const graphHarnessDir = path.join(here, "graph");
+const claudeHarness = path.join(graphHarnessDir, "agent-ab.mjs");
+const codexHarness = path.join(graphHarnessDir, "agent-ab-codex.mjs");
 const PROMPT_FAMILY_ALIASES = {
   "project-specific": "dedicated",
   "shared-onboarding": "common",
@@ -289,7 +289,7 @@ function runCodexTraceAudit(currentReportPath, currentReport) {
   runChecked(
     "node",
     [
-      path.join(graphBenchDir, "audit-codex-traces.mjs"),
+      path.join(graphHarnessDir, "audit-codex-traces.mjs"),
       `--report=${currentReportPath}`,
       `--out=${auditPath}`,
     ],

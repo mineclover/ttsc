@@ -8,8 +8,8 @@
 // shape, not a publishable figure.
 //
 // Usage:
-//   node experimental/graph-bench/bench.mjs                       # default: packages/ttsc
-//   node experimental/graph-bench/bench.mjs --project=/abs/path --tsconfig=tsconfig.json --runs=5
+//   node experimental/benchmark/graph/bench.mjs                       # default: packages/ttsc
+//   node experimental/benchmark/graph/bench.mjs --project=/abs/path --tsconfig=tsconfig.json --runs=5
 
 import cp from "node:child_process";
 import fs from "node:fs";
@@ -18,7 +18,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, "..", "..");
+const repoRoot = path.resolve(here, "..", "..", "..");
 const ttscDir = path.join(repoRoot, "packages", "ttsc");
 
 const args = parseArgs(process.argv.slice(2));

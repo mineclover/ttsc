@@ -29,7 +29,7 @@ The structural benchmark loads a project's resident `Program`, builds the graph,
 Run it against any TypeScript project with a `tsconfig.json`:
 
 ```bash
-node experimental/graph-bench/bench.mjs --project=/abs/path/to/project --runs=5
+node experimental/benchmark/graph/bench.mjs --project=/abs/path/to/project --runs=5
 ```
 
 ## Reproduce
@@ -45,10 +45,10 @@ pnpm install
 
 ### Structural harness
 
-`experimental/graph-bench` loads the resident `Program` for a project, builds the graph, and reports the node and edge counts plus the fair coverage. The counts and coverage are deterministic; the timings are indicative and only meaningful on a quiet host.
+`experimental/benchmark/graph` loads the resident `Program` for a project, builds the graph, and reports the node and edge counts plus the fair coverage. The counts and coverage are deterministic; the timings are indicative and only meaningful on a quiet host.
 
 ```bash
-node experimental/graph-bench/bench.mjs --project=/abs/path/to/project --runs=5
+node experimental/benchmark/graph/bench.mjs --project=/abs/path/to/project --runs=5
 ```
 
 ### Agent-cost harness
@@ -62,9 +62,9 @@ node experimental/benchmark/graph.mjs --all --models=gpt-5.4-mini --arm=baseline
 Codex trace audit:
 
 ```bash
-node experimental/graph-bench/audit-codex-traces.mjs --dir=experimental/benchmark/.work/graph/<timestamp>
-node experimental/graph-bench/audit-codex-traces.mjs --compare=<before>,<after>
-node experimental/graph-bench/audit-codex-traces.mjs --self-test
+node experimental/benchmark/graph/audit-codex-traces.mjs --dir=experimental/benchmark/.work/graph/<timestamp>
+node experimental/benchmark/graph/audit-codex-traces.mjs --compare=<before>,<after>
+node experimental/benchmark/graph/audit-codex-traces.mjs --self-test
 ```
 
 `graph.mjs` writes `codex-trace-audit.json` automatically for Codex cells. The Codex audit records every exposed message, every shell/MCP call in timeline order, usage, reasoning token counts, strict exact avoidable output such as duplicate MCP calls and source-covered evidence text, measured graph-replaceable shell-output surface, candidate MCP overfetch surfaces, zero-MCP and shell-fallback graph-arm traces, later-turn prompt replay exposure when multiple `turn.completed` events are visible, an input ledger comparing usage input tokens with visible trace material, and observed/replacement-lower-bound/candidate-ceiling savings against matching N=5 baseline medians from `website/public/benchmark/graph.json`. Hidden reasoning text is not emitted in the Codex stream, so the audit records the token ledger and explicitly marks the text unavailable. The ledger's unexplained input is an accounting gap, not proof of one hidden category. Use `--compare=<before>,<after>` with audit JSON files, suite reports, or suite directories to compare N=1 optimization smoke runs by the same message/tool/reasoning/savings fields without publishing them.

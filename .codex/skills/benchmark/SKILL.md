@@ -32,9 +32,9 @@ node experimental/benchmark/performance.mjs --list                       # print
 node experimental/benchmark/performance.mjs --sequential                 # clone, measure, delete one fixture at a time (low-disk)
 node experimental/benchmark/graph.mjs --project=typeorm --models=gpt-5.4-mini --tools=ttsc-graph,codegraph # one graph AI-token fixture
 node experimental/benchmark/graph.mjs --all --models=gpt-5.4-mini --arm=baseline --tools=baseline --prompt-family=all --runs=5 --reset # baseline-only publication refresh
-node experimental/graph-bench/audit-codex-traces.mjs --dir=experimental/benchmark/.work/graph/<timestamp> # inspect Codex messages/tools/reasoning tokens and baseline savings
-node experimental/graph-bench/audit-codex-traces.mjs --compare=<before>,<after> # compare smoke-run audit/report dirs during optimization
-node experimental/graph-bench/audit-codex-traces.mjs --self-test # regression-check audit parsing and savings semantics
+node experimental/benchmark/graph/audit-codex-traces.mjs --dir=experimental/benchmark/.work/graph/<timestamp> # inspect Codex messages/tools/reasoning tokens and baseline savings
+node experimental/benchmark/graph/audit-codex-traces.mjs --compare=<before>,<after> # compare smoke-run audit/report dirs during optimization
+node experimental/benchmark/graph/audit-codex-traces.mjs --self-test # regression-check audit parsing and savings semantics
 ```
 
 Option families:

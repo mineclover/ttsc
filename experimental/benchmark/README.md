@@ -17,28 +17,28 @@ node performance.mjs --verbose                # tee child stdio for debugging
 node graph.mjs --project=typeorm --models=gpt-5.4-mini --tools=ttsc-graph,codegraph # one graph AI-token benchmark
 node graph.mjs --all --models=gpt-5.4-mini --arm=baseline --tools=baseline --prompt-family=all --runs=5 --reset # baseline-only graph refresh
 node graph.mjs --all --models=gpt-5.4-mini --arm=graph --tools=ttsc-graph,codegraph --prompt-family=all --runs=5 # comparator graph sweep
-node ../graph-bench/audit-codex-traces.mjs --dir=.work/graph/<timestamp> # inspect Codex message/tool/reasoning ledger and baseline savings
-node ../graph-bench/audit-codex-traces.mjs --self-test # verify audit parser and savings semantics
-node ../graph-bench/bench.mjs --project=../../packages/ttsc --runs=5 # structural graph metrics
+node graph/audit-codex-traces.mjs --dir=.work/graph/<timestamp> # inspect Codex message/tool/reasoning ledger and baseline savings
+node graph/audit-codex-traces.mjs --self-test # verify audit parser and savings semantics
+node graph/bench.mjs --project=../../packages/ttsc --runs=5 # structural graph metrics
 ```
 
 The first run packs the local `ttsc` workspace into tarballs, clones each fixture's three branches into `.work/`, installs the tarballs, runs `ttsc prepare`, then measures the matrix sequentially. Subsequent runs reuse the clones.
 
 `graph.mjs` reuses the same fixture clones and setup path where a performance fixture exists, but it is separate from `performance.mjs` because it spends AI tokens. Excalidraw is the graph-only exception: it is cloned from `https://github.com/samchon/ttsc-benchmark-excalidraw.git` on branch `ttsc` into `.work/ttsc-benchmark-excalidraw@ttsc`, so the graph benchmark exercises the same benchmark fork as the other fixtures. It runs projects sequentially, fixes reasoning effort to `high`, updates only its own cells in `website/public/benchmark/graph.json`, and writes a local report under `.work/graph/<timestamp>/`. Its graph tool axis is `ttsc-graph` and `codegraph`; `--tools=baseline --arm=baseline` records only the empty-MCP baseline cell. Its prompt-family axis is `dedicated` and `common` (`--prompt-family=all` runs both; the old names `project-specific` and `shared-onboarding` are accepted as aliases). The `codegraph` arm runs `codegraph init`, records the index time as `toolSetupMs`, local-ignores `.codegraph/`, and deletes the index after the run unless `--keep-codegraph-index` is set.
 
-The graph harnesses now live in this directory with the performance runner:
+The graph harnesses now live under `graph/` with the performance runner:
 
-- `bench.mjs`: deterministic structural graph metrics for one checkout.
-- `agent-ab.mjs`: Claude Code agent-cost A/B.
-- `agent-ab-codex.mjs`: Codex/GPT agent-cost A/B.
-- `run-suite.mjs`: multi-project suite runner over prepared `.work` fixtures.
-- `questions/manifest.json`: graded prompt registry.
+- `graph/bench.mjs`: deterministic structural graph metrics for one checkout.
+- `graph/agent-ab.mjs`: Claude Code agent-cost A/B.
+- `graph/agent-ab-codex.mjs`: Codex/GPT agent-cost A/B.
+- `graph/run-suite.mjs`: multi-project suite runner over prepared `.work` fixtures.
+- `graph/questions/manifest.json`: graded prompt registry.
 
 The prompt is tool-neutral. No graph-specific guidance is appended to the user prompt; tool guidance belongs in the MCP server descriptions so both arms pose the same question and the token comparison stays honest. Each sample captures the final answer for manual inspection, but the benchmark itself measures runtime behavior only: tokens, tool calls, and wall time. A graph-arm sample that completes without any MCP tool call, or that falls back to shell source reads/searches, is invalid for graph measurement and is retried before it can enter the median. If an arm has samples but no valid sample, `graph.mjs` leaves the report/audit on disk and fails instead of publishing that cell.
 
 For Codex runs, `graph.mjs` automatically writes `codex-trace-audit.json` beside the suite report. The audit reads every `.stream.jsonl` trace and records every exposed agent message, every shell/MCP call in timeline order, per-turn usage, and `reasoning_output_tokens`. Codex does not expose hidden reasoning text in the stream, so the audit records reasoning token counts and marks reasoning text as unavailable instead of fabricating it. It separates strict exact avoidable output such as duplicate MCP calls and source-covered evidence text, measured graph-replaceable source read/search output surface, candidate MCP overfetch surfaces such as broad open traces or batched `source:true + neighbors:true` expands, later-turn prompt replay exposure where the stream exposes multiple `turn.completed` events, graph-arm traces that made zero MCP calls or fell back to shell, and an input ledger comparing usage input tokens with visible trace material. The ledger's unexplained input is an accounting gap, not proof of one hidden category. By default it compares matching cells against the N=5 baseline medians in `website/public/benchmark/graph.json` and reports observed, replacement lower-bound, candidate-ceiling, and observed replay-adjusted savings; pass `--baseline=none` to disable that comparison.
 
-Use `node experimental/graph-bench/audit-codex-traces.mjs --compare=<before>,<after>` on audit JSON files, suite reports, or suite directories while optimizing N=1 smoke runs. The comparison uses the same exposed messages, tool calls, reasoning-token ledger, and theoretical savings fields as the full audit, so optimization decisions stay tied to trace evidence rather than anecdotal output.
+Use `node experimental/benchmark/graph/audit-codex-traces.mjs --compare=<before>,<after>` on audit JSON files, suite reports, or suite directories while optimizing N=1 smoke runs. The comparison uses the same exposed messages, tool calls, reasoning-token ledger, and theoretical savings fields as the full audit, so optimization decisions stay tied to trace evidence rather than anecdotal output.
 
 Whenever a benchmark table is reported or published, mirror it to the active PR.
 Use one sticky comment headed by `<!-- ttsc-benchmark-results -->`; update that

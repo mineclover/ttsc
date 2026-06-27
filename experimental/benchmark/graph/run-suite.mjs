@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url";
 import { gradeAnswer } from "./grade.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, "..", "..");
+const repoRoot = path.resolve(here, "..", "..", "..");
 const work = path.join(repoRoot, "experimental", "benchmark", ".work");
 const graphBenchmarkScript = path.join(
   repoRoot,
@@ -35,12 +35,11 @@ const graphBenchmarkScript = path.join(
   "graph.mjs",
 );
 
-// Match experimental/benchmark/graph.mjs, which owns fixture setup. Source repos
-// live in .work/graph-source; performance fixtures live in .work/<repoName>@ttsc.
+// Match experimental/benchmark/graph.mjs, which owns fixture setup.
+// Prepared clones live in .work/<repoName>@<branch>.
 const PROJECTS = {
   excalidraw: {
-    repoName: "excalidraw",
-    sourceRepo: true,
+    repoName: "ttsc-benchmark-excalidraw",
   },
   vscode: {
     repoName: "ttsc-benchmark-vscode",

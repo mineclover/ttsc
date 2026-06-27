@@ -12,17 +12,17 @@
 // needs Go and the prepared fixture (see --project), which run on a build host.
 //
 // Usage:
-//   node experimental/graph-bench/viewer.mjs --demo
-//   node experimental/graph-bench/viewer.mjs --in raw.json --name vscode
-//   node experimental/graph-bench/viewer.mjs --project vscode \
-//     --root .work/ttsc-benchmark-vscode@ttsc --tsconfig src/tsconfig.json
+//   node experimental/benchmark/graph/viewer.mjs --demo
+//   node experimental/benchmark/graph/viewer.mjs --in raw.json --name vscode
+//   node experimental/benchmark/graph/viewer.mjs --project vscode \
+//     --root experimental/benchmark/.work/ttsc-benchmark-vscode@ttsc --tsconfig src/tsconfig.json
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(HERE, "..", "..");
+const REPO_ROOT = path.resolve(HERE, "..", "..", "..");
 const PUBLIC_GRAPH_DIR = path.join(REPO_ROOT, "website", "public", "graph");
 
 // ---------------------------------------------------------------------------

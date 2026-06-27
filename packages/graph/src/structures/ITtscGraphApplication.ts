@@ -13,9 +13,9 @@ import { ITtscGraphTrace } from "./ITtscGraphTrace";
  */
 export interface ITtscGraphApplication {
   /**
-   * Plan and run one TypeScript graph operation.
+   * Inspect the TypeScript graph before shell-reading source.
    *
-   * Use this before shell-reading TypeScript source. First explain the next
+   * Use this as the first tool for TypeScript code questions. Explain the next
    * graph step in `thinking`, then choose one `request.type`: find entrypoints,
    * lookup symbols, trace dependencies, inspect selected symbols, or summarize
    * the project.
@@ -26,7 +26,7 @@ export interface ITtscGraphApplication {
    * @param props The reasoning and selected graph request
    * @returns The selected graph result, tagged with the request type
    */
-  query_typescript_graph(
+  inspect_typescript_graph_before_shell_reading(
     props: ITtscGraphApplication.IProps,
   ): ITtscGraphApplication.IResult;
 }

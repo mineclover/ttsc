@@ -25,6 +25,10 @@ const baselinePath =
     ? null
     : path.resolve(args.baseline ?? "website/public/benchmark/graph.json");
 const compareInputs = args.compare ? listArg(args.compare) : [];
+const singleGraphToolNames = new Set([
+  "query_typescript_graph",
+  "inspect_typescript_graph_before_shell_reading",
+]);
 
 if (truthy(args["self-test"])) {
   runSelfTest();
@@ -1573,7 +1577,7 @@ function formatHotspotArgs(args) {
 }
 
 function graphToolKind(name, requestType) {
-  if (name === "query_typescript_graph") {
+  if (singleGraphToolNames.has(name)) {
     switch (requestType) {
       case "find_question_entrypoints":
         return "entrypoints";
@@ -1647,12 +1651,12 @@ function summarizeMcpArgs(name, input) {
 
 function mcpRequestArgs(name, input) {
   const args = input && typeof input === "object" ? input : {};
-  if (name !== "query_typescript_graph") return args;
+  if (!singleGraphToolNames.has(name)) return args;
   return args.request && typeof args.request === "object" ? args.request : {};
 }
 
 function mcpInputKey(name, input) {
-  return name === "query_typescript_graph" ? mcpRequestArgs(name, input) : input;
+  return singleGraphToolNames.has(name) ? mcpRequestArgs(name, input) : input;
 }
 
 function isReasoningItem(type) {
@@ -1828,7 +1832,7 @@ function analyzeGraphPayload(name, text) {
 }
 
 function graphPayloadResult(name, parsed) {
-  if (name !== "query_typescript_graph") {
+  if (!singleGraphToolNames.has(name)) {
     return { kind: graphToolKind(name), payload: parsed };
   }
   switch (parsed.type) {

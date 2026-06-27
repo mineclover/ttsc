@@ -12,8 +12,7 @@
 //
 // The MCP server is the @ttsc/graph TypeScript launcher (packages/graph/lib/bin.js),
 // which runs `ttscgraph dump` once for the project (the Go binary is dump-only now)
-// and serves graph_index / graph_overview / graph_query / graph_trace /
-// graph_expand over stdio.
+// and serves one planned graph-inspection tool over stdio.
 // Tool guidance comes from the server's MCP descriptions; the user prompt is the
 // manifest question verbatim, tool-neutral, so the token comparison stays honest —
 // no graph-specific instruction is prepended.

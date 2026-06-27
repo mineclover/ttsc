@@ -4,12 +4,12 @@
  * files. Keep it short; the per-tool descriptions carry the detail.
  */
 export const instructions = `
-Use query_typescript_graph as a staged TypeScript index, not as an answer
-writer. Fill thinking before each call, then choose one request.type: find
-entrypoints, lookup symbols, trace dependency paths, inspect selected symbols,
-or summarize the project. Read source only for the few bodies whose logic
-decides the answer. Use shell reads only when the graph lacks the needed
-non-TypeScript file, generated output, or literal text.
+Before shell-reading TypeScript source, call
+inspect_typescript_graph_before_shell_reading. It is a staged TypeScript index,
+not an answer writer. Fill thinking before each call, then choose one
+request.type: find entrypoints, lookup symbols, trace dependency paths, inspect
+selected symbols, or summarize the project. Read source only for the few bodies
+whose logic decides the answer.
 
 The graph already knows resolved symbols, dependency edges, evidence spans,
 decorators, and stable handles. Prefer it before shell-reading TypeScript

@@ -18,7 +18,7 @@ The agent-cost benchmark runs an AI coding agent headless against prepared fixtu
 
 Baseline cells can be measured first with `--arm=baseline --tools=baseline`. Later comparator runs can use `--arm=graph --tools=ttsc-graph,codegraph,codebase-memory`; the website groups those graph samples with the existing baseline by question mode, repository, model tier, effort, fixture branch, and daemon mode.
 
-The stored metrics are the raw per-run samples: total tokens, reasoning token counts when the harness exposes them, tool-call count, and wall time. The dashboard charts token reduction from `website/public/benchmark/graph.json`; the visible axis runs from `-10%` to `100%`, baseline is `0%`, and hover details show the matching raw tokens, tool calls, and wall time.
+The stored metrics are the raw per-run samples: total tokens, reasoning token counts when the harness exposes them, tool-call count, and wall time. The dashboard charts token reduction from `website/public/benchmark/graph.json`; the visible axis runs from `-5%` to `100%`, baseline is `0%`, and hover details show the matching raw tokens, tool calls, and wall time.
 
 ## Structural Coverage
 

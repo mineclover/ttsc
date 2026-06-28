@@ -538,7 +538,7 @@ interface ReductionDomain {
   max: number;
 }
 
-const REDUCTION_DOMAIN: ReductionDomain = { min: -10, max: 100 };
+const REDUCTION_DOMAIN: ReductionDomain = { min: -5, max: 100 };
 
 function reductionPosition(value: number, domain: ReductionDomain): number {
   const range = domain.max - domain.min;

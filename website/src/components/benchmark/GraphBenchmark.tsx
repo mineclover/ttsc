@@ -505,15 +505,9 @@ function toolReduction(row: ReductionRow, tool: ReductionTool): number | null {
   return pctSaved(row.baseline.tokens, tool.metrics.tokens);
 }
 
-function reductionWidth(reduction: number | null): number {
-  if (reduction === null) return 0;
-  if (reduction <= 0) return 2;
-  return Math.max(2, Math.min(100, reduction));
-}
-
 function reductionLabel(reduction: number | null): string {
   if (reduction === null) return "n/a";
-  return reduction >= 0 ? `${reduction}%` : `+${-reduction}%`;
+  return `${reduction}%`;
 }
 
 function averageReduction(
@@ -537,6 +531,34 @@ function reductionText(reduction: number | null): string {
   return reduction >= 0
     ? `${reduction}% saved`
     : `${-reduction}% over baseline`;
+}
+
+interface ReductionDomain {
+  min: number;
+  max: number;
+}
+
+const REDUCTION_DOMAIN: ReductionDomain = { min: -10, max: 100 };
+
+function reductionPosition(value: number, domain: ReductionDomain): number {
+  const range = domain.max - domain.min;
+  if (range <= 0) return 0;
+  return Math.max(0, Math.min(100, ((value - domain.min) / range) * 100));
+}
+
+function reductionBarStyle(
+  reduction: number | null,
+  domain: ReductionDomain,
+): { width: string } {
+  if (reduction === null) return { width: "0%" };
+  const value = reductionPosition(reduction, domain);
+  return { width: `${Math.max(2, value)}%` };
+}
+
+function reductionTicks(domain: ReductionDomain): number[] {
+  return [...new Set([domain.min, 0, 50, 100])]
+    .filter((tick) => tick >= domain.min && tick <= domain.max)
+    .sort((a, b) => a - b);
 }
 
 function ReductionTooltip({
@@ -652,12 +674,12 @@ function reductionTools(model: ModelGroup): ReductionTool[] {
 function ChartLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[10px] text-neutral-500">
+      <LegendDot fill="#6f7787" label="baseline" />
       <LegendDot fill={ACCENT} label="@ttsc/graph" />
       <LegendDot fill={CODEGRAPH_TEXT} label="codegraph" />
       <LegendDot fill={CODEBASE_MEMORY_TEXT} label="codebase-memory" />
       <span className="text-neutral-600">
-        bars show token reduction vs empty-MCP baseline; hover for raw tokens,
-        calls, and time
+        bars show token reduction vs empty-MCP baseline; baseline is 0%
       </span>
     </div>
   );
@@ -679,6 +701,9 @@ function ReductionChart({
   const ttscAverage = averageReduction(rows, "ttsc");
   const codegraphAverage = averageReduction(rows, "codegraph");
   const codebaseMemoryAverage = averageReduction(rows, "codebaseMemory");
+  const domain = REDUCTION_DOMAIN;
+  const ticks = reductionTicks(domain);
+  const zeroPosition = reductionPosition(0, domain);
 
   return (
     <section className={`${panelClass} overflow-visible`}>
@@ -712,10 +737,29 @@ function ReductionChart({
 
         <div className="grid grid-cols-[9rem_1fr] items-center gap-3 border-y border-[#1a1f29] py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-neutral-600 sm:grid-cols-[12rem_1fr]">
           <span>case</span>
-          <div className="grid grid-cols-3">
-            <span>0%</span>
-            <span className="text-center">50%</span>
-            <span className="text-right">100%</span>
+          <div className="relative h-4">
+            <span
+              className="absolute inset-y-0 w-px bg-[#364153]"
+              style={{ left: `${zeroPosition}%` }}
+            />
+            {ticks.map((tick) => {
+              const position = reductionPosition(tick, domain);
+              return (
+                <span
+                  key={tick}
+                  className={`absolute top-0 ${
+                    position <= 1
+                      ? "text-left"
+                      : position >= 99
+                        ? "-translate-x-full text-right"
+                        : "-translate-x-1/2 text-center"
+                  }`}
+                  style={{ left: `${position}%` }}
+                >
+                  {tick}%
+                </span>
+              );
+            })}
           </div>
         </div>
 
@@ -736,6 +780,24 @@ function ReductionChart({
                 ) : null}
               </div>
               <div className="space-y-1.5">
+                <div className="grid grid-cols-[5.75rem_minmax(0,1fr)_3.25rem] items-center gap-2">
+                  <span className="truncate font-mono text-[10px] text-neutral-500">
+                    baseline
+                  </span>
+                  <div className="relative h-3.5 overflow-hidden rounded-full bg-[#161b24] ring-1 ring-inset ring-white/[0.04]">
+                    <div
+                      className="absolute top-0 h-full rounded-full bg-[#6f7787]"
+                      style={reductionBarStyle(0, domain)}
+                    />
+                    <span
+                      className="absolute inset-y-0 z-10 w-px bg-white/25"
+                      style={{ left: `${zeroPosition}%` }}
+                    />
+                  </div>
+                  <span className="text-right font-mono text-[10px] tabular-nums text-neutral-300">
+                    0%
+                  </span>
+                </div>
                 {row.tools.map((tool) => {
                   const reduction = toolReduction(row, tool);
                   const missing = !tool.metrics;
@@ -752,13 +814,17 @@ function ReductionChart({
                       </span>
                       <div className="relative h-3.5 overflow-hidden rounded-full bg-[#161b24] ring-1 ring-inset ring-white/[0.04]">
                         <div
-                          className={`h-full rounded-full ${
+                          className={`absolute top-0 h-full rounded-full ${
                             missing ? "opacity-25" : ""
                           }`}
                           style={{
-                            width: `${reductionWidth(reduction)}%`,
+                            ...reductionBarStyle(reduction, domain),
                             background: missing ? "#303644" : tool.fill,
                           }}
+                        />
+                        <span
+                          className="absolute inset-y-0 z-10 w-px bg-white/25"
+                          style={{ left: `${zeroPosition}%` }}
                         />
                       </div>
                       <span

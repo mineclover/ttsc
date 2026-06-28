@@ -1,6 +1,7 @@
 import { TtscGraphMemory } from "../model/TtscGraphMemory";
 import { ITtscGraphLookup } from "../structures/ITtscGraphLookup";
 import { ITtscGraphNode } from "../structures/ITtscGraphNode";
+import { resultGuide } from "./resultGuide";
 import { decoratorsOf, signatureOf } from "./runDetails";
 
 // One file should not crowd out the rest of the ranking, so cap hits per file.
@@ -25,7 +26,13 @@ export function runLookup(
   const queryLc = props.query.trim().toLowerCase();
   const wantsInternal = wantsInternalSymbol(queryLc, codeTerms);
   if (terms.length === 0)
-    return { type: "lookup", hits: [], next: { details: [], traceFrom: [] } };
+    return {
+      type: "lookup",
+      hits: [],
+      guide: resultGuide(
+        "No symbol matched; answer that the graph did not resolve this name or ask for a more concrete symbol.",
+      ),
+    };
 
   const scored: ITtscGraphLookup.IHit[] = [];
   for (const node of graph.nodes) {
@@ -78,10 +85,9 @@ export function runLookup(
   return {
     type: "lookup",
     hits,
-    next: {
-      details: hits.map((hit) => hit.id),
-      traceFrom: hits.map((hit) => hit.id),
-    },
+    guide: resultGuide(
+      "Use ranked hits and signatures as symbol evidence; answer when the target is clear.",
+    ),
   };
 }
 

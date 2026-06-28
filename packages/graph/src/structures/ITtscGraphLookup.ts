@@ -1,17 +1,17 @@
 import { ITtscGraphDecorator } from "./ITtscGraphDecorator";
 
-/** The ranked hits returned by targeted symbol lookup. */
+/** Targeted symbol lookup when a concrete name or handle is being resolved. */
 export interface ITtscGraphLookup {
   /** Discriminator for targeted symbol lookup. */
   type: "lookup";
 
   hits: ITtscGraphLookup.IHit[];
 
-  /** Follow-up handles for selected symbol details. */
-  next: ITtscGraphLookup.INext;
+  /** How to use this source-free result before another tool or final answer. */
+  guide: string;
 }
 export namespace ITtscGraphLookup {
-  /** Find the symbols and clusters most relevant to a natural code query. */
+  /** Find a concrete class, method, function, property, type, or dotted handle. */
   export interface IRequest {
     /** Discriminator for targeted symbol lookup. */
     type: "lookup";
@@ -20,12 +20,16 @@ export namespace ITtscGraphLookup {
      * What to find, in natural language and code vocabulary mixed freely: a
      * symbol name, a dotted member (`OrderService.create`), or a phrase
      * (`shopping order create`, `repository find relations`). Exact names are
-     * not required; subword and CamelCase matches rank too.
+     * not required, but this is not a second broad entrypoints call. Use it
+     * when a named handle is missing or ambiguous.
      */
     query: string;
 
     /**
      * Maximum hits to return.
+     *
+     * Prefer the default. Large hit lists usually mean the query is too broad;
+     * refine the name instead of raising this.
      *
      * @default 5
      */
@@ -49,13 +53,5 @@ export namespace ITtscGraphLookup {
     decorators?: ITtscGraphDecorator[];
     /** Relative relevance; higher is a better match. */
     score: number;
-  }
-
-  /** Tool-call handles suggested by this lookup result. */
-  export interface INext {
-    /** Pass these ids to `details` for source-free symbol facts. */
-    details: string[];
-    /** Pass these ids to `trace` when following dependency flow. */
-    traceFrom: string[];
   }
 }

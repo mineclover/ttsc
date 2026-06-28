@@ -3,6 +3,7 @@ import { ITtscGraphEdge } from "../structures/ITtscGraphEdge";
 import { ITtscGraphEntrypoints } from "../structures/ITtscGraphEntrypoints";
 import { ITtscGraphNode } from "../structures/ITtscGraphNode";
 import { resolveGraphHandle } from "./resolveHandle";
+import { resultGuide } from "./resultGuide";
 import { decoratorsOf, edgeEvidenceOf, signatureOf } from "./runDetails";
 import { runLookup } from "./runLookup";
 
@@ -84,10 +85,9 @@ export function runEntrypoints(
     hits,
     mentions,
     neighborhood,
-    next: {
-      details: seeds.slice(0, MAX_SEEDS).map((node) => node.id),
-      traceFrom: seeds.slice(0, MAX_SEEDS).map((node) => node.id),
-    },
+    guide: resultGuide(
+      "Use hits, mentions, and neighborhood as the code index; answer when this identifies the relevant files and symbols.",
+    ),
     ...(truncated ? { truncated: true } : {}),
   };
 }

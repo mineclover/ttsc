@@ -12,12 +12,10 @@
 //
 // The MCP server is the @ttsc/graph TypeScript launcher (packages/graph/lib/bin.js),
 // which runs `ttscgraph dump` once for the project (the Go binary is now dump-only)
-// and serves graph_index / graph_overview / graph_query / graph_trace /
-// graph_expand over stdio.
+// and serves one planned graph-inspection tool over stdio.
 // All tool guidance comes from the server's MCP initialize/tool descriptions.
-// The manifest question stays tool-neutral; the graph arm adds only the
-// measurement contract that repository evidence must come from the configured
-// graph MCP, not shell reads.
+// The manifest question is sent unchanged; graph-arm validity is enforced after
+// the run from the trace instead of by adding prompt text.
 //
 // Each sample also captures the agent's final answer text for manual
 // inspection. The benchmark itself measures runtime behavior only: tokens, tool
@@ -462,16 +460,8 @@ async function runClaude(question, cfg, armName, runNumber) {
   return parseStream(stdout);
 }
 
-function promptForArm(baseQuestion, armName) {
-  if (armName !== "graph") return baseQuestion;
-  return [
-    "Use the configured graph MCP as the repository evidence source for this run.",
-    "Use at most four graph MCP calls total; after entrypoints plus one trace or details call, answer from returned handles and ranges when possible.",
-    "Do not spend graph calls only to hunt for tests. Recommend tests only when the graph slice already returned test evidence.",
-    "Do not run shell commands to search or read source files. If the graph cannot answer a detail, cite the graph range or say what is missing.",
-    "",
-    baseQuestion,
-  ].join("\n");
+function promptForArm(baseQuestion, _armName) {
+  return baseQuestion;
 }
 
 // spawnAsync runs a child to completion and resolves its captured stdout/stderr,

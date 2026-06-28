@@ -5,78 +5,78 @@ import { ITtscGraphLookup } from "./ITtscGraphLookup";
 import { ITtscGraphOverview } from "./ITtscGraphOverview";
 import { ITtscGraphTrace } from "./ITtscGraphTrace";
 
-/**
- * The MCP tool surface of `@ttsc/graph`, as a typed application.
- *
- * The single method is the single MCP tool. Its parameter object becomes the
- * JSON schema once `typia.llm.controller` reflects this interface.
- * `TtscGraphApplication` implements it over the resident graph.
- */
+/** The typed MCP surface; its single method becomes the single graph tool. */
 export interface ITtscGraphApplication {
   /**
-   * Query the TypeScript project graph for code evidence.
+   * Inspect TypeScript source flow before shell search or file reads.
    *
-   * Use this before answering TypeScript codebase questions. It returns
-   * checker-resolved symbols, dependency paths, edge evidence ranges, and
-   * sourceSpan anchors from the resident graph, avoiding assumptions, shell
-   * search, or file reads when graph evidence is enough.
+   * Use first when an answer depends on TypeScript source structure: symbols,
+   * imports, calls, decorators, DI/request lifecycle, refs, types, ranges, or
+   * flows such as IPC/process/channel communication, render, validation, load,
+   * persist, or propagation. Use shell reads for scripts, configs, docs, exact
+   * text, generated output, and non-TypeScript files.
    *
-   * Fill properties in order: question, graphNeed, draft, review, request.
-   * Write `draft.reason` before `draft.type`, then choose `entrypoints`,
-   * `lookup`, `trace`, `details`, `overview`, or `escape`.
+   * It returns index facts and ranges, not file bodies. After calling it,
+   * answer from graph fields only or choose `escape` and cite the smallest
+   * range.
    *
-   * Most answers should need 1-3 calls; four is the hard stop for one answer.
-   * Keep slices small, prefer defaults, and stop once file/symbol/range
-   * evidence is enough.
-   *
-   * @param props The reasoning and selected graph request
-   * @returns One `result` union member matching the selected request type
+   * @param props Reasoning plus one graph request
+   * @returns Matching `result` union member
    */
-  query(props: ITtscGraphApplication.IProps): ITtscGraphApplication.IResult;
+  inspect_typescript_source_flow(
+    props: ITtscGraphApplication.IProps,
+  ): ITtscGraphApplication.IResult;
 }
 
 export namespace ITtscGraphApplication {
-  /** Think, review, then submit exactly one graph request. */
+  /** Plan with graph-specific reasoning, then submit exactly one request. */
   export interface IProps {
     /**
      * User's TypeScript code question.
      *
-     * Restate the codebase question being answered. Keep this about TypeScript
-     * source, symbols, call flow, type flow, or architecture. If the user is
-     * asking about scripts, config, generated output, or documentation instead,
-     * say that boundary here.
+     * Restate only the code question being answered. Keep it about TypeScript
+     * symbols, call flow, type flow, runtime behavior, tests exposed by the
+     * graph, or architecture. If the user asks about scripts, config, docs,
+     * generated output, exact text, or non-TypeScript files, say so here and
+     * choose `escape`.
      */
     question: string;
 
     /**
      * Why the resident graph is the next evidence source.
      *
-     * State what graph evidence is needed and why assumptions or broad shell
-     * search are not the next step for this call. Name the smallest evidence
-     * that would let the agent stop. If graph is not actually the right source,
-     * say that and use `escape`.
+     * State the smallest evidence that will settle the answer: central handles,
+     * a path, caller, dependency edge, signature, member outline, or range. If
+     * current graph evidence is enough, say so and choose `escape`. Do not
+     * frame this as an invitation to keep finding every branch.
+     *
+     * Example: `central public API-to-worker path with range anchors`.
      */
     graphNeed: string;
 
     /**
      * First request-type decision before arguments are filled.
      *
-     * Explain why one operation class is smaller than the alternatives, then
-     * name it in `draft.type`. This is only the draft; the final arguments are
-     * in `request` after `review`.
+     * Choose the smallest operation class before filling arguments.
+     * `entrypoints` starts natural questions, `lookup` resolves a concrete
+     * name, `trace` follows flow, `details` inspects selected handles,
+     * `overview` maps broad surfaces, and `escape` stops.
+     *
+     * Example: reason `find central handles before tracing`, type
+     * `entrypoints`.
      */
     draft: IRequestDraft;
 
     /**
-     * Critical review of the draft request.
+     * Critical gate before the final request.
      *
-     * Check whether the draft avoids overfetch, non-graph fallback, broad
-     * reads, and unnecessary neighbor expansion. If this would be a fourth
-     * broad lookup, trace, or details call, prefer answering from evidence in
-     * hand or choose `escape`. Do not spend graph calls only to hunt for tests.
-     * If the draft is wrong, choose the corrected type in `request`.
+     * Example inspect gate: reason `no graph evidence yet; default entrypoints
+     * is smallest`, decision `inspect`, finish `answer`.
+     *
+     * Example stop gate: reason `current graph result has ranges; source body
+     * would require file text`, decision `escape`, finish `range`.
      */
-    review: string;
+    review: IRequestReview;
 
     /** The graph operation chosen from the reasoning above, or a no-op escape. */
     request:
@@ -101,6 +101,38 @@ export namespace ITtscGraphApplication {
       | ITtscGraphDetails.IRequest["type"]
       | ITtscGraphOverview.IRequest["type"]
       | ITtscGraphEscape.IRequest["type"];
+  }
+
+  /** Final gate that prevents graph calls from becoming source-read preludes. */
+  export interface IRequestReview {
+    /**
+     * Why the final request is valid, or why graph use must stop.
+     *
+     * Reject duplicate evidence, broad limits, neighbor expansion without a
+     * named missing edge, test-only hunting, and any plan to fall back to shell
+     * search or file reads after this tool returns.
+     */
+    reason: string;
+
+    /**
+     * Whether this MCP call should run a graph request or intentionally stop.
+     *
+     * Use exactly `inspect` only when the next evidence source is still the
+     * resident graph. Use exactly `escape` when current graph evidence is
+     * enough, when the user needs non-TypeScript/source-body facts, or when
+     * another graph call would be overfetch.
+     */
+    decision: string;
+
+    /**
+     * How the agent must finish after this MCP call returns.
+     *
+     * Use exactly `answer`, `range`, or `clarify`. `answer` means answer from
+     * graph fields only. `range` means cite the smallest returned `sourceSpan`
+     * or edge `evidence` range and stop instead of reading the file. `clarify`
+     * means ask for a concrete symbol or scope.
+     */
+    finish: string;
   }
 
   /** The selected request's output. `result.type` mirrors `request.type`. */

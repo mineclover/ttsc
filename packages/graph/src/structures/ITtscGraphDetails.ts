@@ -2,10 +2,10 @@ import { ITtscGraphDecorator } from "./ITtscGraphDecorator";
 import { ITtscGraphEvidence } from "./ITtscGraphEvidence";
 
 /**
- * The resolved symbol details returned for a set of handles.
+ * The source-free facts for a few selected handles.
  *
- * The default payload is source-free: signatures, member outlines, and direct
- * graph summaries with sourceSpan anchors.
+ * This is not a file reader. It returns signatures, member outlines, direct
+ * calls, direct types, dependency summaries, and sourceSpan anchors.
  */
 export interface ITtscGraphDetails {
   /** Discriminator for selected symbol inspection. */
@@ -13,11 +13,14 @@ export interface ITtscGraphDetails {
 
   nodes: ITtscGraphDetails.INode[];
 
+  /** How to use this source-free result before another tool or final answer. */
+  guide: string;
+
   /** Handles that resolved to no node, or that were ambiguous. */
   unknown: string[];
 }
 export namespace ITtscGraphDetails {
-  /** Which handles to inspect, and how much of each to return. */
+  /** Which selected handles to inspect, and how much of each to return. */
   export interface IRequest {
     /** Discriminator for selected symbol inspection. */
     type: "details";
@@ -25,14 +28,16 @@ export namespace ITtscGraphDetails {
     /**
      * Node ids from another tool, or dotted symbol handles such as
      * `OrderService.create`. Pass the few handles you need for source-free
-     * details; use `trace` when you need a path instead of widening this call.
+     * details. Prefer one to three handles. Use `trace` when you need a path
+     * instead of widening this call.
      */
     handles: string[];
 
     /**
      * Also list each node's direct dependencies and dependents (the symbols it
      * uses and the symbols that use it). The list is capped; raise
-     * `neighborLimit` only when the first slice is not enough.
+     * `neighborLimit` only when the first slice is truncated and the missing
+     * relation is named. Do not use neighbors to recreate a file body.
      *
      * @default false
      */
@@ -42,13 +47,17 @@ export namespace ITtscGraphDetails {
      * Maximum dependencies and dependents to return per side when
      * `neighbors:true`.
      *
+     * Prefer the default. Values above a few neighbors are usually overfetch;
+     * call `trace` for flow instead.
+     *
      * @default 2
      */
     neighborLimit?: number;
 
     /**
      * Maximum owned members to return for a container or object literal. Raise
-     * only when the first outline is truncated.
+     * only when the first outline is truncated and the missing member is
+     * named.
      *
      * @default 6
      */
@@ -56,7 +65,8 @@ export namespace ITtscGraphDetails {
 
     /**
      * Maximum direct execution and type references to return per group. Raise
-     * only when the first dependency slice is not enough.
+     * only when the first dependency slice is truncated and the missing
+     * dependency is named.
      *
      * @default 1
      */

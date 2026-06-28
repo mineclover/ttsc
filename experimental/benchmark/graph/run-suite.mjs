@@ -223,7 +223,7 @@ function runPrompt(prompt) {
       let samples = [];
       try {
         const rep = JSON.parse(fs.readFileSync(report, "utf8"));
-        samples = (rep.samples?.[arm] ?? []).filter((s) => s.ok !== false);
+        samples = (rep.samples?.[arm] ?? []).filter(validMeasuredSample);
       } catch {
         /* report missing — child crashed */
       }
@@ -424,14 +424,16 @@ function agentLabel(resolvedModel) {
 function sanitizeSamples(samples) {
   return {
     baseline: (samples?.baseline ?? [])
-      .filter(validSample)
+      .filter(validMeasuredSample)
       .map(sanitizeSample),
-    graph: (samples?.graph ?? []).filter(validSample).map(sanitizeSample),
+    graph: (samples?.graph ?? [])
+      .filter(validMeasuredSample)
+      .map(sanitizeSample),
   };
 }
 
-function validSample(sample) {
-  return sample?.ok !== false;
+function validMeasuredSample(sample) {
+  return Number(sample?.tokens ?? 0) > 0;
 }
 
 function sanitizeSample(sample) {

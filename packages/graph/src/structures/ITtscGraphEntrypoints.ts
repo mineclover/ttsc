@@ -1,7 +1,7 @@
 import { ITtscGraphDecorator } from "./ITtscGraphDecorator";
 import { ITtscGraphEvidence } from "./ITtscGraphEvidence";
 
-/** The compact source-free entrypoint list returned for a code question. */
+/** The first compact source-free handle list for a TypeScript code question. */
 export interface ITtscGraphEntrypoints {
   /** Discriminator for first-pass question indexing. */
   type: "entrypoints";
@@ -18,8 +18,8 @@ export interface ITtscGraphEntrypoints {
   /** Direct dependency context for the resolved mentions and highest hits. */
   neighborhood: ITtscGraphEntrypoints.INeighborhood[];
 
-  /** Follow-up handles for deeper graph calls. */
-  next: ITtscGraphEntrypoints.INext;
+  /** How to use this source-free result before another tool or final answer. */
+  guide: string;
 
   /** True when result caps hid additional seeds or references. */
   truncated?: boolean;
@@ -27,9 +27,10 @@ export interface ITtscGraphEntrypoints {
 
 export namespace ITtscGraphEntrypoints {
   /**
-   * Ask the graph for the first entrypoints an agent should read before opening
-   * source: ranked symbols, exact mentioned handles, and nearby dependency
-   * edges.
+   * Ask for the first handles to follow. Use this once at the start of a
+   * natural behavior, architecture, lifecycle, rendering, request-flow, or
+   * validation-flow question. It returns ranked symbols, mentioned handles, and
+   * a small orientation slice without implementation text.
    */
   export interface IRequest {
     /** Discriminator for first-pass question indexing. */
@@ -38,12 +39,16 @@ export namespace ITtscGraphEntrypoints {
     /**
      * A natural code question or search phrase. Mix prose with code handles,
      * for example `how Repository.find loads relations` or
-     * `SelectQueryBuilder.setFindOptions join aliases`.
+     * `SelectQueryBuilder.setFindOptions join aliases`. Keep this close to the
+     * user's question; do not turn it into a broad keyword dump.
      */
     query: string;
 
     /**
      * Maximum ranked hits to return.
+     *
+     * Prefer the default. Raise only when the first result was truncated and
+     * the missing handle is named.
      *
      * @default 4
      */
@@ -53,6 +58,7 @@ export namespace ITtscGraphEntrypoints {
      * Maximum direct dependencies and dependents to return per indexed symbol.
      * This is an orientation slice, not a dependency dump; use `trace` or
      * `details` with `neighbors:true` after choosing the specific handles.
+     * Prefer the default zero for the first call.
      *
      * @default 0
      */
@@ -106,13 +112,5 @@ export namespace ITtscGraphEntrypoints {
      * an agent see why the edge exists without opening the file.
      */
     evidence?: ITtscGraphEvidence;
-  }
-
-  /** Tool-call handles suggested by this first entrypoints result. */
-  export interface INext {
-    /** Pass these ids to `details` for source-free symbol facts. */
-    details: string[];
-    /** Pass these ids to `trace` when following dependency flow. */
-    traceFrom: string[];
   }
 }

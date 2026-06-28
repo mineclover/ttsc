@@ -4,6 +4,7 @@ import { ITtscGraphNode } from "../structures/ITtscGraphNode";
 import { ITtscGraphTrace } from "../structures/ITtscGraphTrace";
 import { accessAliasesFor } from "./accessAliases";
 import { resolveGraphHandle } from "./resolveHandle";
+import { resultGuide } from "./resultGuide";
 import { edgeEvidenceOf, edgeEvidenceTextOf, signatureOf } from "./runDetails";
 
 const DEFAULT_DEPTH = 2;
@@ -12,7 +13,6 @@ const MAX_OPEN_DEPTH = 2;
 const MAX_OPEN_NODES = 8;
 const MAX_HOPS_PER_NODE = 1;
 const MAX_STEPS = 6;
-const MAX_NEXT_HANDLES = 2;
 
 /**
  * Breadth-first trace along the dependency graph. Structural
@@ -43,6 +43,9 @@ export function runTrace(
       hops: [],
       reached: [],
       truncated: false,
+      guide: resultGuide(
+        "Disambiguate with the returned candidates, or ask the user for the intended symbol.",
+      ),
       candidates: start.candidates.map((n) => summary(graph, n)),
     };
   }
@@ -53,6 +56,9 @@ export function runTrace(
       hops: [],
       reached: [],
       truncated: false,
+      guide: resultGuide(
+        "The start symbol was not resolved; answer that the graph has no trace from this handle.",
+      ),
     };
   }
 
@@ -65,6 +71,9 @@ export function runTrace(
       hops: [],
       reached: [],
       truncated: false,
+      guide: resultGuide(
+        "Use the returned path, hops, and evidence ranges as the flow answer.",
+      ),
     };
     const target = resolveGraphHandle(graph, props.to);
     if (target.candidates) {
@@ -93,7 +102,6 @@ export function runTrace(
       hops,
       path: path.map((node, i) => summary(graph, node, i, false, true)),
       steps: traceSteps(graph, hops),
-      next: nextFromPath(path),
     };
   }
 
@@ -164,18 +172,10 @@ export function runTrace(
     hops,
     reached: [...reached.values()],
     steps: traceSteps(graph, hops),
-    next: {
-      details: [start.node.id, ...reached.keys()].slice(0, MAX_NEXT_HANDLES),
-      traceFrom: [...reached.keys()].slice(0, MAX_NEXT_HANDLES),
-    },
+    guide: resultGuide(
+      "Use steps, hops, reached nodes, and evidence ranges as the flow answer.",
+    ),
     truncated,
-  };
-}
-
-function nextFromPath(path: ITtscGraphNode[]): ITtscGraphTrace.INext {
-  return {
-    details: path.map((node) => node.id),
-    traceFrom: path.length > 0 ? [path[path.length - 1]!.id] : [],
   };
 }
 

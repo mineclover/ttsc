@@ -9,6 +9,7 @@ import { ITtscGraphEvidence } from "../structures/ITtscGraphEvidence";
 import { ITtscGraphNode } from "../structures/ITtscGraphNode";
 import { accessAliasesFor } from "./accessAliases";
 import { resolveGraphHandle } from "./resolveHandle";
+import { resultGuide } from "./resultGuide";
 
 // A signature is the declaration head up to the body brace: a handful of lines.
 const MAX_SIGNATURE_LINES = 4;
@@ -123,7 +124,14 @@ export function runDetails(
     }
     nodes.push(detail);
   }
-  return { type: "details", nodes, unknown };
+  return {
+    type: "details",
+    nodes,
+    guide: resultGuide(
+      "Use signatures, members, calls, types, literals, and sourceSpan anchors as selected symbol facts.",
+    ),
+    unknown,
+  };
 }
 
 /** The members a container owns (via `contains`), each with its own signature. */

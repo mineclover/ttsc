@@ -1,6 +1,6 @@
 import { ITtscGraphEvidence } from "./ITtscGraphEvidence";
 
-/** The ordered dependency flow returned from a start symbol. */
+/** The compact dependency or caller flow returned from a selected start symbol. */
 export interface ITtscGraphTrace {
   /** Discriminator for dependency tracing. */
   type: "trace";
@@ -32,8 +32,8 @@ export interface ITtscGraphTrace {
   /** Compact hop summaries preserving node names and edge evidence, capped. */
   steps?: string[];
 
-  /** Follow-up handles for inspecting or continuing the trace. */
-  next?: ITtscGraphTrace.INext;
+  /** How to use this source-free result before another tool or final answer. */
+  guide: string;
 
   /** When `from` was an ambiguous name, the matches to disambiguate with. */
   candidates?: ITtscGraphTrace.INode[];
@@ -55,14 +55,15 @@ export namespace ITtscGraphTrace {
      * A target symbol: node id, simple symbol name, or dotted member name. When
      * given, the tool returns the dependency path from `from` to this target,
      * the one-call answer for "how does A reach B", instead of an open-ended
-     * trace.
+     * trace. Prefer this path mode whenever both ends are known.
      */
     to?: string;
 
     /**
      * `forward` follows what the start uses (callees, instantiations, renders);
      * `reverse` follows what uses the start (callers); `impact` is a reverse
-     * trace that flags the public API and tests a change would reach.
+     * trace that flags the public API and tests a change would reach. Caller
+     * questions should use `reverse`, not shell search.
      *
      * @default "forward"
      */
@@ -71,7 +72,8 @@ export namespace ITtscGraphTrace {
     /**
      * Which non-structural edge family to follow: `execution` follows runtime
      * calls, instantiations, property access, and JSX renders; `types` follows
-     * type references and inheritance; `all` preserves the full graph.
+     * type references and inheritance; `all` preserves the full graph. Flow
+     * questions should usually choose `execution` rather than `all`.
      *
      * @default "all"
      */
@@ -81,6 +83,9 @@ export namespace ITtscGraphTrace {
      * How many hops deep to follow. Open traces are capped at 2; path mode is
      * capped at 12.
      *
+     * Prefer the default for open traces. Raise only for path mode or when the
+     * previous trace named the missing next hop.
+     *
      * @default 2
      */
     maxDepth?: number;
@@ -89,6 +94,8 @@ export namespace ITtscGraphTrace {
      * Cap on reached nodes; the trace stops and marks itself truncated past it.
      * Open traces are capped at 10 nodes so a broad graph cannot flood
      * context.
+     *
+     * Prefer the default. Do not use a large open trace as a source reader.
      *
      * @default 6
      */
@@ -128,13 +135,5 @@ export namespace ITtscGraphTrace {
     signature?: string;
     /** Why this node matters to an impact trace: `exported`, `test`. */
     roles?: string[];
-  }
-
-  /** Tool-call handles suggested by this trace. */
-  export interface INext {
-    /** Pass these ids to `details` for selected symbol details. */
-    details: string[];
-    /** Continue tracing from these ids when the current result is intermediate. */
-    traceFrom: string[];
   }
 }

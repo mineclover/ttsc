@@ -1,6 +1,7 @@
 import { TtscGraphMemory } from "../model/TtscGraphMemory";
 import { ITtscGraphNode } from "../structures/ITtscGraphNode";
 import { ITtscGraphOverview } from "../structures/ITtscGraphOverview";
+import { resultGuide } from "./resultGuide";
 
 /** Edges that express nesting/packaging, not code dependency. */
 const STRUCTURAL_KINDS = new Set<string>(["contains", "exports", "imports"]);
@@ -36,6 +37,9 @@ export function runOverview(
       edges: graph.edges.length,
       byKind,
     },
+    guide: resultGuide(
+      "Use counts, layers, hotspots, and public API as a broad orientation map only.",
+    ),
   };
   if (want("layers")) result.layers = layers(graph);
   if (want("hotspots")) result.hotspots = hotspots(graph);

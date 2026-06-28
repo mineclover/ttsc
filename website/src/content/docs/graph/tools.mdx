@@ -4,19 +4,19 @@ import LocalSource from "../../../components/LocalSource";
 
 # Tools
 
-`@ttsc/graph` exposes one MCP tool: `query`. It is a narrowing engine over the checker-resolved graph. The model first states why graph evidence is needed, writes `draft.reason` before `draft.type`, reviews that draft for overfetch or wrong-tool use, then submits one request branch.
+`@ttsc/graph` exposes one MCP tool: `inspect_typescript_source_flow`. It is a narrowing engine over the checker-resolved graph. The model first states why graph evidence is needed, writes `draft.reason` before `draft.type`, reviews that draft for overfetch or wrong-tool use, then submits one request branch.
 
 Every node and edge is resolved by the TypeScript checker, so the graph is a checker-resolved fact map end to end. The MCP return value is always one object: `{ result: ... }`. The `result` property is the union branch, and `result.type` matches the selected request branch.
 
 Use `escape` when the review shows the graph is the wrong evidence source, or the previous result is enough. That branch returns without running a graph lookup or traversal.
 
-## query
+## inspect_typescript_source_flow
 
 The tool contract is `ITtscGraphApplication.ts`. Its request branches are the files listed below.
 
 ## Request Branches
 
-`ITtscGraphEntrypoints.IRequest` returns a compact shortlist for behavior-specific code questions: ranked symbols, direct mentions, small dependency orientation, and follow-up handles. It is the source-free replacement for broad search.
+`ITtscGraphEntrypoints.IRequest` returns a compact shortlist for behavior-specific code questions: ranked symbols, direct mentions, and small dependency orientation. It is the source-free replacement for broad search.
 
 `ITtscGraphLookup.IRequest` finds a class, method, function, property, type, or file concept when you do not already have its handle. Keep the default limit unless a previous result was ambiguous.
 

@@ -1,7 +1,4 @@
-/**
- * A compact, source-read-free architecture map of the project returned by
- * `overview`.
- */
+/** A compact, source-read-free project map for broad orientation only. */
 export interface ITtscGraphOverview {
   /** Discriminator for source-free project overview. */
   type: "overview";
@@ -11,6 +8,9 @@ export interface ITtscGraphOverview {
 
   /** Size of the graph. */
   counts: ITtscGraphOverview.ICounts;
+
+  /** How to use this source-free result before another tool or final answer. */
+  guide: string;
 
   /** Folder layering, largest first. */
   layers?: ITtscGraphOverview.ILayer[];
@@ -22,7 +22,7 @@ export interface ITtscGraphOverview {
   publicApi?: ITtscGraphOverview.IPublicApi[];
 }
 export namespace ITtscGraphOverview {
-  /** Which architecture facets `overview` should return. */
+  /** Which broad architecture facets `overview` should return. */
   export interface IRequest {
     /** Discriminator for source-free project overview. */
     type: "overview";
@@ -31,6 +31,10 @@ export namespace ITtscGraphOverview {
      * The facet to project, or `all` for every facet. `layers` is the folder
      * layering, `hotspots` the highest-dependency symbols, `publicApi` the
      * exported API symbols ranked by how depended-on they are.
+     *
+     * Use this only for broad public API or layer orientation. For behavior,
+     * lifecycle, request-flow, rendering-flow, validation-flow, caller, or
+     * dependency questions, use `entrypoints` then `trace` instead.
      *
      * @default "all"
      */

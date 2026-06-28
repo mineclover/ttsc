@@ -206,6 +206,7 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
           request: {
             type: "entrypoints",
             query: "how Service.run reaches helper",
+            neighbors: 1,
           },
         }),
       })) as ToolResult,

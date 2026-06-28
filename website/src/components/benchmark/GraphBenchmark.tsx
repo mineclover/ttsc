@@ -9,7 +9,11 @@ import { useEffect, useState } from "react";
 interface AgentSample {
   tokens: number;
   tools: number;
+  graph?: number;
+  shell?: number;
   ok?: boolean;
+  invalid?: string;
+  error?: string;
   durMs?: number;
   [key: string]: unknown;
 }
@@ -164,16 +168,15 @@ function cellTool(cell: AgentCell): string {
 }
 
 /**
- * Display order for the model rows inside a project tab: Claude Code first,
- * then Codex; within each harness the larger model first. Unknown models sort
- * last.
+ * Display order for model rows and tabs. Keep Codex GPT-5.4 mini first because
+ * it is the primary benchmark lane, then larger Codex and Claude models.
  */
 function modelOrder(model: string): number {
   const order = [
+    "codex-gpt-mini",
+    "codex-gpt",
     "claude-code-opus",
     "claude-code-sonnet",
-    "codex-gpt",
-    "codex-gpt-mini",
   ];
   const index = order.indexOf(model);
   return index === -1 ? order.length : index;
@@ -242,7 +245,7 @@ interface PromptModeGroup {
 }
 
 function medianMetrics(samples: AgentSample[]): Metrics {
-  const valid = validSamples(samples);
+  const valid = metricSamples(samples);
   return {
     tokens: median(valid.map((s) => s.tokens)),
     tools: median(valid.map((s) => s.tools)),
@@ -250,8 +253,10 @@ function medianMetrics(samples: AgentSample[]): Metrics {
   };
 }
 
-function validSamples(samples: AgentSample[]): AgentSample[] {
-  return samples.filter((sample) => sample.ok !== false);
+function metricSamples(samples: AgentSample[]): AgentSample[] {
+  // Plot raw token cost even when the harness labels a graph run invalid, such
+  // as shell fallback. Only zero-token process failures are missing data.
+  return samples.filter((sample) => sample.tokens > 0);
 }
 
 function modelGroupKey(cell: AgentCell): string {
@@ -362,17 +367,17 @@ function buildProjectGroups(cells: AgentCell[]): ProjectGroup[] {
           codebaseMemorySetupMs: codebaseMemoryCell?.toolSetupMs,
           baseline: medianMetrics(baselineSamples),
           ttsc:
-            ttscCell && validSamples(ttscCell.samples.graph).length > 0
+            ttscCell && metricSamples(ttscCell.samples.graph).length > 0
               ? medianMetrics(ttscCell.samples.graph)
               : undefined,
           codegraph:
             codegraphCell &&
-            validSamples(codegraphCell.samples.graph).length > 0
+            metricSamples(codegraphCell.samples.graph).length > 0
               ? medianMetrics(codegraphCell.samples.graph)
               : undefined,
           codebaseMemory:
             codebaseMemoryCell &&
-            validSamples(codebaseMemoryCell.samples.graph).length > 0
+            metricSamples(codebaseMemoryCell.samples.graph).length > 0
               ? medianMetrics(codebaseMemoryCell.samples.graph)
               : undefined,
         };
@@ -533,32 +538,50 @@ function reductionText(reduction: number | null): string {
     : `${-reduction}% over baseline`;
 }
 
-interface ReductionDomain {
-  min: number;
-  max: number;
+interface TokenDomain {
+  maxTokens: number;
 }
 
-const REDUCTION_DOMAIN: ReductionDomain = { min: -5, max: 100 };
-
-function reductionPosition(value: number, domain: ReductionDomain): number {
-  const range = domain.max - domain.min;
-  if (range <= 0) return 0;
-  return Math.max(0, Math.min(100, ((value - domain.min) / range) * 100));
+function tokenDomain(rows: ReductionRow[]): TokenDomain {
+  const values = rows.flatMap((row) => [
+    row.baseline.tokens,
+    ...row.tools
+      .map((tool) => tool.metrics?.tokens)
+      .filter((value): value is number => value !== undefined),
+  ]);
+  const max = Math.max(1, ...values);
+  return { maxTokens: max * 1.05 };
 }
 
-function reductionBarStyle(
-  reduction: number | null,
-  domain: ReductionDomain,
+function tokenPosition(tokens: number, domain: TokenDomain): number {
+  if (domain.maxTokens <= 0) return 0;
+  return Math.max(0, Math.min(100, (tokens / domain.maxTokens) * 100));
+}
+
+function tokenBarStyle(
+  tokens: number | null,
+  domain: TokenDomain,
 ): { width: string } {
-  if (reduction === null) return { width: "0%" };
-  const value = reductionPosition(reduction, domain);
-  return { width: `${Math.max(2, value)}%` };
+  if (tokens === null) return { width: "0%" };
+  return { width: `${Math.max(1.2, tokenPosition(tokens, domain))}%` };
 }
 
-function reductionTicks(domain: ReductionDomain): number[] {
-  return [...new Set([domain.min, 0, 50, 100])]
-    .filter((tick) => tick >= domain.min && tick <= domain.max)
-    .sort((a, b) => a - b);
+function tokenTicks(domain: TokenDomain): number[] {
+  const rawStep = domain.maxTokens / 4;
+  const base = 10 ** Math.floor(Math.log10(rawStep));
+  const step =
+    [1, 2, 5, 10].find((factor) => factor * base >= rawStep) ?? 10 * base;
+  const ticks: number[] = [];
+  for (let tick = 0; tick <= domain.maxTokens; tick += step) ticks.push(tick);
+  if (ticks.length === 1) ticks.push(domain.maxTokens);
+  return ticks;
+}
+
+function fmtTokenShort(tokens: number): string {
+  if (tokens >= 1_000_000)
+    return `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}k`;
+  return `${Math.round(tokens)}`;
 }
 
 function ReductionTooltip({
@@ -679,7 +702,7 @@ function ChartLegend() {
       <LegendDot fill={CODEGRAPH_TEXT} label="codegraph" />
       <LegendDot fill={CODEBASE_MEMORY_TEXT} label="codebase-memory" />
       <span className="text-neutral-600">
-        bars show token reduction vs empty-MCP baseline; baseline is 0%
+        bars show raw token usage; lower is better
       </span>
     </div>
   );
@@ -701,9 +724,8 @@ function ReductionChart({
   const ttscAverage = averageReduction(rows, "ttsc");
   const codegraphAverage = averageReduction(rows, "codegraph");
   const codebaseMemoryAverage = averageReduction(rows, "codebaseMemory");
-  const domain = REDUCTION_DOMAIN;
-  const ticks = reductionTicks(domain);
-  const zeroPosition = reductionPosition(0, domain);
+  const domain = tokenDomain(rows);
+  const ticks = tokenTicks(domain);
 
   return (
     <section className={`${panelClass} overflow-visible`}>
@@ -738,12 +760,8 @@ function ReductionChart({
         <div className="grid grid-cols-[9rem_1fr] items-center gap-3 border-y border-[#1a1f29] py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-neutral-600 sm:grid-cols-[12rem_1fr]">
           <span>case</span>
           <div className="relative h-4">
-            <span
-              className="absolute inset-y-0 w-px bg-[#364153]"
-              style={{ left: `${zeroPosition}%` }}
-            />
             {ticks.map((tick) => {
-              const position = reductionPosition(tick, domain);
+              const position = tokenPosition(tick, domain);
               return (
                 <span
                   key={tick}
@@ -756,7 +774,7 @@ function ReductionChart({
                   }`}
                   style={{ left: `${position}%` }}
                 >
-                  {tick}%
+                  {fmtTokenShort(tick)}
                 </span>
               );
             })}
@@ -780,22 +798,18 @@ function ReductionChart({
                 ) : null}
               </div>
               <div className="space-y-1.5">
-                <div className="grid grid-cols-[5.75rem_minmax(0,1fr)_3.25rem] items-center gap-2">
+                <div className="grid grid-cols-[5.75rem_minmax(0,1fr)_4.25rem] items-center gap-2">
                   <span className="truncate font-mono text-[10px] text-neutral-500">
                     baseline
                   </span>
                   <div className="relative h-3.5 overflow-hidden rounded-full bg-[#161b24] ring-1 ring-inset ring-white/[0.04]">
                     <div
                       className="absolute top-0 h-full rounded-full bg-[#6f7787]"
-                      style={reductionBarStyle(0, domain)}
-                    />
-                    <span
-                      className="absolute inset-y-0 z-10 w-px bg-white/25"
-                      style={{ left: `${zeroPosition}%` }}
+                      style={tokenBarStyle(row.baseline.tokens, domain)}
                     />
                   </div>
                   <span className="text-right font-mono text-[10px] tabular-nums text-neutral-300">
-                    0%
+                    {fmtTokenShort(row.baseline.tokens)}
                   </span>
                 </div>
                 {row.tools.map((tool) => {
@@ -804,7 +818,7 @@ function ReductionChart({
                   return (
                     <div
                       key={tool.key}
-                      className="group relative grid grid-cols-[5.75rem_minmax(0,1fr)_3.25rem] items-center gap-2"
+                      className="group relative grid grid-cols-[5.75rem_minmax(0,1fr)_4.25rem] items-center gap-2"
                     >
                       <span
                         className="truncate font-mono text-[10px]"
@@ -818,13 +832,9 @@ function ReductionChart({
                             missing ? "opacity-25" : ""
                           }`}
                           style={{
-                            ...reductionBarStyle(reduction, domain),
+                            ...tokenBarStyle(tool.metrics?.tokens ?? null, domain),
                             background: missing ? "#303644" : tool.fill,
                           }}
-                        />
-                        <span
-                          className="absolute inset-y-0 z-10 w-px bg-white/25"
-                          style={{ left: `${zeroPosition}%` }}
                         />
                       </div>
                       <span
@@ -832,9 +842,11 @@ function ReductionChart({
                           reduction !== null && reduction < 0
                             ? "text-rose-400"
                             : "text-neutral-300"
-                        }`}
+                          }`}
                       >
-                        {reductionLabel(reduction)}
+                        {tool.metrics
+                          ? fmtTokenShort(tool.metrics.tokens)
+                          : "n/a"}
                       </span>
                       <ReductionTooltip row={row} tool={tool} />
                     </div>

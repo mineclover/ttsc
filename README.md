@@ -6,17 +6,10 @@
 
 A `typescript-go` toolchain for compiler-powered plugins and type-safe execution.
 
-Benchmarked against the legacy `tsc` + `eslint`/`prettier` path on real repositories; see the [benchmark guide](https://ttsc.dev/docs/benchmark/performance) for per-project ratios.
-
 - **`ttsc`**: build, check, and transform.
 - **`ttsx`**: execute TypeScript with type checking.
-  - native TypeScript-Go execution instead of transpile-only runners.
-  - type checking that `tsx` does not provide.
-- **`@ttsc/lint`**: replaces `eslint` and `prettier`.
-  - lint violations as TS compile errors.
-  - format autofixes via `ttsc format`.
-- **`@ttsc/graph`**: a code map for coding agents, over MCP.
-  - what calls what, and a change's blast radius, from the type checker.
+- **`@ttsc/lint`**: lint violations as compiler errors.
+- **`@ttsc/graph`**: MCP code graph that reduce token usage.
 - **plugin support**: compiler-powered libraries, such as `typia`.
 
 ## Setup

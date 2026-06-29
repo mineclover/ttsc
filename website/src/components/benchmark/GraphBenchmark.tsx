@@ -1378,17 +1378,18 @@ export default function GraphBenchmark({
     };
   }, []);
 
-  if (error)
-    return <Notice>Could not load graph benchmark data ({error}).</Notice>;
-
-  if (!report) return <Notice>Loading graph benchmark results...</Notice>;
-
   const modes = useMemo(() => {
+    if (!report) return [];
     const groups = buildProjectGroups(report.agent?.cells ?? []);
     return buildPromptModeGroups(groups);
   }, [report]);
   const commonMode = modes.find((mode) => mode.id === "common");
   const dedicatedMode = modes.find((mode) => mode.id === "dedicated");
+
+  if (error)
+    return <Notice>Could not load graph benchmark data ({error}).</Notice>;
+
+  if (!report) return <Notice>Loading graph benchmark results...</Notice>;
 
   // The landing summary keeps the shared onboarding comparison only. The full
   // page follows with dedicated project prompts and structural coverage.

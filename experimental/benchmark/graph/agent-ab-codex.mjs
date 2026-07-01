@@ -179,18 +179,31 @@ const toolSetupMs =
   args["tool-setup-ms"] === undefined
     ? undefined
     : Number(args["tool-setup-ms"]);
-// --cg points the graph arm at codegraph, and --cbm points it at
-// codebase-memory-mcp. Both use the same prompt and validity gates as
-// @ttsc/graph.
+// --cg, --cbm, and --serena point the graph arm at external MCP comparators.
+// They use the same prompt and validity gates as @ttsc/graph.
 const cg = args.cg === "1" || args.cg === "true";
 const cbm = args.cbm === "1" || args.cbm === "true";
-if (cg && cbm) throw new Error("--cg and --cbm cannot be combined");
+const serena = args.serena === "1" || args.serena === "true";
+if ([cg, cbm, serena].filter(Boolean).length > 1) {
+  throw new Error("--cg, --cbm, and --serena cannot be combined");
+}
 const cbmBinary =
   args["cbm-binary"] ??
   process.env.CODEBASE_MEMORY_MCP_BINARY ??
   "codebase-memory-mcp";
 const cbmCommand = commandPath(cbmBinary);
 const cbmCacheDir = args["cbm-cache-dir"];
+const serenaCommand = commandPath(
+  args["serena-command"] ?? process.env.SERENA_MCP_COMMAND ?? "uvx",
+);
+const mcpStartupTimeoutSec = optionalNonNegativeInteger(
+  args["mcp-startup-timeout-sec"] ?? process.env.CODEX_MCP_STARTUP_TIMEOUT_SEC,
+  "--mcp-startup-timeout-sec",
+);
+const mcpToolTimeoutSec = optionalNonNegativeInteger(
+  args["mcp-tool-timeout-sec"] ?? process.env.CODEX_MCP_TOOL_TIMEOUT_SEC,
+  "--mcp-tool-timeout-sec",
+);
 // --arm selects which arms to run: `baseline` and `graph` can be measured
 // separately so a fixed baseline is cached once and later graph iterations only
 // rerun the MCP arm. Baseline-only does not need graph binaries or dependencies.
@@ -217,7 +230,7 @@ const binary = path.join(
   os.tmpdir(),
   `ttscgraph-codex-${process.pid}${process.platform === "win32" ? ".exe" : ""}`,
 );
-if (armsRequested.graph && !cg && !cbm) {
+if (armsRequested.graph && !cg && !cbm && !serena) {
   if (!fs.existsSync(graphLauncher)) {
     throw new Error(
       `@ttsc/graph launcher not built: ${graphLauncher}\n` +
@@ -255,11 +268,12 @@ if (
   armsRequested.graph &&
   !cg &&
   !cbm &&
+  !serena &&
   !fs.existsSync(path.join(repoDir, tsconfig))
 ) {
   throw new Error(`missing tsconfig: ${path.join(repoDir, tsconfig)}`);
 }
-if (armsRequested.graph && !cg && !cbm) ensureInstalled(repoDir);
+if (armsRequested.graph && !cg && !cbm && !serena) ensureInstalled(repoDir);
 
 // 3. The graph server is the Node launcher run over stdio; it shells out to the
 // dump binary (pointed at via TTSC_GRAPH_BINARY) on the first tool call, then
@@ -272,7 +286,7 @@ const launcherArgs = [graphLauncher, "--cwd", repoDir, "--tsconfig", tsconfig];
 // server. Both copy the real auth.json so codex stays logged in.
 const realHome = path.join(os.homedir(), ".codex");
 const withHome = armsRequested.graph
-  ? makeCodexHome("with", cg || cbm ? [] : launcherArgs)
+  ? makeCodexHome("with", cg || cbm || serena ? [] : launcherArgs)
   : null;
 const withoutHome = armsRequested.baseline
   ? makeCodexHome("without", null)
@@ -315,9 +329,13 @@ const samples = Object.fromEntries(arms.map((a) => [a.name, []]));
 const concurrency = Number(process.env.TTSC_BENCH_CONCURRENCY) || Infinity;
 const thunks = arms.flatMap((arm) =>
   Array.from({ length: runs }, (_, r) => async () => {
-    // A failed run (rate limit or an incomplete turn) carries no usable sample, so
-    // retry it in place rather than letting it thin the median. The trace file is
-    // keyed by run number, so a retry overwrites the attempt.
+    // Validity is token-based only: a run that spent tokens is a real measurement
+    // and is kept, even if its MCP calls failed or it never produced a clean
+    // answer. Those are quality concerns judged out of band, not reasons to
+    // re-spend the budget. Only a zero-token run (rate limit / capacity failure /
+    // an incomplete turn that never reached the model) is invalid: it carries no
+    // usable sample, so retry it in place rather than letting it thin the median.
+    // The trace file is keyed by run number, so a retry overwrites the attempt.
     let m;
     let attempts = 0;
     for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
@@ -331,7 +349,7 @@ const thunks = arms.flatMap((arm) =>
         ),
         arm.name,
       );
-      if (m.ok) break;
+      if (Number(m?.tokens ?? 0) > 0) break;
       if (attempt < MAX_RUN_RETRIES)
         console.log(
           `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED]${m.error ? ` ${m.error}` : ""} retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
@@ -369,7 +387,11 @@ async function runWithConcurrency(work, limit) {
 }
 
 const med = (arm, k) =>
-  median((samples[arm] ?? []).filter((m) => m.ok).map((m) => m[k]));
+  median(
+    (samples[arm] ?? [])
+      .filter((m) => Number(m?.tokens ?? 0) > 0)
+      .map((m) => m[k]),
+  );
 const pct = (g, b) => (b === 0 ? 0 : Math.round((1 - g / b) * 100));
 const printBaselineLine = (label, k, fmt = (x) => x) => {
   console.log(`  ${label.padEnd(12)} baseline ${fmt(med("baseline", k))}`);
@@ -422,14 +444,19 @@ function makeCodexHome(tag, serverArgs) {
       const a = codegraphServerArgs(repoDir)
         .map((x) => `'${x}'`)
         .join(", ");
-      toml += `\n[mcp_servers.codegraph]\ncommand = '${command}'\nargs = [${a}]\nenv = { CODEGRAPH_NO_DAEMON = "1" }\nrequired = true\n`;
+      toml += `\n[mcp_servers.codegraph]\ncommand = '${command}'\nargs = [${a}]\nenv = { CODEGRAPH_NO_DAEMON = "1" }\nrequired = true\n${mcpTimeoutConfigToml()}`;
     } else if (cbm) {
       const envParts = [`CBM_LOG_LEVEL = "warn"`];
       if (cbmCacheDir) envParts.unshift(`CBM_CACHE_DIR = '${cbmCacheDir}'`);
-      toml += `\n[mcp_servers.codebase_memory]\ncommand = '${cbmCommand}'\nargs = []\nenv = { ${envParts.join(", ")} }\nrequired = true\n`;
+      toml += `\n[mcp_servers.codebase_memory]\ncommand = '${cbmCommand}'\nargs = []\nenv = { ${envParts.join(", ")} }\nrequired = true\n${mcpTimeoutConfigToml()}`;
+    } else if (serena) {
+      const argList = serenaServerArgs(repoDir)
+        .map((a) => `'${a}'`)
+        .join(", ");
+      toml += `\n[mcp_servers.serena]\ncommand = '${serenaCommand}'\nargs = [${argList}]\nrequired = true\n${mcpTimeoutConfigToml()}`;
     } else {
       const argList = serverArgs.map((a) => `'${a}'`).join(", ");
-      toml += `\n[mcp_servers.ttscgraph]\ncommand = '${process.execPath}'\nargs = [${argList}]\nenv = { TTSC_GRAPH_BINARY = '${binary}' }\nrequired = true\n`;
+      toml += `\n[mcp_servers.ttscgraph]\ncommand = '${process.execPath}'\nargs = [${argList}]\nenv = { TTSC_GRAPH_BINARY = '${binary}' }\nrequired = true\n${mcpTimeoutConfigToml()}`;
     }
   }
   validateMcpConfig(toml);
@@ -438,7 +465,7 @@ function makeCodexHome(tag, serverArgs) {
 }
 
 function validateMcpConfig(toml) {
-  if ((cg || cbm) && toml.includes("[mcp_servers.ttscgraph]")) {
+  if ((cg || cbm || serena) && toml.includes("[mcp_servers.ttscgraph]")) {
     throw new Error("comparator Codex config must not include @ttsc/graph");
   }
   if (cg && !toml.includes("[mcp_servers.codegraph]")) {
@@ -449,11 +476,15 @@ function validateMcpConfig(toml) {
       "codebase-memory Codex config did not include codebase-memory",
     );
   }
+  if (serena && !toml.includes("[mcp_servers.serena]")) {
+    throw new Error("Serena Codex config did not include Serena");
+  }
 }
 
 function graphToolName() {
   if (cg) return "codegraph";
   if (cbm) return "codebase-memory";
+  if (serena) return "serena";
   return "ttsc-graph";
 }
 
@@ -463,11 +494,63 @@ function commandPath(command) {
     : command;
 }
 
+function mcpTimeoutConfigToml() {
+  return [
+    mcpStartupTimeoutSec === undefined
+      ? null
+      : `startup_timeout_sec = ${mcpStartupTimeoutSec}`,
+    mcpToolTimeoutSec === undefined
+      ? null
+      : `tool_timeout_sec = ${mcpToolTimeoutSec}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function codegraphServerArgs(targetRepoDir) {
   const args = ["serve", "--mcp", "--path", targetRepoDir];
   return process.platform === "win32"
     ? ["/d", "/s", "/c", "codegraph", ...args]
     : args;
+}
+
+function serenaServerArgs(targetRepoDir) {
+  const configured = args["serena-args"] ?? process.env.SERENA_MCP_ARGS;
+  if (configured) return parseConfiguredArgs(configured, targetRepoDir);
+  return [
+    "--from",
+    "git+https://github.com/oraios/serena",
+    "serena",
+    "start-mcp-server",
+    "--context",
+    "codex",
+    "--project",
+    targetRepoDir,
+    "--enable-web-dashboard",
+    "False",
+    "--open-web-dashboard",
+    "False",
+    "--log-level",
+    "WARNING",
+  ];
+}
+
+function parseConfiguredArgs(raw, targetRepoDir) {
+  const parsed = raw.trim().startsWith("[")
+    ? JSON.parse(raw)
+    : raw
+        .match(/"[^"]*"|'[^']*'|\S+/g)
+        ?.map((part) => part.replace(/^(['"])(.*)\1$/, "$2"));
+  if (!Array.isArray(parsed)) {
+    throw new Error(
+      "--serena-args must be a JSON string array or shell-like list",
+    );
+  }
+  return parsed.map((part) =>
+    String(part)
+      .replaceAll("{repo}", targetRepoDir)
+      .replaceAll("{cwd}", targetRepoDir),
+  );
 }
 
 function promptForArm(baseQuestion, _armName) {
@@ -535,6 +618,11 @@ function parseNonNegativeInteger(value, label) {
     throw new Error(`${label} must be a non-negative integer`);
   }
   return out;
+}
+
+function optionalNonNegativeInteger(value, label) {
+  if (value === undefined || value === null || value === "") return undefined;
+  return parseNonNegativeInteger(value, label);
 }
 
 function sourceInspectionCommand(command) {

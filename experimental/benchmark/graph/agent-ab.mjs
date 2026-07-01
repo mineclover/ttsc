@@ -143,6 +143,12 @@ const claudeStartupGraceMs = parseNonNegativeInteger(
     "5000",
   "--claude-startup-grace-ms",
 );
+const claudeRunTimeoutMs = parseNonNegativeInteger(
+  args["claude-run-timeout-ms"] ??
+    process.env.TTSC_CLAUDE_RUN_TIMEOUT_MS ??
+    "900000",
+  "--claude-run-timeout-ms",
+);
 const tsconfig =
   args.tsconfig ?? manifestPrompt?.entry.tsconfig ?? spec.tsconfig;
 const question = args.question ?? manifestPrompt?.text;
@@ -181,18 +187,23 @@ const toolSetupMs =
   args["tool-setup-ms"] === undefined
     ? undefined
     : Number(args["tool-setup-ms"]);
-// --cg points the "graph" arm at codegraph (colbymchenry/codegraph) instead of
-// @ttsc/graph, so the exact same A/B can be run against the tool we ported, for an
-// apples-to-apples comparison. The repo must already be indexed (`codegraph init`).
+// --cg, --cbm, and --serena point the graph arm at external MCP comparators.
+// They use the same A/B prompt and validity gates as @ttsc/graph.
 const cg = args.cg === "1" || args.cg === "true";
 const cbm = args.cbm === "1" || args.cbm === "true";
-if (cg && cbm) throw new Error("--cg and --cbm cannot be combined");
+const serena = args.serena === "1" || args.serena === "true";
+if ([cg, cbm, serena].filter(Boolean).length > 1) {
+  throw new Error("--cg, --cbm, and --serena cannot be combined");
+}
 const cbmBinary =
   args["cbm-binary"] ??
   process.env.CODEBASE_MEMORY_MCP_BINARY ??
   "codebase-memory-mcp";
 const cbmCommand = commandPath(cbmBinary);
 const cbmCacheDir = args["cbm-cache-dir"];
+const serenaCommand = commandPath(
+  args["serena-command"] ?? process.env.SERENA_MCP_COMMAND ?? "uvx",
+);
 // --arm selects which arms to run: `baseline` and `graph` can be measured
 // separately so a fixed baseline is cached once and later graph iterations only
 // rerun the MCP arm. Baseline-only does not need graph binaries or dependencies.
@@ -219,7 +230,7 @@ const binary = path.join(
   os.tmpdir(),
   `ttscgraph-ab-${process.pid}${process.platform === "win32" ? ".exe" : ""}`,
 );
-if (armsRequested.graph && !cg && !cbm) {
+if (armsRequested.graph && !cg && !cbm && !serena) {
   if (!fs.existsSync(graphLauncher)) {
     throw new Error(
       `@ttsc/graph launcher not built: ${graphLauncher}\n` +
@@ -257,11 +268,12 @@ if (
   armsRequested.graph &&
   !cg &&
   !cbm &&
+  !serena &&
   !fs.existsSync(path.join(repoDir, tsconfig))
 ) {
   throw new Error(`missing tsconfig: ${path.join(repoDir, tsconfig)}`);
 }
-if (armsRequested.graph && !cg && !cbm) ensureInstalled(repoDir);
+if (armsRequested.graph && !cg && !cbm && !serena) ensureInstalled(repoDir);
 
 // 3. WITH = @ttsc/graph; WITHOUT = empty config. Both --strict-mcp-config. The
 // graph server is the Node launcher run over stdio; it shells out to the dump
@@ -279,13 +291,15 @@ if (withCfg) {
     ? { codegraph: codegraphServerConfig(repoDir) }
     : cbm
       ? { "codebase-memory-mcp": codebaseMemoryServerConfig() }
-      : {
-          "ttsc-graph": {
-            command: process.execPath,
-            args: [graphLauncher, "--cwd", repoDir, "--tsconfig", tsconfig],
-            env: { TTSC_GRAPH_BINARY: binary },
-          },
-        };
+      : serena
+        ? { serena: serenaServerConfig(repoDir) }
+        : {
+            "ttsc-graph": {
+              command: process.execPath,
+              args: [graphLauncher, "--cwd", repoDir, "--tsconfig", tsconfig],
+              env: { TTSC_GRAPH_BINARY: binary },
+            },
+          };
   validateMcpServerConfig(serverCfg);
   fs.writeFileSync(withCfg, JSON.stringify({ mcpServers: serverCfg }));
 }
@@ -330,9 +344,13 @@ const MAX_RUN_RETRIES = parseNonNegativeInteger(
 const concurrency = Number(process.env.TTSC_BENCH_CONCURRENCY) || Infinity;
 const thunks = arms.flatMap((arm) =>
   Array.from({ length: runs }, (_, r) => async () => {
-    // A failed run (a 529 overload, mostly) carries no usable sample, so retry it
-    // in place rather than letting it thin the median. The trace file is keyed by
-    // run number, so a successful retry overwrites the failed attempt.
+    // Validity is token-based only: a run that spent tokens is a real measurement
+    // and is kept, even if its MCP calls failed or it never produced a clean
+    // answer. Those are quality concerns judged out of band, not reasons to
+    // re-spend the budget. Only a zero-token run is invalid and worth retrying: a
+    // 529 overload reports subtype "success" with is_error and zero token usage,
+    // so it carries no usable sample. The trace file is keyed by run number, so a
+    // successful retry overwrites the failed attempt.
     let m;
     let attempts = 0;
     for (let attempt = 0; attempt <= MAX_RUN_RETRIES; attempt++) {
@@ -346,7 +364,7 @@ const thunks = arms.flatMap((arm) =>
         ),
         arm.name,
       );
-      if (m.ok) break;
+      if (Number(m?.tokens ?? 0) > 0) break;
       if (attempt < MAX_RUN_RETRIES)
         console.log(
           `  ${arm.name.padEnd(8)} run ${r + 1}: [FAILED] ${m.error || ""} retrying (${attempt + 1}/${MAX_RUN_RETRIES})`,
@@ -384,7 +402,11 @@ async function runWithConcurrency(work, limit) {
 }
 
 const med = (arm, k) =>
-  median((samples[arm] ?? []).filter((m) => m.ok).map((m) => m[k]));
+  median(
+    (samples[arm] ?? [])
+      .filter((m) => Number(m?.tokens ?? 0) > 0)
+      .map((m) => m[k]),
+  );
 const pct = (g, b) => (b === 0 ? 0 : Math.round((1 - g / b) * 100));
 const printBaselineLine = (label, k, fmt = (x) => x) => {
   console.log(`  ${label.padEnd(12)} baseline ${fmt(med("baseline", k))}`);
@@ -490,7 +512,7 @@ async function runClaude(question, cfg, armName, runNumber) {
     inputDelayMs: delayedInput ? claudeStartupGraceMs : 0,
     windowsHide: true,
     shell: true,
-    timeout: 900_000,
+    timeout: claudeRunTimeoutMs,
   });
   if (result.error) throw result.error;
   const stdout = result.stdout ?? "";
@@ -602,7 +624,7 @@ function codegraphServerConfig(targetRepoDir) {
 }
 
 function validateMcpServerConfig(serverCfg) {
-  if ((cg || cbm) && serverCfg["ttsc-graph"]) {
+  if ((cg || cbm || serena) && serverCfg["ttsc-graph"]) {
     throw new Error("comparator Claude config must not include @ttsc/graph");
   }
   if (cg && !serverCfg.codegraph) {
@@ -612,6 +634,9 @@ function validateMcpServerConfig(serverCfg) {
     throw new Error(
       "codebase-memory Claude config did not include codebase-memory",
     );
+  }
+  if (serena && !serverCfg.serena) {
+    throw new Error("Serena Claude config did not include Serena");
   }
 }
 
@@ -626,6 +651,52 @@ function codebaseMemoryServerConfig() {
   };
 }
 
+function serenaServerConfig(targetRepoDir) {
+  return {
+    command: serenaCommand,
+    args: serenaServerArgs(targetRepoDir),
+  };
+}
+
+function serenaServerArgs(targetRepoDir) {
+  const configured = args["serena-args"] ?? process.env.SERENA_MCP_ARGS;
+  if (configured) return parseConfiguredArgs(configured, targetRepoDir);
+  return [
+    "--from",
+    "git+https://github.com/oraios/serena",
+    "serena",
+    "start-mcp-server",
+    "--context",
+    "claude-code",
+    "--project",
+    targetRepoDir,
+    "--enable-web-dashboard",
+    "False",
+    "--open-web-dashboard",
+    "False",
+    "--log-level",
+    "WARNING",
+  ];
+}
+
+function parseConfiguredArgs(raw, targetRepoDir) {
+  const parsed = raw.trim().startsWith("[")
+    ? JSON.parse(raw)
+    : raw
+        .match(/"[^"]*"|'[^']*'|\S+/g)
+        ?.map((part) => part.replace(/^(['"])(.*)\1$/, "$2"));
+  if (!Array.isArray(parsed)) {
+    throw new Error(
+      "--serena-args must be a JSON string array or shell-like list",
+    );
+  }
+  return parsed.map((part) =>
+    String(part)
+      .replaceAll("{repo}", targetRepoDir)
+      .replaceAll("{cwd}", targetRepoDir),
+  );
+}
+
 function commandPath(command) {
   return path.isAbsolute(command) || /[\\/]/.test(command)
     ? path.resolve(command)
@@ -635,6 +706,7 @@ function commandPath(command) {
 function graphToolName() {
   if (cg) return "codegraph";
   if (cbm) return "codebase-memory";
+  if (serena) return "serena";
   return "ttsc-graph";
 }
 
@@ -827,7 +899,7 @@ function parseStream(text) {
 }
 
 function graphToolUseName(name) {
-  return /graph|ttsc|codebase|memory|architecture|trace_path|search_code|semantic_query|index_status|list_projects/i.test(
+  return /graph|ttsc|codebase|memory|serena|architecture|trace_path|search_code|semantic_query|index_status|list_projects|find_symbol|references|symbols_overview/i.test(
     name,
   );
 }

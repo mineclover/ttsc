@@ -20,3 +20,6 @@ compiler/playground
 
 # Auto-generated blog RSS feed
 public/blog/rss.xml
+
+# PNG re-exports of benchmark charts for dev.to (build/svg-to-png.cjs)
+build/png-out/

@@ -10,6 +10,7 @@
     "build:compiler": "node build/compiler.cjs",
     "build:blog:rss": "node build/blog.cjs",
     "build:benchmark:graph": "node build/graph-benchmark-svg.cjs",
+    "charts:png": "node build/svg-to-png.cjs",
     "prepare": "pnpm run build:benchmark:graph",
     "postbuild": "pnpm run build:pagefind && pnpm run build:sitemap",
     "build:pagefind": "pagefind --site .next/server/app --output-path out/_pagefind",

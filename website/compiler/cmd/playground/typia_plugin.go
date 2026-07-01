@@ -107,7 +107,7 @@ func buildTypiaTransform(prog *driver.Program, cwd, tsconfigPath string) (driver
   pluginOptions := readTypiaPluginOptions(cwd, tsconfigPath)
   transformOptions := pluginOptions.TransformOptions()
   extras := nativecontext.ITypiaContext_Extras{
-    AddDiagnostic: func(_ *shimast.Diagnostic) int {
+    AddDiagnostic: func(_ *nativecontext.ITypiaDiagnostic) int {
       *diags = append(*diags, typiaTransformDiag{Message: "typia transform error"})
       return len(*diags)
     },
@@ -437,10 +437,11 @@ func readTypiaPluginOptions(cwd, tsconfigPath string) typiaadapter.PluginOptions
   if !regexp.MustCompile(`(?s)"transform"\s*:\s*"typia/lib/transform"`).MatchString(text) {
     return typiaadapter.PluginOptions{}
   }
+  undefined := regexp.MustCompile(`(?s)"undefined"\s*:\s*true`).MatchString(text)
   return typiaadapter.PluginOptions{
     Functional: regexp.MustCompile(`(?s)"functional"\s*:\s*true`).MatchString(text),
     Numeric:    regexp.MustCompile(`(?s)"numeric"\s*:\s*true`).MatchString(text),
     Finite:     regexp.MustCompile(`(?s)"finite"\s*:\s*true`).MatchString(text),
-    Undefined:  regexp.MustCompile(`(?s)"undefined"\s*:\s*true`).MatchString(text),
+    Undefined:  &undefined,
   }
 }

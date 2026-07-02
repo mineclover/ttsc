@@ -139,6 +139,43 @@ func writeExecutable(t *testing.T, file string, contents string) string {
   return file
 }
 
+// writeDirectLauncher writes a fake launcher that prints fixed bytes and
+// exits. POSIX gets a `#!/bin/sh` script; Windows cannot spawn an
+// extensionless shell script, so it gets the equivalent `.cmd` batch file and
+// the returned path carries that extension. Both stay OFF the script-extension
+// list, preserving the direct-exec (not node-routed) classification under
+// test. Payloads must avoid cmd metacharacters (%, ^, &, |, <, >) — batch has
+// no way to quote them that sh's single quotes would mirror.
+func writeDirectLauncher(t *testing.T, file, stdout, stderr string, exitCode int) string {
+  t.Helper()
+  var b strings.Builder
+  if runtime.GOOS == "windows" {
+    b.WriteString("@echo off\r\n")
+    if stdout != "" {
+      b.WriteString("echo " + stdout + "\r\n")
+    }
+    if stderr != "" {
+      // The redirect goes up front: a trailing `1>&2` would emit "x ", and
+      // a bare `>&2` glued to a payload ending in a digit would turn that
+      // digit into a file-descriptor redirect.
+      b.WriteString("1>&2 echo " + stderr + "\r\n")
+    }
+    b.WriteString("exit /b " + strconv.Itoa(exitCode) + "\r\n")
+    return writeExecutable(t, file+".cmd", b.String())
+  }
+  b.WriteString("#!/bin/sh\n")
+  if stdout != "" {
+    b.WriteString("printf '" + stdout + "'\n")
+  }
+  if stderr != "" {
+    b.WriteString("printf '" + stderr + "' >&2\n")
+  }
+  if exitCode != 0 {
+    b.WriteString("exit " + strconv.Itoa(exitCode) + "\n")
+  }
+  return writeExecutable(t, file, b.String())
+}
+
 // bannerManifest builds the plugin manifest shape that ttsc passes to native
 // plugins through --plugins-json. It writes a temporary banner.config.cjs file
 // in dir exporting an object with a "text" string and returns a manifest that

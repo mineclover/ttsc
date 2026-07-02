@@ -535,7 +535,9 @@ function evaluateTtsxConfigPlugins(
   configPath: string,
   _context: TtscPluginFactoryContext<ITtscLintPluginConfig>,
 ): ConfigPluginEntry[] {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "ttsc-lint-cfg-"));
+  const tempDir = fs.mkdtempSync(
+    path.join(loaderTempBase(configPath), "ttsc-lint-cfg-"),
+  );
   try {
     linkNearestNodeModules(tempDir, path.dirname(configPath));
     const loaderPath = path.join(tempDir, "loader.mts");
@@ -919,6 +921,50 @@ function linkNearestNodeModules(tempDir: string, sourceDir: string): void {
       );
     }
   }
+}
+
+/**
+ * Picks the parent directory for the ephemeral config-loader tree. The system
+ * temp dir is the default, but when it sits on a different volume than the
+ * config file (Windows: TEMP on `C:`, project on `D:`) the loader cannot work
+ * from there — no single tsconfig `rootDir` spans two volumes and
+ * `path.relative` cannot produce a relative import across drives (#305) — so
+ * the tree is created under the config's nearest `node_modules/.cache` instead,
+ * falling back to the config's own directory when no `node_modules` exists (or
+ * its `.cache` cannot be created): any location on the config's volume beats
+ * the system temp dir, which is guaranteed to fail. Keeps the system temp dir
+ * when the volumes already match.
+ */
+function loaderTempBase(configPath: string): string {
+  const systemTemp = os.tmpdir();
+  const systemRoot = path.parse(systemTemp).root;
+  const configRoot = path.parse(configPath).root;
+  // A relative config path has no root; "" must not be read as "a volume
+  // other than the system temp's" — it keeps the historical default.
+  if (
+    configRoot === "" ||
+    systemRoot.toLowerCase() === configRoot.toLowerCase()
+  ) {
+    return systemTemp;
+  }
+  const nodeModules = findNearestNodeModules(path.dirname(configPath));
+  if (!nodeModules) return path.dirname(configPath);
+  const base = path.join(nodeModules, ".cache");
+  try {
+    fs.mkdirSync(base, { recursive: true });
+    // Resolve symlinks/junctions now (a linked node_modules is common):
+    // Node's ESM loader realpaths the loader module at import time, and a
+    // relative config specifier computed from the link-form path would
+    // resolve against the wrong directory. Realpathing may also land on
+    // another volume, which defeats the whole point — fall through then.
+    const real = fs.realpathSync(base);
+    if (path.parse(real).root.toLowerCase() === configRoot.toLowerCase()) {
+      return real;
+    }
+  } catch {
+    // fall through to the config's own directory
+  }
+  return path.dirname(configPath);
 }
 
 function relativeImportSpecifier(fromDir: string, target: string): string {

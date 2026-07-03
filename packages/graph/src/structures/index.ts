@@ -5,6 +5,7 @@
 // source of truth to mirror.
 
 export * from "./ITtscGraphApplication";
+export * from "./ITtscGraphAnnotation";
 export * from "./ITtscGraphDecorator";
 export * from "./ITtscGraphDump";
 export * from "./ITtscGraphEdge";

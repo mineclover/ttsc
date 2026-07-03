@@ -1,3 +1,4 @@
+import { ITtscGraphAnnotation } from "./ITtscGraphAnnotation";
 import { ITtscGraphDecorator } from "./ITtscGraphDecorator";
 import { ITtscGraphEvidence } from "./ITtscGraphEvidence";
 import { TtscGraphNodeKind } from "./TtscGraphNodeKind";
@@ -64,8 +65,15 @@ export interface ITtscGraphNode {
   modifiers?: TtscGraphNodeModifier[];
 
   /**
-   * Graph-specific semantic labels declared with `@graphSemantic` JSDoc tags.
-   * Consumers use these as traversal boundaries without reparsing source.
+   * Declaration metadata such as JSDoc tags, kept as neutral producer facts so
+   * consumers can apply their own semantic conventions.
+   */
+  annotations?: ITtscGraphAnnotation[];
+
+  /**
+   * Backward-compatible projection of `@graphSemantic` JSDoc annotations.
+   * Consumers that need source/name/evidence details should prefer
+   * `annotations`.
    */
   semanticTags?: string[];
 

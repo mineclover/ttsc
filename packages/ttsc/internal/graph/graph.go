@@ -58,9 +58,13 @@ type Node struct {
   // the declaration's combined modifier flags during the build pass and emitted
   // for projections that filter on visibility and shape.
   Modifiers []string
-  // SemanticTags holds graph-specific declaration annotations from
-  // `@graphSemantic` JSDoc tags. These are producer-owned labels consumers can
-  // use as semantic traversal boundaries without parsing source.
+  // Annotations holds declaration-level metadata collected from source
+  // annotations such as JSDoc tags. The graph preserves these as neutral
+  // producer facts; consumers decide what a namespace or tag name means.
+  Annotations []Annotation
+  // SemanticTags is the compatibility projection of `@graphSemantic` JSDoc
+  // annotations. New consumers should prefer Annotations when they need the
+  // source/name/evidence contract.
   SemanticTags []string
   // Pos and End bound the declaration in its source file (byte offsets). They
   // are for display, never identity, so an edit that shifts them does not re-key
@@ -70,6 +74,20 @@ type Node struct {
   ImplementationFile string
   ImplementationPos  int
   ImplementationEnd  int
+}
+
+// Annotation is declaration metadata attached to a graph node. Source and Name
+// identify where the annotation came from and how it was written; Namespace is
+// optional normalized grouping for consumers that want to interpret a family of
+// annotations together. Pos and End ground the written annotation in source and
+// are evidence only, never identity.
+type Annotation struct {
+  Source    string
+  Name      string
+  Namespace string
+  Values    []string
+  Pos       int
+  End       int
 }
 
 // EdgeKind classifies a relationship between two nodes.

@@ -57,23 +57,35 @@ type DumpDecorator struct {
   Arguments []DumpDecoratorArgument `json:"arguments"`
 }
 
+// DumpAnnotation is declaration metadata carried on a node without interpreting
+// domain meaning. Consumers can project semantic tags, layers, feature markers,
+// or plugin-specific facts from this neutral source/name/value shape.
+type DumpAnnotation struct {
+  Source    string        `json:"source"`
+  Name      string        `json:"name"`
+  Namespace string        `json:"namespace,omitempty"`
+  Values    []string      `json:"values"`
+  Evidence  *DumpEvidence `json:"evidence,omitempty"`
+}
+
 // DumpNode is the wire shape of a graph node. Lowercase json keys are the
 // contract; the Go field names are not.
 type DumpNode struct {
-  ID             string          `json:"id"`
-  Kind           string          `json:"kind"`
-  Name           string          `json:"name"`
-  QualifiedName  string          `json:"qualifiedName,omitempty"`
-  File           string          `json:"file"`
-  External       bool            `json:"external"`
-  Ignored        bool            `json:"ignored,omitempty"`
-  Exported       bool            `json:"exported,omitempty"`
-  Closure        bool            `json:"closure,omitempty"`
-  Modifiers      []string        `json:"modifiers,omitempty"`
-  SemanticTags   []string        `json:"semanticTags,omitempty"`
-  Evidence       *DumpEvidence   `json:"evidence,omitempty"`
-  Implementation *DumpEvidence   `json:"implementation,omitempty"`
-  Decorators     []DumpDecorator `json:"decorators,omitempty"`
+  ID             string           `json:"id"`
+  Kind           string           `json:"kind"`
+  Name           string           `json:"name"`
+  QualifiedName  string           `json:"qualifiedName,omitempty"`
+  File           string           `json:"file"`
+  External       bool             `json:"external"`
+  Ignored        bool             `json:"ignored,omitempty"`
+  Exported       bool             `json:"exported,omitempty"`
+  Closure        bool             `json:"closure,omitempty"`
+  Modifiers      []string         `json:"modifiers,omitempty"`
+  Annotations    []DumpAnnotation `json:"annotations,omitempty"`
+  SemanticTags   []string         `json:"semanticTags,omitempty"`
+  Evidence       *DumpEvidence    `json:"evidence,omitempty"`
+  Implementation *DumpEvidence    `json:"implementation,omitempty"`
+  Decorators     []DumpDecorator  `json:"decorators,omitempty"`
 }
 
 // DumpEdge is the wire shape of a graph edge. Lowercase json keys are the
@@ -135,6 +147,7 @@ func NewDump(g *Graph, project, tsconfig string, ignored map[string]bool, source
       Exported:       n.Exported,
       Closure:        n.Closure,
       Modifiers:      n.Modifiers,
+      Annotations:    ctx.annotations(n),
       SemanticTags:   n.SemanticTags,
       Evidence:       withoutFile(ctx.evidence(n.File, n.Pos, n.End)),
       Implementation: ctx.evidence(n.ImplementationFile, n.ImplementationPos, n.ImplementationEnd),
@@ -255,6 +268,23 @@ func nodeNames(n *Node) (simple, qualified string) {
     return n.Simple, ""
   }
   return n.Simple, n.Name
+}
+
+func (c *dumpContext) annotations(n *Node) []DumpAnnotation {
+  if len(n.Annotations) == 0 {
+    return nil
+  }
+  out := make([]DumpAnnotation, 0, len(n.Annotations))
+  for _, annotation := range n.Annotations {
+    out = append(out, DumpAnnotation{
+      Source:    annotation.Source,
+      Name:      annotation.Name,
+      Namespace: annotation.Namespace,
+      Values:    append([]string{}, annotation.Values...),
+      Evidence:  c.evidence(n.File, annotation.Pos, annotation.End),
+    })
+  }
+  return out
 }
 
 // dumpContext relativizes paths and turns byte spans into line/col evidence,

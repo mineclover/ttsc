@@ -397,6 +397,7 @@ func putDeclaredNode(g *Graph, path, name string, kind NodeKind, declaration *sh
       return
     }
   }
+  annotations := declarationAnnotations(declaration)
   g.Nodes[id] = &Node{
     ID:           id,
     Name:         name,
@@ -406,7 +407,8 @@ func putDeclaredNode(g *Graph, path, name string, kind NodeKind, declaration *sh
     Pos:          declaration.Pos(),
     End:          declaration.End(),
     Modifiers:    declarationModifiers(declaration),
-    SemanticTags: declarationSemanticTags(declaration),
+    Annotations:  annotations,
+    SemanticTags: semanticTagsFromAnnotations(annotations),
   }
   g.bodyNodes[id] = hasBody
 }

@@ -21,3 +21,13 @@ export function handle(name: string): string {
 }
 `, 3)
 }
+
+// TestRuleJSDocCheckTagNamesAllowsGraphSemantic verifies the graph annotation
+// tag is a first-party JSDoc tag, not an unknown custom marker.
+func TestRuleJSDocCheckTagNamesAllowsGraphSemantic(t *testing.T) {
+  assertJSDocRuleLines(t, "jsdoc/check-tag-names", `/**
+ * @graphSemantic shared-contract
+ */
+export interface SharedErrorResponse {}
+`)
+}

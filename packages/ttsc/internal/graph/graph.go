@@ -58,6 +58,10 @@ type Node struct {
   // the declaration's combined modifier flags during the build pass and emitted
   // for projections that filter on visibility and shape.
   Modifiers []string
+  // SemanticTags holds graph-specific declaration annotations from
+  // `@graphSemantic` JSDoc tags. These are producer-owned labels consumers can
+  // use as semantic traversal boundaries without parsing source.
+  SemanticTags []string
   // Pos and End bound the declaration in its source file (byte offsets). They
   // are for display, never identity, so an edit that shifts them does not re-key
   // the node.

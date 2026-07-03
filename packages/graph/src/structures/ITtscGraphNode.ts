@@ -64,9 +64,16 @@ export interface ITtscGraphNode {
   modifiers?: TtscGraphNodeModifier[];
 
   /**
-   * Decorators written on this declaration, in source order: raw facts
-   * (`@Controller`, `@Get`) a consumer interprets without re-parsing source.
+   * Graph-specific semantic labels declared with `@graphSemantic` JSDoc tags.
+   * Consumers use these as traversal boundaries without reparsing source.
    */
+  semanticTags?: string[];
+
+  /**
+   * The decorators written on this declaration, in source order, when it has
+   * any: raw decorator facts (`@Controller`, `@Get`) a consumer can interpret
+   * without re-parsing source.
+    */
   decorators?: ITtscGraphDecorator[];
 
   /** The declaration span, for display and signatures. */

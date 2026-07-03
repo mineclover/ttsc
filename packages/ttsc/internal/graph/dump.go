@@ -70,6 +70,7 @@ type DumpNode struct {
   Exported       bool            `json:"exported,omitempty"`
   Closure        bool            `json:"closure,omitempty"`
   Modifiers      []string        `json:"modifiers,omitempty"`
+  SemanticTags   []string        `json:"semanticTags,omitempty"`
   Evidence       *DumpEvidence   `json:"evidence,omitempty"`
   Implementation *DumpEvidence   `json:"implementation,omitempty"`
   Decorators     []DumpDecorator `json:"decorators,omitempty"`
@@ -134,6 +135,7 @@ func NewDump(g *Graph, project, tsconfig string, ignored map[string]bool, source
       Exported:       n.Exported,
       Closure:        n.Closure,
       Modifiers:      n.Modifiers,
+      SemanticTags:   n.SemanticTags,
       Evidence:       withoutFile(ctx.evidence(n.File, n.Pos, n.End)),
       Implementation: ctx.evidence(n.ImplementationFile, n.ImplementationPos, n.ImplementationEnd),
       Decorators:     decByNode[n.ID],

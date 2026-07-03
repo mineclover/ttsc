@@ -80,6 +80,8 @@ var knownJSDocTags = map[string]struct{}{
   "function":        {},
   "generator":       {},
   "global":          {},
+  "graphSemantic":   {},
+  "graphsemantic":   {},
   "hideconstructor": {},
   "host":            {},
   "ignore":          {},

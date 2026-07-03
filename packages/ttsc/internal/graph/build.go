@@ -398,14 +398,15 @@ func putDeclaredNode(g *Graph, path, name string, kind NodeKind, declaration *sh
     }
   }
   g.Nodes[id] = &Node{
-    ID:        id,
-    Name:      name,
-    Simple:    simpleName(declaration.Symbol()),
-    Kind:      kind,
-    File:      path,
-    Pos:       declaration.Pos(),
-    End:       declaration.End(),
-    Modifiers: declarationModifiers(declaration),
+    ID:           id,
+    Name:         name,
+    Simple:       simpleName(declaration.Symbol()),
+    Kind:         kind,
+    File:         path,
+    Pos:          declaration.Pos(),
+    End:          declaration.End(),
+    Modifiers:    declarationModifiers(declaration),
+    SemanticTags: declarationSemanticTags(declaration),
   }
   g.bodyNodes[id] = hasBody
 }

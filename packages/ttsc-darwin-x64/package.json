@@ -15,6 +15,13 @@
   "license": "MIT",
   "files": ["bin", "package.json", "README.md"],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "executableFiles": [
+      "./bin/ttsc",
+      "./bin/ttscserver",
+      "./bin/ttscgraph",
+      "./bin/go/bin/go",
+      "./bin/go/bin/gofmt"
+    ]
   }
 }

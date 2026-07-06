@@ -107,9 +107,11 @@ export class PosterController {
   if got := annotations[0]; got.Source != annotationSourceJSDoc || got.Name != graphSemanticTagName || got.Namespace != graphSemanticNamespace || !reflect.DeepEqual(got.Values, []string{"shared-contract", "route-contract"}) || got.Evidence == nil {
     t.Fatalf("first dumped annotation = %+v", got)
   }
+  assertAnnotationEvidence(t, annotations[0], 2, 4)
   if got := annotations[1]; got.Source != annotationSourceJSDoc || got.Name != graphSemanticTagName || got.Namespace != graphSemanticNamespace || !reflect.DeepEqual(got.Values, []string{"shared-contract"}) || got.Evidence == nil {
     t.Fatalf("second dumped annotation = %+v", got)
   }
+  assertAnnotationEvidence(t, annotations[1], 3, 4)
   if got := dumped["src/main.ts#DottedSemantic:type"].SemanticTags; got != nil {
     t.Fatalf("dotted semantic value was emitted as semanticTags: %v", got)
   }
@@ -155,5 +157,22 @@ func assertNodeAnnotations(t *testing.T, node *Node, want [][]string) {
       annotation.End <= annotation.Pos {
       t.Fatalf("node %s annotation[%d] = %+v, want values %v", node.ID, i, annotation, values)
     }
+  }
+}
+
+func assertAnnotationEvidence(t *testing.T, annotation DumpAnnotation, wantLine, wantCol int) {
+  t.Helper()
+  if annotation.Evidence == nil {
+    t.Fatalf("annotation evidence is nil: %+v", annotation)
+  }
+  if annotation.Evidence.File != "src/main.ts" ||
+    annotation.Evidence.StartLine != wantLine ||
+    annotation.Evidence.StartCol != wantCol {
+    t.Fatalf(
+      "annotation evidence = %+v, want file src/main.ts line %d col %d",
+      annotation.Evidence,
+      wantLine,
+      wantCol,
+    )
   }
 }

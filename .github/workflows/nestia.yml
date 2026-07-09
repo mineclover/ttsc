@@ -60,7 +60,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # Run nestia (next)'s standard test suite against the local ttsc tarballs
+  # Run nestia's standard test suite against the local ttsc tarballs
   # instead of the published release.
   nestia:
     needs: tarballs
@@ -93,12 +93,12 @@ jobs:
       - name: Clone nestia
         run: |
           rm -rf experimental/nestia
-          git clone --depth=1 --branch next https://github.com/samchon/nestia experimental/nestia
+          git clone --depth=1 --branch master https://github.com/samchon/nestia experimental/nestia
 
       - name: Use local ttsc tarballs
         working-directory: experimental/nestia
         run: |
-          # nestia (next) resolves ttsc through a catalog and may grow its own
+          # nestia resolves ttsc through a catalog and may grow its own
           # top-level `overrides:` block, in which case appending a second one
           # makes pnpm fail with a duplicated-mapping-key YAML error (see the
           # typia workflow). Merge the local-tarball overrides into the existing

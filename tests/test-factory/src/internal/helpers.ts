@@ -12,6 +12,10 @@ export const printer = new TsPrinter();
 /** Print a node with the shared default printer. */
 export const print = (node: Node): string => printer.print(node);
 
+/** Parse printed expression source back and return its runtime value. */
+export const cook = (source: string): string =>
+  new Function(`return (${source});`)() as string;
+
 /** Shorthand for {@link factory.createIdentifier}. */
 export const id = (text: string) => factory.createIdentifier(text);
 

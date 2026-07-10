@@ -1,11 +1,7 @@
 import { TestValidator } from "@nestia/e2e";
 import factory from "@ttsc/factory";
 
-import { print } from "../../internal/helpers";
-
-/** Parse printed source back and return the runtime value of the template. */
-const cook = (source: string): string =>
-  new Function(`return (${source});`)() as string;
+import { cook, print } from "../../internal/helpers";
 
 /**
  * Verifies no-substitution template escaping: every metacharacter round-trips.

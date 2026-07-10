@@ -1,11 +1,7 @@
 import { TestValidator } from "@nestia/e2e";
 import factory from "@ttsc/factory";
 
-import { id, print, str } from "../../internal/helpers";
-
-/** Parse printed source back and return the runtime value of the template. */
-const cook = (source: string): string =>
-  new Function(`return (${source});`)() as string;
+import { cook, id, print, str } from "../../internal/helpers";
 
 /**
  * Verifies multi-span template escaping: head, middle, and tail round-trip.

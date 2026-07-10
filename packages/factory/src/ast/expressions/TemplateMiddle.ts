@@ -11,4 +11,7 @@ export interface TemplateMiddle {
 
   /** Text. */
   text: string;
+
+  /** RawText. */
+  rawText?: string;
 }

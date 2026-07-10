@@ -11,4 +11,7 @@ export interface TemplateTail {
 
   /** Text. */
   text: string;
+
+  /** RawText. */
+  rawText?: string;
 }

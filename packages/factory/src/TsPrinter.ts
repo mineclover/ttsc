@@ -1156,13 +1156,13 @@ export class TsPrinter {
 
       /* template literals */
       case "TemplateHead":
-        return concat(["`", node.text, "${"]);
+        return concat(["`", templateText(node), "${"]);
       case "TemplateMiddle":
-        return concat(["}", node.text, "${"]);
+        return concat(["}", templateText(node), "${"]);
       case "TemplateTail":
-        return concat(["}", node.text, "`"]);
+        return concat(["}", templateText(node), "`"]);
       case "NoSubstitutionTemplateLiteral":
-        return concat(["`", node.text, "`"]);
+        return concat(["`", templateText(node), "`"]);
 
       /* template & misc expressions */
       case "TemplateExpression":
@@ -2152,6 +2152,31 @@ export namespace TsPrinter {
     newLine?: string;
   }
 }
+
+/**
+ * Source text of a template span: `rawText` verbatim when the author provided
+ * one (raw fidelity is theirs to own, mirroring the legacy TypeScript emitter),
+ * otherwise the cooked `text` escaped for template context.
+ */
+const templateText = (node: { text: string; rawText?: string }): string =>
+  typeof node.rawText === "string"
+    ? node.rawText
+    : escapeTemplateText(node.text);
+
+/**
+ * Escape cooked text so it re-parses to the same cooked value inside a template
+ * literal: backslashes, backticks, and `${` sequences (a `$` not followed by
+ * `{` stays literal). CR and CRLF are escaped because the scanner normalizes
+ * raw template line terminators to LF; a lone LF is legal template text and
+ * stays literal.
+ */
+const escapeTemplateText = (text: string): string =>
+  text
+    .replace(/\\/g, "\\\\")
+    .replace(/`/g, "\\`")
+    .replace(/\$\{/g, "\\${")
+    .replace(/\r\n/g, "\\r\\n")
+    .replace(/\r/g, "\\r");
 
 const escapeString = (text: string, singleQuote?: boolean): string => {
   const escaped: string = text

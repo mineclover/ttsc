@@ -16,6 +16,14 @@ export interface TtscCommonOptions {
   cwd?: string;
   /** Project root override for generated tsconfig wrappers. */
   projectRoot?: string;
+  /**
+   * Directory that anchors plugin config-file discovery and relative
+   * `configFile` resolution (forwarded to plugin processes as
+   * `TTSC_PLUGIN_CONFIG_DIR`). Set by build integrations that compile through a
+   * generated tsconfig outside the project; when omitted, plugins anchor at the
+   * tsconfig's own directory.
+   */
+  pluginConfigDir?: string;
   /** Environment variables merged over `process.env` for child processes. */
   env?: NodeJS.ProcessEnv;
   /** Explicit root directory for compiled source-plugin cache artifacts. */

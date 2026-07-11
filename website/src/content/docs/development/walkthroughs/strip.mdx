@@ -49,7 +49,7 @@ Two configuration knobs:
 - **`calls`**: match call statements by dotted name. `console.log` matches exactly `console.log(...)`; `myLogger.*` matches `myLogger.<anything>(...)` for any single property access. Wildcards are only supported at the **end** of a pattern.
 - **`statements`**: match statement-level syntax. Today only `debugger` is supported; the slot exists so future statement kinds can be added without a breaking change.
 
-`@ttsc/strip` discovers its config by walking upward from the tsconfig directory, looking for `strip.config.{ts,cts,mts,js,cjs,mjs,json}`. To point at a specific file, set `configFile` on the tsconfig entry: `{ "transform": "@ttsc/strip", "configFile": "./config/strip.config.ts" }`.
+`@ttsc/strip` discovers its config by walking upward from the tsconfig directory (or from the launcher-provided `TTSC_PLUGIN_CONFIG_DIR` project root when the compile runs through a generated wrapper tsconfig), looking for `strip.config.{ts,cts,mts,js,cjs,mjs,json}`. To point at a specific file, set `configFile` on the tsconfig entry: `{ "transform": "@ttsc/strip", "configFile": "./config/strip.config.ts" }`.
 
 ## Directory layout
 

@@ -16,6 +16,7 @@ import { resolveTsgo } from "./resolveTsgo";
 import {
   assertSharedHostCompatibility,
   linkedTransformPlugins,
+  resolvePluginConfigDir,
   selectSharedHostPlugin,
 } from "./sharedHostHelpers";
 import { outputText, spawnNative } from "./spawnNative";
@@ -119,9 +120,13 @@ function formatTimingSeconds(ms: number): string {
 
 /**
  * Build the environment for a native plugin spawn. Injects `TTSC_TSGO_BINARY`
- * and `TTSC_TTSX_BINARY` alongside the base env from `mergeEnv`. For
- * transform-stage plugins, also passes `TTSC_LINKED_PLUGINS_JSON` containing
- * any linked sources so they run inside the same process as the host plugin.
+ * and `TTSC_TTSX_BINARY` alongside the base env from `mergeEnv`, plus
+ * `TTSC_PLUGIN_CONFIG_DIR` when the caller declared a plugin config anchor (an
+ * embedder compiling through a generated wrapper tsconfig) so config-file
+ * discovery walks the real project instead of the wrapper's temp-dir ancestry.
+ * For transform-stage plugins, also passes `TTSC_LINKED_PLUGINS_JSON`
+ * containing any linked sources so they run inside the same process as the host
+ * plugin.
  */
 function nativePluginEnv(
   extra: NodeJS.ProcessEnv | undefined,
@@ -129,12 +134,25 @@ function nativePluginEnv(
   plugin?: ITtscLoadedNativePlugin,
 ): NodeJS.ProcessEnv {
   const env = mergeEnv({
+    ...(execution.pluginConfigDir === undefined
+      ? {}
+      : { TTSC_PLUGIN_CONFIG_DIR: execution.pluginConfigDir }),
     TTSC_TSGO_BINARY: process.env.TTSC_TSGO_BINARY ?? execution.tsgo.binary,
     TTSC_TTSX_BINARY:
       process.env.TTSC_TTSX_BINARY ??
       path.join(__dirname, "..", "..", "launcher", "ttsx.js"),
     ...extra,
   });
+  // The anchor is per-invocation state owned by this host: when this run
+  // declared none (and the caller's env does not name one), drop any value
+  // inherited from an ancestor ttsc process so a nested build never
+  // mis-anchors its plugins at the outer project.
+  if (
+    execution.pluginConfigDir === undefined &&
+    extra?.TTSC_PLUGIN_CONFIG_DIR === undefined
+  ) {
+    delete env.TTSC_PLUGIN_CONFIG_DIR;
+  }
   if (plugin?.stage === "transform") {
     const linked = linkedTransformPlugins(execution.nativePlugins);
     if (linked.length !== 0) {
@@ -1079,6 +1097,7 @@ function resolveExecutionContext(
         cacheDir: options.cacheDir ?? options.env?.TTSC_CACHE_DIR,
         cwd,
         entries: options.plugins,
+        pluginConfigDir: options.pluginConfigDir,
         projectRoot,
         tsconfig,
       }).nativePlugins;
@@ -1094,6 +1113,10 @@ function resolveExecutionContext(
   return {
     cwd,
     nativePlugins,
+    pluginConfigDir: resolvePluginConfigDir({
+      cwd,
+      pluginConfigDir: options.pluginConfigDir,
+    }),
     pluginSetupFailure,
     projectNoEmit: project.compilerOptions.noEmit === true,
     projectRoot,

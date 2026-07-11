@@ -74,6 +74,7 @@ export class TtscCompiler {
       cacheDir: this.resolvePluginCacheDir(),
       cwd: execution.cwd,
       entries: this.context.plugins,
+      pluginConfigDir: this.context.pluginConfigDir,
       projectRoot: execution.projectRoot,
       tsconfig: execution.tsconfig,
     });

@@ -462,6 +462,13 @@ async function transformProject(props: {
   try {
     const result = new TtscCompiler({
       cwd: projectRoot,
+      // The generated tsconfig (if any) lives in the system temp directory,
+      // so declare the real project as the plugin config anchor: utility
+      // plugin config discovery (banner.config.*, strip.config.*,
+      // lint.config.*) and relative configFile resolution walk the project,
+      // never the temp tree. In the passthrough case this equals the
+      // tsconfig's own directory, the default anchor.
+      pluginConfigDir: projectRoot,
       plugins: props.plugins,
       projectRoot,
       tsconfig: configured.path,
@@ -568,6 +575,14 @@ function normalizeCompilerOptionsForGeneratedTsconfig(
   return output;
 }
 
+/**
+ * Absolutize the relative path-typed keys of one plugin entry before it is
+ * written into the generated temp-dir tsconfig: `config`/`source`/`transform`
+ * are the descriptor-resolution keys, and `configFile` is the config-file
+ * override accepted by the shipped utility plugins (`@ttsc/banner`,
+ * `@ttsc/strip`, `@ttsc/lint`). Left relative, each would resolve against the
+ * temp directory instead of the project.
+ */
 function normalizePluginConfigForGeneratedTsconfig(
   entry: unknown,
   tsconfigDir: string,
@@ -576,7 +591,7 @@ function normalizePluginConfigForGeneratedTsconfig(
     return entry;
   }
   const output: Record<string, unknown> = { ...entry };
-  for (const key of ["config", "source", "transform"]) {
+  for (const key of ["config", "configFile", "source", "transform"]) {
     const value = output[key];
     if (typeof value === "string" && isRelativeSpecifier(value)) {
       output[key] = path.resolve(tsconfigDir, value);

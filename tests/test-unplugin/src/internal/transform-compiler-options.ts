@@ -217,6 +217,43 @@ async function assertTransformAbsolutizesPluginConfigPaths() {
 }
 
 /**
+ * Asserts that `transformTtsc` resolves a relative `configFile` path on a
+ * plugin descriptor to an absolute path before writing the temp tsconfig,
+ * verified by the fixture plugin's `assert-config-file-path` operation.
+ * `configFile` is the config-file override the shipped utility plugins accept,
+ * so leaving it relative would resolve against the temp dir.
+ */
+async function assertTransformAbsolutizesPluginConfigFilePaths() {
+  const { resolveOptions, transformTtsc } =
+    await TestUnpluginRuntime.loadUnpluginApi();
+  const root = TestUnpluginProject.createProject({ plugins: [] });
+  fs.writeFileSync(
+    path.join(root, "fixture.config.json"),
+    JSON.stringify({ ok: true }),
+    "utf8",
+  );
+  const result = await transformTtsc(
+    TestUnpluginProject.mainFile(root),
+    TestUnpluginProject.mainSource(root),
+    resolveOptions({
+      compilerOptions: {
+        plugins: [
+          {
+            transform: "./plugin.cjs",
+            name: "fixture",
+            configFile: "./fixture.config.json",
+            operation: "assert-config-file-path",
+          },
+        ],
+      },
+    }),
+  );
+
+  assert.ok(result);
+  assert.match(result.code, /"PLUGIN"/);
+}
+
+/**
  * Asserts that a plugin installed as a workspace package under `node_modules`
  * (written via `writePackagePlugin`) is auto-discovered and applied when no
  * explicit plugin list is provided.
@@ -239,6 +276,7 @@ async function assertTransformUsesPackageDiscoveredProjectPlugins() {
 
 export {
   assertGeneratedTsconfigStaysOutsideProjectRoot,
+  assertTransformAbsolutizesPluginConfigFilePaths,
   assertTransformAbsolutizesPluginConfigPaths,
   assertTransformCacheInvalidatesOnLibSourceChange,
   assertTransformCacheInvalidatesOnProjectSourceChange,

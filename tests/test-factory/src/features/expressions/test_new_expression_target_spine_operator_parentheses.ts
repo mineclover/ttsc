@@ -11,21 +11,25 @@ const construct = (target: Expression): Expression =>
 
 /**
  * Verifies new-expression parenthesizer: sees a call through non-null
- * assertions, template tags, and optional chains on the target's spine.
+ * assertions, template tags, and optional calls on the target's spine.
  *
- * Boundary cases of the stop-at-call walk in `TsPrinter.newExpressionTarget`:
- * the walk must traverse every construct that keeps the call on the printed
- * left edge, not just plain accesses. `new f()!.bar()`, `new f()`x`()`, and the
- * illegal `new f()?.bar()` would each re-bind (or reject) the arguments; the
- * tag-over-identifier twin guards against wrapping every tagged template used
- * as a target.
+ * Boundary cases of the stop-at-call walk in `TsPrinter.newExpressionTarget`.
+ * The walk must traverse every construct that keeps the call on the printed
+ * left edge — not just plain property accesses — and must stop at both a
+ * `CallExpression` and a `CallChain`. A non-null assertion over a call, a
+ * tagged template whose tag is a call, an optional call at the chain head, and
+ * an optional property access over a call would each re-bind the arguments to
+ * the `new` (or, for the optional access, produce the illegal `new f()?.bar()`)
+ * once printed bare. The tag-over-identifier twin guards against wrapping every
+ * tagged template used as a target.
  *
- * 1. Print `new` expressions targeting `f()!.bar` (non-null in the chain), `f()`x`
- *    ` (tagged template whose tag is a call), and `f()?.bar` (optional chain
- *    over a call — a runtime `TypeError` shape, but the printed text must still
- *    parse back to the same AST).
- * 2. Assert each target is parenthesized, and the tag-over-identifier twin `tag`x`
- *    ` stays bare.
+ * 1. Print `new` expressions targeting a non-null assertion, a call-tagged
+ *    template, an optional call at the chain head (leftmost node is a
+ *    `CallChain`), and an optional property access over a call (a runtime
+ *    `TypeError` shape, but the printed text must still parse back to the same
+ *    AST).
+ * 2. Assert each target is parenthesized, and the identifier-tagged twin stays
+ *    bare.
  * 3. Re-parse each output with the legacy compiler and assert the top-level
  *    expression is still a `NewExpression`.
  */
@@ -46,6 +50,19 @@ export const test_new_expression_target_spine_operator_parentheses =
             call(id("f")),
             undefined,
             factory.createNoSubstitutionTemplateLiteral("x"),
+          ),
+        ),
+      ),
+      "optional call at chain head": print(
+        construct(
+          factory.createPropertyAccessExpression(
+            factory.createCallChain(
+              id("f"),
+              factory.createToken(SyntaxKind.QuestionDotToken),
+              undefined,
+              [],
+            ),
+            "bar",
           ),
         ),
       ),
@@ -77,6 +94,11 @@ export const test_new_expression_target_spine_operator_parentheses =
       "template tag is a call",
       printed["template tag is a call"],
       "new (f()`x`)()",
+    );
+    TestValidator.equals(
+      "optional call at chain head",
+      printed["optional call at chain head"],
+      "new (f?.().bar)()",
     );
     TestValidator.equals(
       "optional chain over a call",

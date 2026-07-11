@@ -13,8 +13,9 @@ import { ITtscGraphTrace } from "./ITtscGraphTrace";
  *   project, not text guesses.
  * - Returns declarations, signatures, edges (calls, extends, references),
  *   decorators, tests, and source spans.
- * - Facts are compiler truth. Trust them; never re-verify a returned fact with
- *   files or another call.
+ * - The graph does not change until you edit the source. Until then every
+ *   returned fact is complete compiler truth: trust it, and never re-verify
+ *   with a file or another call.
  *
  * ## Which request
  *
@@ -34,11 +35,12 @@ import { ITtscGraphTrace } from "./ITtscGraphTrace";
  *
  * ## Stop
  *
- * - Every result carries a `directive`: an unedited result is complete, so answer
- *   from it and stop. A span is a citation, not a cue to open the file.
+ * - A returned result is the whole answer: answer from it and stop. A span is a
+ *   citation, not a cue to open the file.
  * - `escape` when the graph answered, or the need is outside it (source body
  *   text, non-TypeScript files, exact search).
- * - After you edit the source, earlier facts retire; call again first.
+ * - Only a source edit changes the graph. Until you edit, one call fully answers
+ *   the question; after an edit, earlier facts no longer hold, so call again.
  */
 export interface ITtscGraphApplication {
   /**

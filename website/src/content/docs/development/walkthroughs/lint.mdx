@@ -41,7 +41,7 @@ export default {
 } satisfies ITtscLintConfig;
 ```
 
-`@ttsc/lint` discovers `lint.config.ts` by walking upward from the tsconfig directory. To point at a specific file, set `configFile` on the tsconfig entry:
+`@ttsc/lint` discovers `lint.config.ts` by walking upward from the tsconfig directory (or from the launcher-provided `TTSC_PLUGIN_CONFIG_DIR` project root when the compile runs through a generated wrapper tsconfig). To point at a specific file, set `configFile` on the tsconfig entry:
 
 ```jsonc
 // tsconfig.json

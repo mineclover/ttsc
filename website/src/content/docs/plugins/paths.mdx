@@ -22,6 +22,8 @@ import { value } from "@lib/value"; // ← Node can't resolve this
 npm install -D @ttsc/paths
 ```
 
+`@ttsc/paths` ships the `ttsc.plugin` auto-discovery marker in its `package.json`, so the install alone activates the rewrite for any project whose tsconfig declares `compilerOptions.paths`, no `plugins` entry needed. The explicit entry below is equivalent and takes precedence; to turn a discovered plugin off without uninstalling it, declare the entry with `enabled: false` (see [Plugin protocol](/docs/development/concepts/protocol)).
+
 ```jsonc
 // tsconfig.json
 {

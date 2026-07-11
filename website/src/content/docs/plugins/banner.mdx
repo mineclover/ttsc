@@ -8,9 +8,11 @@
 npm install -D @ttsc/banner
 ```
 
+`@ttsc/banner` ships the `ttsc.plugin` auto-discovery marker in its `package.json`, so `ttsc` picks it up the moment it appears in your `dependencies` / `devDependencies`, no `compilerOptions.plugins[]` entry needed. The banner text still comes from the `banner.config.*` file below; the plugin errors without one. To turn a discovered plugin off without uninstalling it, declare the tsconfig entry with `enabled: false` (see [Plugin protocol](/docs/development/concepts/protocol)).
+
 ## Configure
 
-Register the plugin in `tsconfig.json`:
+Register the plugin in `tsconfig.json` (optional with auto-discovery; the explicit entry is equivalent and takes precedence):
 
 ```jsonc
 // tsconfig.json

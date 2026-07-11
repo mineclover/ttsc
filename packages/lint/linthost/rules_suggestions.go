@@ -1226,13 +1226,20 @@ func flattenConcatOperands(node *shimast.Node) []*shimast.Node {
 
 // concatChainContainsString reports whether a `+` chain (or a single
 // operand) contains a string-like operand: a string literal, a template
-// literal (with or without substitutions), or a nested `+` chain that
-// itself contains one. This is the flattening gate for
-// flattenConcatOperands. Once a string-like operand appears in a
-// left-associative chain, every later `+` is string concatenation, so
-// splitting the chain into template segments preserves the value; a
-// chain with none may be numeric addition and must stay whole.
+// literal (with or without substitutions), or a nested `+` chain —
+// parenthesized or not — that itself contains one. This is the
+// flattening gate for flattenConcatOperands. Once a string-like operand
+// appears in a left-associative chain, every later `+` is string
+// concatenation, so splitting the chain into template segments preserves
+// the value; a chain with none may be numeric addition and must stay
+// whole. Parentheses are transparent to the DECISION (`("a" + b) + c`
+// is a string chain, so `c` still gets its own slot) even though the
+// flattener keeps the parenthesized operand itself as one slot. A
+// string-like node under any other operator (e.g. `a * "x"`) does NOT
+// qualify: that subexpression coerces away from string, so its chain
+// may still be numeric addition.
 func concatChainContainsString(node *shimast.Node) bool {
+  node = stripParens(node)
   if node == nil {
     return false
   }
@@ -1242,11 +1249,7 @@ func concatChainContainsString(node *shimast.Node) bool {
       return concatChainContainsString(bin.Left) || concatChainContainsString(bin.Right)
     }
   }
-  inner := stripParens(node)
-  if inner == nil {
-    return false
-  }
-  return isStringLikeLiteral(inner) || inner.Kind == shimast.KindTemplateExpression
+  return isStringLikeLiteral(node) || node.Kind == shimast.KindTemplateExpression
 }
 
 // renderConcatAsTemplate renders the flattened concat operands as a single

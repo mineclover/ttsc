@@ -595,7 +595,8 @@ func originalEntry(d siDecl) siEntry {
 // It returns the rendered text, whether the merged result is a type-only import,
 // and an `ok` flag that is false when the declarations cannot be merged
 // (conflicting default names, a type-only default that cannot survive in a
-// mixed value import, or a type-only default alongside named bindings).
+// mixed value import, a type-only default alongside named bindings, or a
+// bucket containing a namespace or comment-bearing declaration).
 func renderMergedDecl(group []siDecl, opts resolvedSortImportsOptions) (string, bool, bool) {
   mergedTypeOnly := true
   for _, d := range group {

@@ -235,10 +235,16 @@ func isBlockScopeContainer(kind shimast.Kind) bool {
 
 // isFunctionCaptureBoundary reports whether a node creates a new function
 // scope whose body captures outer bindings by closure: function
-// declarations/expressions, arrows, methods, constructors, accessors, and
-// class static blocks. Used both to stop the enclosing-loop walk (a `var`
-// inside a function nested in a loop is per-call regardless of the loop) and
-// to detect references that reach the loop only through a closure.
+// declarations/expressions, arrows, methods, constructors, accessors, class
+// static blocks, and class property declarations (an instance field
+// initializer runs at construction time and closes over the class
+// definition's environment exactly like a method body; escope models it as
+// its own variable scope). A PropertyDeclaration's computed NAME evaluates
+// immediately rather than deferred, so classifying the whole declaration
+// over-declines that rare shape — which never corrupts. Used both to stop
+// the enclosing-loop walk (a `var` inside a function nested in a loop is
+// per-call regardless of the loop) and to detect references that reach the
+// loop only through deferred code.
 func isFunctionCaptureBoundary(node *shimast.Node) bool {
   switch node.Kind {
   case shimast.KindFunctionDeclaration,
@@ -248,7 +254,8 @@ func isFunctionCaptureBoundary(node *shimast.Node) bool {
     shimast.KindConstructor,
     shimast.KindGetAccessor,
     shimast.KindSetAccessor,
-    shimast.KindClassStaticBlockDeclaration:
+    shimast.KindClassStaticBlockDeclaration,
+    shimast.KindPropertyDeclaration:
     return true
   }
   return false

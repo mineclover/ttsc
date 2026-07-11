@@ -1,6 +1,5 @@
 import { TtscGraphMemory } from "./model/TtscGraphMemory";
 import { RESULT_DIRECTIVE } from "./server/resultDirective";
-import { resultGuide, resultNext } from "./server/resultGuide";
 import { runDetails } from "./server/runDetails";
 import { runEntrypoints } from "./server/runEntrypoints";
 import { runLookup } from "./server/runLookup";
@@ -88,23 +87,11 @@ export class TtscGraphApplication implements ITtscGraphApplication {
     }
   }
 
-  private escape(
-    reason: string,
-    nextStep?: string,
-    action: "answer" | "outside" | "clarify" = "outside",
-  ): ITtscGraphEscape {
+  private escape(reason: string, nextStep?: string): ITtscGraphEscape {
     return {
       type: "escape",
       skipped: true,
       reason,
-      next: resultNext(
-        action,
-        nextStep ??
-          "Graph evidence is exhausted or not the next evidence source.",
-      ),
-      guide: resultGuide(
-        "Finish from existing graph evidence, state the graph gap, or ask for clarification.",
-      ),
       ...(nextStep !== undefined ? { nextStep } : {}),
     };
   }

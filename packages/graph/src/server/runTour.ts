@@ -6,7 +6,6 @@ import { ITtscGraphNode } from "../structures/ITtscGraphNode";
 import { ITtscGraphTour } from "../structures/ITtscGraphTour";
 import { ITtscGraphTrace } from "../structures/ITtscGraphTrace";
 import { isSupportPath, isTestPath } from "./pathPolicy";
-import { resultGuide, resultNext } from "./resultGuide";
 import { decoratorsOf, runDetails, signatureOf } from "./runDetails";
 import { runEntrypoints } from "./runEntrypoints";
 import { runTrace } from "./runTrace";
@@ -192,13 +191,6 @@ export function runTour(
     nearby: nearby.slice(0, MAX_NEARBY),
     tests: tests.slice(0, MAX_TESTS),
     answerAnchors,
-    next: resultNext(
-      "answer",
-      "This tour is the complete index-level answer surface: central entrypoints, primary flow, nearby paths, tests, and answer anchors.",
-    ),
-    guide: resultGuide(
-      "Use this tour as the answer-ready index. Do not split it into extra lookup/details/trace calls unless the user asks for a named missing symbol or exact source text.",
-    ),
     ...(entry.truncated ||
     primaryFlow.some((flow) => flow.truncated === true) ||
     nearby.length > MAX_NEARBY ||

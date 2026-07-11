@@ -1,5 +1,4 @@
 import { ITtscGraphDecorator } from "./ITtscGraphDecorator";
-import { ITtscGraphNext } from "./ITtscGraphNext";
 
 /** Answer-ready, source-free tour evidence for broad code-flow questions. */
 export interface ITtscGraphTour {
@@ -24,23 +23,14 @@ export interface ITtscGraphTour {
   /** Ordered file/line anchors to cite in the final answer, not file reads. */
   answerAnchors: ITtscGraphTour.IAnchor[];
 
-  /** How to use this source-free result next. */
-  next: ITtscGraphNext;
-
-  /** Human-readable compatibility note mirroring `next`. */
-  guide: string;
-
-  /** True when any internal slice hit its cap. */
+  /** True when some low-signal extras were capped; the returned tour stands. */
   truncated?: boolean;
 }
 
 export namespace ITtscGraphTour {
   /**
-   * Build the complete index-level answer surface for broad code tours: central
-   * entrypoints, primary flow, nearby paths, tests, and answer anchors. Use
-   * this instead of decomposing repository-orientation, read-next,
-   * architecture, or multi-phase runtime-flow questions into many
-   * lookup/details/trace calls.
+   * The whole answer surface for a broad code tour: entrypoints, primary flow,
+   * nearby paths, tests, and answer anchors.
    */
   export interface IRequest {
     /** Discriminator for code-tour indexing. */
@@ -50,10 +40,8 @@ export namespace ITtscGraphTour {
     query: string;
 
     /**
-     * Maximum central entrypoints to seed the tour.
-     *
-     * Prefer the default. Raise only when the question names several distinct
-     * public paths that must all appear in one answer.
+     * Central entrypoints to seed the tour. Raise only when the question names
+     * several public paths that must all appear in one answer.
      *
      * @default 4
      */
@@ -108,7 +96,7 @@ export namespace ITtscGraphTour {
     /** Edge and node anchors that explain the flow. */
     anchors: ITtscGraphTour.IAnchor[];
 
-    /** True when the flow hit graph caps. */
+    /** True when some low-signal flow steps were capped; the flow stands. */
     truncated?: boolean;
   }
 

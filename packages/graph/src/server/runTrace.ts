@@ -5,7 +5,6 @@ import { ITtscGraphNode } from "../structures/ITtscGraphNode";
 import { ITtscGraphTrace } from "../structures/ITtscGraphTrace";
 import { isExternalNode, isTestPath } from "./pathPolicy";
 import { resolveGraphHandle } from "./resolveHandle";
-import { resultGuide, resultNext } from "./resultGuide";
 import { edgeEvidenceOf, signatureOf } from "./runDetails";
 
 const DEFAULT_DEPTH = 2;
@@ -58,13 +57,6 @@ export function runTrace(
       hops: [],
       reached: [],
       truncated: false,
-      next: resultNext(
-        "clarify",
-        "The start handle is ambiguous; choose one returned candidate.",
-      ),
-      guide: resultGuide(
-        "Disambiguate with the returned candidates, or ask the user for the intended symbol.",
-      ),
       candidates: start.candidates.map((n) => summary(graph, n)),
     };
   }
@@ -75,13 +67,6 @@ export function runTrace(
       hops: [],
       reached: [],
       truncated: false,
-      next: resultNext(
-        "clarify",
-        "The start handle did not resolve in the compiler graph.",
-      ),
-      guide: resultGuide(
-        "The start symbol was not resolved; answer that the graph has no trace from this handle.",
-      ),
     };
   }
 
@@ -94,13 +79,6 @@ export function runTrace(
       hops: [],
       reached: [],
       truncated: false,
-      next: resultNext(
-        "answer",
-        "The path result is the structural flow answer; cite path nodes and evidence ranges.",
-      ),
-      guide: resultGuide(
-        "Use the returned path, hops, and evidence ranges as the flow answer.",
-      ),
     };
     const target = resolveGraphHandle(graph, props.to);
     if (target.candidates) {
@@ -201,13 +179,6 @@ export function runTrace(
     hops,
     reached: [...reached.values()],
     steps: traceSteps(graph, hops),
-    next: resultNext(
-      "answer",
-      "Steps, hops, reached nodes, and evidence ranges are the flow answer surface.",
-    ),
-    guide: resultGuide(
-      "Use steps, hops, reached nodes, and evidence ranges as the flow answer or reading-list anchor.",
-    ),
     truncated,
   };
 }

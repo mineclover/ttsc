@@ -49,6 +49,8 @@ type PackageManifest = {
  * @param options.entries - Explicit plugin entries; `false` disables all
  *   plugins (skips both tsconfig entries and package auto-discovery).
  * @param options.file - Path to the tsconfig/jsconfig file.
+ * @param options.pluginConfigDir - Caller-declared anchor for plugin
+ *   config-file discovery (see `ITtscPluginFactoryContext.pluginConfigDir`).
  * @param options.projectRoot - Override the project root directory.
  * @param options.tsconfig - Alias for `file`.
  */
@@ -58,6 +60,7 @@ export function loadProjectPlugins(options: {
   cwd?: string;
   entries?: readonly ITtscProjectPluginConfig[] | false;
   file?: string;
+  pluginConfigDir?: string;
   projectRoot?: string;
   tsconfig?: string;
 }): {
@@ -83,9 +86,13 @@ export function loadProjectPlugins(options: {
     };
   }
 
+  const cwd = path.resolve(options.cwd ?? process.cwd());
   const context = {
     binary: options.binary,
-    cwd: path.resolve(options.cwd ?? process.cwd()),
+    cwd,
+    ...(options.pluginConfigDir === undefined || options.pluginConfigDir === ""
+      ? {}
+      : { pluginConfigDir: path.resolve(cwd, options.pluginConfigDir) }),
     projectRoot: project.root,
     tsconfig: project.path,
   };

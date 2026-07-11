@@ -10,6 +10,7 @@ import { resolveTsgo } from "./resolveTsgo";
 import {
   assertSharedHostCompatibility,
   linkedTransformPlugins,
+  resolvePluginConfigDir,
   selectSharedHostPlugin,
 } from "./sharedHostHelpers";
 
@@ -51,6 +52,7 @@ export function startResidentTransform(
     cacheDir: context.cacheDir ?? context.env?.TTSC_CACHE_DIR,
     cwd,
     entries: context.plugins,
+    pluginConfigDir: context.pluginConfigDir,
     projectRoot: context.projectRoot,
     tsconfig: project.path,
   });
@@ -76,7 +78,7 @@ export function startResidentTransform(
     ],
     binary: host.binary,
     cwd: project.root,
-    env: residentEnv(context, project.root, tsgoBinary, loaded.nativePlugins),
+    env: residentEnv(context, tsgoBinary, loaded.nativePlugins),
   });
   return { process: resident, projectRoot: project.root };
 }
@@ -84,27 +86,40 @@ export function startResidentTransform(
 /**
  * Build the environment for the resident host spawn. Matches the per-call
  * transform spawn: injects the Node, tsgo, and ttsx binaries so the host never
- * searches PATH, sets `TTSC_PLUGIN_CONFIG_DIR` so plugin config-file discovery
- * anchors at the project root even when the compiled tsconfig is a generated
- * wrapper in a temp directory, and forwards linked transform plugins via
+ * searches PATH, sets `TTSC_PLUGIN_CONFIG_DIR` when the caller declared a
+ * plugin config anchor (an embedder compiling through a generated wrapper
+ * tsconfig) so config-file discovery walks the real project instead of the
+ * wrapper's temp-dir ancestry, and forwards linked transform plugins via
  * `TTSC_LINKED_PLUGINS_JSON`.
  */
 function residentEnv(
   context: ITtscCompilerContext,
-  projectRoot: string,
   tsgoBinary: string,
   nativePlugins: readonly ITtscLoadedNativePlugin[],
 ): NodeJS.ProcessEnv {
+  const pluginConfigDir = resolvePluginConfigDir(context);
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     TTSC_NODE_BINARY: process.env.TTSC_NODE_BINARY ?? process.execPath,
-    TTSC_PLUGIN_CONFIG_DIR: projectRoot,
+    ...(pluginConfigDir === undefined
+      ? {}
+      : { TTSC_PLUGIN_CONFIG_DIR: pluginConfigDir }),
     TTSC_TSGO_BINARY: process.env.TTSC_TSGO_BINARY ?? tsgoBinary,
     TTSC_TTSX_BINARY:
       process.env.TTSC_TTSX_BINARY ??
       path.join(__dirname, "..", "..", "launcher", "ttsx.js"),
     ...context.env,
   };
+  // The anchor is per-invocation state owned by this host: when this run
+  // declared none (and the caller's env does not name one), drop any value
+  // inherited from an ancestor ttsc process so a nested build never
+  // mis-anchors its plugins at the outer project.
+  if (
+    pluginConfigDir === undefined &&
+    context.env?.TTSC_PLUGIN_CONFIG_DIR === undefined
+  ) {
+    delete env.TTSC_PLUGIN_CONFIG_DIR;
+  }
   const linked = linkedTransformPlugins(nativePlugins);
   if (linked.length !== 0) {
     env.TTSC_LINKED_PLUGINS_JSON = serializeNativePlugins(linked);

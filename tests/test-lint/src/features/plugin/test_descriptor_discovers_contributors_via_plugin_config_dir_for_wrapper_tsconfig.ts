@@ -16,19 +16,19 @@ import { createLintProject } from "../../internal/config-file";
  * from the tsconfig directory, so a generated wrapper tsconfig (e.g.
  * `@ttsc/unplugin`'s alias overlay) re-anchored the walk at the OS temp tree. A
  * config planted there would be honored and the project's contributors silently
- * dropped. `projectRoot` is the host's explicit channel for the real project
- * and must be the single walk origin.
+ * dropped. `pluginConfigDir` is the embedder's explicit channel for the real
+ * project and must be the single walk origin when present.
  *
  * 1. Materialize a project whose `lint.config.json` declares the
  *    `lint-contributor-demo` contributor, with the package linked into
  *    `node_modules`.
  * 2. Create a separate wrapper directory holding a `tsconfig.json` plus a decoy
  *    `lint.config.json` that declares no contributors.
- * 3. Call the factory with `tsconfig` pointing at the wrapper and `projectRoot` at
- *    the project; assert the demo contributor is forwarded (the decoy must
- *    never win).
+ * 3. Call the factory with `tsconfig` pointing at the wrapper and
+ *    `pluginConfigDir` at the project; assert the demo contributor is forwarded
+ *    (the decoy must never win).
  */
-export const test_descriptor_discovers_contributors_via_project_root_for_wrapper_tsconfig =
+export const test_descriptor_discovers_contributors_via_plugin_config_dir_for_wrapper_tsconfig =
   () => {
     const project = createLintProject({
       name: "wrapper-anchor",
@@ -57,12 +57,13 @@ export const test_descriptor_discovers_contributors_via_project_root_for_wrapper
       const descriptor = factory({
         ...TestLintPlugin.factoryContext({ transform: "@ttsc/lint" }),
         cwd: project.tmpdir,
+        pluginConfigDir: project.tmpdir,
         projectRoot: project.tmpdir,
         tsconfig: path.join(wrapper, "tsconfig.json"),
       });
       assert.ok(
         Array.isArray(descriptor.contributors),
-        "contributors must be discovered via projectRoot, not the wrapper tsconfig dir",
+        "contributors must be discovered via pluginConfigDir, not the wrapper tsconfig dir",
       );
       assert.ok(
         descriptor.contributors.some(

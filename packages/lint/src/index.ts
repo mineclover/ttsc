@@ -43,6 +43,12 @@ type TtscPluginFactoryContext<TConfig> = {
   /** This descriptor's own path — the ESM-safe replacement for `__filename`. */
   filename: string;
   plugin: TConfig;
+  /**
+   * Caller-declared anchor for plugin config-file discovery, present when the
+   * embedder compiles through a generated tsconfig outside the project (see
+   * `ITtscPluginFactoryContext.pluginConfigDir`).
+   */
+  pluginConfigDir?: string;
   projectRoot: string;
   tsconfig: string;
 };
@@ -104,9 +110,9 @@ const FRAMEWORK_KEYS = new Set<string>([
  * (`lint.config.{ts,cts,mts,js,cjs,mjs,json}` or `ttsc-lint.config.*`). The
  * tsconfig plugin entry carries no rule or plugin surface — it optionally names
  * the config file via `configFile`, otherwise the file is discovered by walking
- * upward from the host-provided project root (which defaults to the tsconfig
- * directory and stays correct when the resolved tsconfig is a generated wrapper
- * in a temp directory).
+ * upward from the tsconfig directory (or from the caller-declared
+ * `pluginConfigDir` when the resolved tsconfig is a generated wrapper in a temp
+ * directory).
  *
  * The factory locates the config file, evaluates it (via ttsx for TS / ESM
  * sources, `require` for CommonJS, `JSON.parse` for JSON), reads every
@@ -190,9 +196,11 @@ type ConfigPluginEntry = { namespace: string; source: string };
  * file.
  *
  * - When the tsconfig plugin entry sets `configFile`, that exact file is loaded
- *   (relative paths resolve against the host-provided project root).
+ *   (relative paths resolve against the tsconfig directory, or against the
+ *   caller-declared `pluginConfigDir` when present).
  * - Otherwise a `lint.config.*` / `ttsc-lint.config.*` file is discovered by
- *   walking upward from the host-provided project root.
+ *   walking upward from the tsconfig directory (or from `pluginConfigDir` when
+ *   present).
  *
  * Returns an empty array when no config file is set or discovered — the Go
  * sidecar surfaces the missing-config error; the factory only needs to forward
@@ -263,13 +271,14 @@ function readConfigFileOption(
 function findLintConfigFile(
   context: TtscPluginFactoryContext<ITtscLintPluginConfig>,
 ): string | undefined {
-  // Mirror the Go side (driver.PluginConfigBaseDir): the host-provided
-  // projectRoot is the single walk origin — it names the real project even
-  // when the resolved tsconfig is a generated wrapper in a temp dir (a
-  // TtscCompiler embedding, @ttsc/unplugin's alias overlay), and it keeps the
-  // wrapper's temp ancestry out of the walk so a stray config planted there
-  // is never honored. Without a projectRoot (defensive; the host always sets
-  // one) walk from the tsconfig directory, then from the working directory.
+  // Mirror the Go side (driver.PluginConfigBaseDir): the caller-declared
+  // pluginConfigDir is the single walk origin when present — it names the
+  // real project when the resolved tsconfig is a generated wrapper in a temp
+  // dir (@ttsc/unplugin's alias overlay), and it keeps the wrapper's temp
+  // ancestry out of the walk so a stray config planted there is never
+  // honored. Otherwise walk upward from the tsconfig directory first, then
+  // fall back to the working directory: that covers callers that point at an
+  // out-of-tree tsconfig without declaring an anchor.
   for (const origin of discoveryConfigBaseDirs(context)) {
     const discovered = findLintConfigFileFrom(origin);
     if (discovered !== undefined) {
@@ -282,11 +291,11 @@ function findLintConfigFile(
 function discoveryConfigBaseDirs(
   context: TtscPluginFactoryContext<ITtscLintPluginConfig>,
 ): string[] {
-  if (context.projectRoot) {
-    return [path.resolve(context.projectRoot)];
+  if (context.pluginConfigDir) {
+    return [path.resolve(context.cwd ?? ".", context.pluginConfigDir)];
   }
   const tsconfigDir = tsconfigBaseDir(context);
-  const cwd = path.resolve(context.cwd ?? tsconfigDir);
+  const cwd = path.resolve(context.cwd ?? context.projectRoot);
   return tsconfigDir === cwd ? [tsconfigDir] : [tsconfigDir, cwd];
 }
 
@@ -329,16 +338,16 @@ function findLintConfigFileFrom(origin: string): string | undefined {
 
 /**
  * Base directory for resolving a relative `configFile` from the tsconfig plugin
- * entry. Mirrors the Go side (driver.PluginConfigBaseDir): the host-provided
- * projectRoot wins — the resolved tsconfig may be a generated wrapper in a temp
- * directory that no longer identifies the project — otherwise the tsconfig
- * directory, falling back to the working directory.
+ * entry. Mirrors the Go side (driver.PluginConfigBaseDir): the caller-declared
+ * pluginConfigDir wins when present — the resolved tsconfig is then a generated
+ * wrapper in a temp directory that no longer identifies the project — otherwise
+ * the tsconfig directory, falling back to the working directory.
  */
 function pluginConfigBaseDir(
   context: TtscPluginFactoryContext<ITtscLintPluginConfig>,
 ): string {
-  if (context.projectRoot) {
-    return path.resolve(context.projectRoot);
+  if (context.pluginConfigDir) {
+    return path.resolve(context.cwd ?? ".", context.pluginConfigDir);
   }
   return tsconfigBaseDir(context);
 }

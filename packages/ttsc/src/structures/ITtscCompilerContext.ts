@@ -41,11 +41,25 @@ export interface ITtscCompilerContext {
    * Most callers should leave this unset so the project root is the directory
    * containing {@link ITtscCompilerContext.tsconfig}. Embedders that synthesize
    * a temporary config extending a real project config can set this to keep
-   * plugin resolution, cache paths, native plugin `--cwd`, and plugin
-   * config-file discovery (forwarded to plugin processes as
-   * `TTSC_PLUGIN_CONFIG_DIR`) anchored to the real project.
+   * plugin resolution, cache paths, and native plugin `--cwd` anchored to the
+   * real project.
    */
   projectRoot?: string;
+
+  /**
+   * Directory that anchors plugin config-file discovery and relative
+   * `configFile` resolution.
+   *
+   * Leave this unset so plugins anchor at the directory of the resolved
+   * {@link ITtscCompilerContext.tsconfig} as usual. Embedders that compile
+   * through a generated tsconfig outside the project (the bundler adapters'
+   * alias overlay, for example) set it to the real project directory; ttsc
+   * forwards the value to every plugin process as `TTSC_PLUGIN_CONFIG_DIR`, so
+   * `banner.config.*` / `strip.config.*` / `lint.config.*` discovery walks the
+   * project instead of the generated tsconfig's temp-dir ancestry. Relative
+   * paths are resolved from {@link ITtscCompilerContext.cwd}.
+   */
+  pluginConfigDir?: string;
 
   /**
    * Explicit TypeScript-Go executable for controlled embedding.

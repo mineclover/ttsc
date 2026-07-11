@@ -67,6 +67,21 @@ export interface ITtscPluginFactoryContext<T = ITtscProjectPluginConfig> {
   plugin: T;
 
   /**
+   * Caller-declared anchor for plugin config-file discovery and relative
+   * `configFile` resolution.
+   *
+   * Absent for ordinary invocations, where a factory anchors config discovery
+   * at the {@link ITtscPluginFactoryContext.tsconfig} directory. Present when
+   * the embedder compiles through a generated tsconfig outside the project (the
+   * bundler adapters' alias overlay): it names the real project directory, and
+   * a factory that discovers its own config file should anchor there instead of
+   * the generated tsconfig's temp-dir ancestry. Mirrors the
+   * `TTSC_PLUGIN_CONFIG_DIR` environment variable ttsc sets for native plugin
+   * processes.
+   */
+  pluginConfigDir?: string;
+
+  /**
    * Project root used as the native plugin working directory and package
    * discovery base.
    *

@@ -462,6 +462,13 @@ async function transformProject(props: {
   try {
     const result = new TtscCompiler({
       cwd: projectRoot,
+      // The generated tsconfig (if any) lives in the system temp directory,
+      // so declare the real project as the plugin config anchor: utility
+      // plugin config discovery (banner.config.*, strip.config.*,
+      // lint.config.*) and relative configFile resolution walk the project,
+      // never the temp tree. In the passthrough case this equals the
+      // tsconfig's own directory, the default anchor.
+      pluginConfigDir: projectRoot,
       plugins: props.plugins,
       projectRoot,
       tsconfig: configured.path,

@@ -1,6 +1,5 @@
 import { ITtscGraphDecorator } from "./ITtscGraphDecorator";
 import { ITtscGraphEvidence } from "./ITtscGraphEvidence";
-import { ITtscGraphNext } from "./ITtscGraphNext";
 
 /** The first compact source-free handle list for a TypeScript code question. */
 export interface ITtscGraphEntrypoints {
@@ -18,12 +17,6 @@ export interface ITtscGraphEntrypoints {
 
   /** Direct dependency context for the resolved mentions and highest hits. */
   neighborhood: ITtscGraphEntrypoints.INeighborhood[];
-
-  /** How to use this source-free result next. */
-  next: ITtscGraphNext;
-
-  /** Human-readable compatibility note mirroring `next`. */
-  guide: string;
 
   /** True when result caps hid additional seeds or references. */
   truncated?: boolean;

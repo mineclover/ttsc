@@ -1,5 +1,4 @@
 import { ITtscGraphDecorator } from "./ITtscGraphDecorator";
-import { ITtscGraphNext } from "./ITtscGraphNext";
 
 /** Answer-ready, source-free tour evidence for broad code-flow questions. */
 export interface ITtscGraphTour {
@@ -23,12 +22,6 @@ export interface ITtscGraphTour {
 
   /** Ordered file/line anchors to cite in the final answer, not file reads. */
   answerAnchors: ITtscGraphTour.IAnchor[];
-
-  /** How to use this source-free result next. */
-  next: ITtscGraphNext;
-
-  /** Human-readable compatibility note mirroring `next`. */
-  guide: string;
 
   /** True when any internal slice hit its cap. */
   truncated?: boolean;

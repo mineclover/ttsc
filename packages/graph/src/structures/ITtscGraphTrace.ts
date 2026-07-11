@@ -1,5 +1,4 @@
 import { ITtscGraphEvidence } from "./ITtscGraphEvidence";
-import { ITtscGraphNext } from "./ITtscGraphNext";
 
 /** The compact dependency or caller flow returned from a selected start symbol. */
 export interface ITtscGraphTrace {
@@ -32,12 +31,6 @@ export interface ITtscGraphTrace {
 
   /** Compact hop summaries preserving node names and edge evidence, capped. */
   steps?: string[];
-
-  /** How to use this source-free result next. */
-  next: ITtscGraphNext;
-
-  /** Human-readable compatibility note mirroring `next`. */
-  guide: string;
 
   /** When `from` was an ambiguous name, the matches to disambiguate with. */
   candidates?: ITtscGraphTrace.INode[];

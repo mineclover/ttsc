@@ -9,7 +9,6 @@ import { ITtscGraphEvidence } from "../structures/ITtscGraphEvidence";
 import { ITtscGraphNode } from "../structures/ITtscGraphNode";
 import { isExternalNode } from "./pathPolicy";
 import { resolveGraphHandle } from "./resolveHandle";
-import { resultGuide, resultNext } from "./resultGuide";
 
 // A signature is the declaration head up to the body brace: a handful of lines.
 const MAX_SIGNATURE_LINES = 4;
@@ -150,13 +149,6 @@ export function runDetails(
   return {
     type: "details",
     nodes,
-    next: resultNext(
-      "answer",
-      "Selected signatures, members, dependencies, implementation candidates, and ranges are enough for a shape or reading-anchor answer.",
-    ),
-    guide: resultGuide(
-      "Use signatures, members, calls, types, implementedBy, literals, and sourceSpan anchors as selected symbol facts.",
-    ),
     unknown,
   };
 }

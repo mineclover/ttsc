@@ -1,5 +1,3 @@
-import { ITtscGraphNext } from "./ITtscGraphNext";
-
 /** A compact, source-read-free project map for broad orientation only. */
 export interface ITtscGraphOverview {
   /** Discriminator for source-free project overview. */
@@ -10,12 +8,6 @@ export interface ITtscGraphOverview {
 
   /** Size of the graph. */
   counts: ITtscGraphOverview.ICounts;
-
-  /** How to use this source-free result next. */
-  next: ITtscGraphNext;
-
-  /** Human-readable compatibility note mirroring `next`. */
-  guide: string;
 
   /** Folder layering, largest first. */
   layers?: ITtscGraphOverview.ILayer[];

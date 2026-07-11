@@ -1,6 +1,5 @@
 import { ITtscGraphDecorator } from "./ITtscGraphDecorator";
 import { ITtscGraphEvidence } from "./ITtscGraphEvidence";
-import { ITtscGraphNext } from "./ITtscGraphNext";
 
 /**
  * Source-free facts for a few selected handles, not a file reader: signatures,
@@ -13,12 +12,6 @@ export interface ITtscGraphDetails {
 
   /** Selected node facts, in the same order as resolved handles when possible. */
   nodes: ITtscGraphDetails.INode[];
-
-  /** How to use this source-free result next. */
-  next: ITtscGraphNext;
-
-  /** Human-readable compatibility note mirroring `next`. */
-  guide: string;
 
   /** Handles that resolved to no node, or that were ambiguous. */
   unknown: string[];

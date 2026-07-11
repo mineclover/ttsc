@@ -239,7 +239,6 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
           evidence?: { file?: string; startLine?: number; text?: string };
         }[];
       }[];
-      guide: string;
     }>(
       (await client.request("tools/call", {
         name: GRAPH_TOOL_NAME,
@@ -300,9 +299,8 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
       (hit) => hit.name === "Service.run",
     );
     assert.ok(
-      entrypointRun !== undefined &&
-        entrypoints.guide.includes("sacred, infallible compiler truth"),
-      `entrypoints returns compact follow-up guidance: ${JSON.stringify(entrypoints.guide)}`,
+      entrypointRun !== undefined,
+      `entrypoints resolves the Service.run handle: ${JSON.stringify(entrypoints.hits)}`,
     );
 
     // tour: one answer-ready onboarding slice with flow, tests, and anchors.
@@ -316,7 +314,6 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
       }[];
       tests: { file: string; startLine: number; source?: string }[];
       answerAnchors: { file: string; startLine: number; source?: string }[];
-      guide: string;
     }>(
       (await client.request("tools/call", {
         name: GRAPH_TOOL_NAME,
@@ -357,11 +354,6 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
       ),
       `tour returns answer anchors, not source text: ${JSON.stringify(tour.answerAnchors)}`,
     );
-    assert.ok(
-      tour.guide.includes("answer-ready index") &&
-        tour.guide.includes("sacred, infallible compiler truth"),
-      `tour guide explains answer-ready use: ${JSON.stringify(tour.guide)}`,
-    );
 
     // overview: a compact architecture map with real counts.
     const overview = callGraphJson<{
@@ -399,7 +391,6 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
     // lookup: finds Service by name and ranks explicit method queries.
     const lookup = callGraphJson<{
       hits: { id: string; name: string; kind: string }[];
-      guide: string;
     }>(
       (await client.request("tools/call", {
         name: GRAPH_TOOL_NAME,
@@ -414,10 +405,6 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
     );
     const service = lookup.hits.find((hit) => hit.name === "Service");
     assert.ok(service, `lookup finds Service: ${JSON.stringify(lookup.hits)}`);
-    assert.ok(
-      lookup.guide.includes("sacred, infallible compiler truth"),
-      `lookup returns compact follow-up guidance: ${JSON.stringify(lookup.guide)}`,
-    );
     const methodQuery = callGraphJson<{
       hits: { name: string; kind: string }[];
     }>(
@@ -569,7 +556,6 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
     const pathTrace = callGraphJson<{
       path?: { name: string; signature?: string }[];
       steps?: string[];
-      guide: string;
     }>(
       (await client.request("tools/call", {
         name: GRAPH_TOOL_NAME,
@@ -594,9 +580,8 @@ export const test_ttscgraph_serves_graph_tools_over_mcp = async () => {
       `trace path carries signatures: ${JSON.stringify(pathTrace.path)}`,
     );
     assert.ok(
-      pathTrace.steps?.some((step) => step.includes("helper")) &&
-        pathTrace.guide.includes("sacred, infallible compiler truth"),
-      `trace path returns step text and compact guidance: ${JSON.stringify(pathTrace)}`,
+      pathTrace.steps?.some((step) => step.includes("helper")),
+      `trace path returns step text: ${JSON.stringify(pathTrace.steps)}`,
     );
 
     // details: returns declared shape and anchors, not implementation text.

@@ -1,5 +1,3 @@
-import { ITtscGraphNext } from "./ITtscGraphNext";
-
 /** The no-op result for when graph is not the useful next evidence source. */
 export interface ITtscGraphEscape {
   /** Discriminator for the no-op escape route. */
@@ -10,12 +8,6 @@ export interface ITtscGraphEscape {
 
   /** Why no graph operation should run. */
   reason: string;
-
-  /** How to proceed after skipping graph work. */
-  next: ITtscGraphNext;
-
-  /** Human-readable compatibility note mirroring `next`. */
-  guide: string;
 
   /** Optional note about the next non-graph step. */
   nextStep?: string;

@@ -1,5 +1,4 @@
 import { ITtscGraphDecorator } from "./ITtscGraphDecorator";
-import { ITtscGraphNext } from "./ITtscGraphNext";
 
 /** Targeted symbol lookup when a concrete name or handle is being resolved. */
 export interface ITtscGraphLookup {
@@ -8,12 +7,6 @@ export interface ITtscGraphLookup {
 
   /** Ranked symbol matches for the query. */
   hits: ITtscGraphLookup.IHit[];
-
-  /** How to use this source-free result next. */
-  next: ITtscGraphNext;
-
-  /** Human-readable compatibility note mirroring `next`. */
-  guide: string;
 }
 export namespace ITtscGraphLookup {
   /** Find a concrete class, method, function, property, type, or dotted handle. */

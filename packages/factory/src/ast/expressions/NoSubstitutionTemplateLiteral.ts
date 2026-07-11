@@ -11,4 +11,7 @@ export interface NoSubstitutionTemplateLiteral {
 
   /** Text. */
   text: string;
+
+  /** RawText. */
+  rawText?: string;
 }

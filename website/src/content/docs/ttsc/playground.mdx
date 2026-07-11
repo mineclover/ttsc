@@ -12,6 +12,6 @@ The dependency loader starts from bare imports, dynamic imports, and `require("p
 
 The `typia` packages used by the default examples remain bundled because the wasm-side typia adapter must match the exact typia source version linked into the playground compiler.
 
-## Current Scope
+## Embedding the playground
 
-The browser-side dependency loader currently lives inside the website playground. A reusable UI package can be split out later once the interaction surface settles.
+Everything behind the hosted playground ships as the [`@ttsc/playground`](https://github.com/samchon/ttsc/tree/master/packages/playground) package: the worker compiler (`createWorkerCompiler`), the browser-side npm dependency loader (`installPlaygroundDependencies`), and the Monaco-based React UI (`PlaygroundShell`). The website itself consumes the package, so embedding the same playground in another site starts from the package README.

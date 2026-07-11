@@ -1,0 +1,4 @@
+interface:
+  display_name: "TTSC Graph Insights"
+  short_description: "Compiler graph insight and review workflows"
+  default_prompt: "Use $ttsc-graph-insights to summarize graph impact and produce concise review notes."

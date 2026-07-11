@@ -1,0 +1,90 @@
+[mcp_servers.ttsc-graph]
+command = "node"
+args = ["/Users/junwoobang/workflow/ttsc-ex/node_modules/@ttsc/graph/lib/bin.js", "--cwd", "/Users/junwoobang/workflow/ttsc-ex", "--tsconfig", "tsconfig.json"]
+
+[mcp_servers.ttsc-graph.env]
+TTSC_GRAPH_BINARY = "/Users/junwoobang/workflow/ttsc-ex/node_modules/@ttsc/darwin-arm64/bin/ttscgraph"
+
+[mcp_servers.ttsc-graph.tools.inspect_typescript_graph]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-self-graph]
+command = "node"
+args = ["/Users/junwoobang/workflow/ttsc-ex/node_modules/@ttsc/graph/lib/bin.js", "--cwd", "/Users/junwoobang/workflow/ttsc-ex/ttsc/packages/ttsc", "--tsconfig", "tsconfig.json"]
+
+[mcp_servers.ttsc-self-graph.env]
+TTSC_GRAPH_BINARY = "/Users/junwoobang/workflow/ttsc-ex/node_modules/@ttsc/darwin-arm64/bin/ttscgraph"
+
+[mcp_servers.ttsc-self-graph.tools.inspect_typescript_graph]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router]
+command = "node"
+args = ["/Users/junwoobang/workflow/ttsc-ex/packages/ttsc-graph-router/dist/bin/ttsc-graph-router.js", "--config", "/Users/junwoobang/workflow/ttsc-ex/ttsc-graph-router.config.json"]
+startup_timeout_sec = 120.0
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_health]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_list_repos]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_refresh]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_inspect]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_changed_impact]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_artifact_stats]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_artifact_validate]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_repo_map]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_related_nodes]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_lint_rules]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_document_symbols]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_checkpoint_diff]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_scope_tree]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_file_visualization]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_file_dependencies]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_checkpoint_list]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_checkpoint_create]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_checkpoint_prune]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_checkpoint_export]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_checkpoint_import]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_checkpoint_inspect]
+approval_mode = "approve"
+
+[mcp_servers.ttsc-graph-router.tools.graph_router_checkpoint_delete]
+approval_mode = "approve"

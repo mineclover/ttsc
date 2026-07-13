@@ -221,7 +221,7 @@ func NewContextWithProjectResults(
     File:     file,
     Checker:  checker,
     Severity: severity,
-    Options:  options,
+    Options:  append(json.RawMessage(nil), options...),
     reporter: reporter,
     results:  results,
   }

@@ -415,13 +415,17 @@ func Checker_resolveCallSignatures(
     return nil
   }
   var candidates []*innerchecker.Signature
+  // Upstream defines normal checking and no call-chain flags as the zero values.
+  // Avoid selecting individual private enum members into the public shim surface.
+  var checkMode innerchecker.CheckMode
+  var callChainFlags innerchecker.SignatureFlags
   return checkerResolveCall(
     recv,
     node,
     signatures,
     &candidates,
-    innerchecker.CheckModeNormal,
-    innerchecker.SignatureFlagsNone,
+    checkMode,
+    callChainFlags,
     nil,
   )
 }

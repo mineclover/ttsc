@@ -37,9 +37,10 @@ func forEachCommentToken(file *shimast.SourceFile, visit func(kind shimast.Kind,
     return
   }
   text := file.Text()
-  opaque := parserTokenSpans(file)
+  opaque := parserOpaqueTokenSpans(file)
   comments := make([]commentToken, 0)
   seen := make(map[sourceSpan]struct{})
+  gapScanner := shimscanner.NewScanner()
   collect := func(kind shimast.Kind, pos, end int) {
     if pos < 0 || end <= pos || end > len(text) {
       return
@@ -55,14 +56,14 @@ func forEachCommentToken(file *shimast.SourceFile, visit func(kind shimast.Kind,
   cursor := 0
   for _, span := range opaque {
     if cursor < span.pos {
-      scanCommentGap(text, cursor, span.pos, collect)
+      scanCommentGap(gapScanner, text, cursor, span.pos, collect)
     }
     if span.end > cursor {
       cursor = span.end
     }
   }
   if cursor < len(text) {
-    scanCommentGap(text, cursor, len(text), collect)
+    scanCommentGap(gapScanner, text, cursor, len(text), collect)
   }
 
   sort.Slice(comments, func(i, j int) bool {
@@ -76,18 +77,20 @@ func forEachCommentToken(file *shimast.SourceFile, visit func(kind shimast.Kind,
   }
 }
 
-// parserTokenSpans returns merged source ranges for every parser-owned token.
-// These are the lexical-goal boundaries a raw scanner cannot infer: string and
-// regex literals, template heads/middles/tails, and JSX text are all token
-// nodes, as are their TS/JS counterparts under the selected ScriptKind.
-func parserTokenSpans(file *shimast.SourceFile) []sourceSpan {
+// parserOpaqueTokenSpans returns merged source ranges for the parser-owned
+// tokens whose contents a context-free scanner cannot classify: strings,
+// regex literals, template heads/middles/tails, and JSX text. Numeric literals,
+// identifiers, keywords, and punctuation remain in the scanned gaps because
+// they cannot contain comment-shaped source bytes; keeping them there avoids a
+// scanner reset for every ordinary token.
+func parserOpaqueTokenSpans(file *shimast.SourceFile) []sourceSpan {
   spans := make([]sourceSpan, 0)
   var walk func(*shimast.Node)
   walk = func(node *shimast.Node) {
     if node == nil {
       return
     }
-    if node.Kind >= shimast.KindFirstToken && node.Kind <= shimast.KindLastToken {
+    if parserOpaqueTokenKind(node.Kind) {
       pos := shimscanner.GetTokenPosOfNode(node, file, false /*includeJSDoc*/)
       if pos >= 0 && node.End() > pos && node.End() <= len(file.Text()) {
         spans = append(spans, sourceSpan{pos: pos, end: node.End()})
@@ -123,16 +126,20 @@ func parserTokenSpans(file *shimast.SourceFile) []sourceSpan {
   return merged
 }
 
+func parserOpaqueTokenKind(kind shimast.Kind) bool {
+  return kind >= shimast.KindStringLiteral && kind <= shimast.KindLastLiteralToken ||
+    kind >= shimast.KindFirstTemplateToken && kind <= shimast.KindLastTemplateToken
+}
+
 // scanCommentGap scans one parser-classified non-token gap. Context-sensitive
 // token bodies never enter this function, so every comment trivia token it
 // returns is a real source comment. Scanning the isolated gap also preserves
 // CRLF and Unicode line-terminator behavior without range arithmetic in a
 // second comment parser.
-func scanCommentGap(text string, from, to int, visit func(kind shimast.Kind, pos, end int)) {
-  if from < 0 || to <= from || to > len(text) {
+func scanCommentGap(scanner *shimscanner.Scanner, text string, from, to int, visit func(kind shimast.Kind, pos, end int)) {
+  if scanner == nil || from < 0 || to <= from || to > len(text) {
     return
   }
-  scanner := shimscanner.NewScanner()
   scanner.SetText(text[from:to])
   scanner.SetSkipTrivia(false)
   for {

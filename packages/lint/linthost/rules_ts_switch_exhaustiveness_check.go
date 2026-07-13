@@ -573,7 +573,7 @@ func switchExhaustivenessCheckCommentDefaultCase(
   // last clause and ends before the case block's closing-brace token. Scan the
   // bounded gap directly so a file with many switches does not re-enumerate
   // the whole AST for every switch node.
-  scanCommentGap(text, from, to, func(kind shimast.Kind, pos, end int) {
+  scanCommentGap(shimscanner.NewScanner(), text, from, to, func(kind shimast.Kind, pos, end int) {
     candidateKind = kind
     candidatePos = pos
     candidateEnd = end

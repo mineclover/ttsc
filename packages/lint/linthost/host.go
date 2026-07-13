@@ -208,9 +208,6 @@ func realProjectPath(target string) string {
     }
     seen[key] = struct{}{}
 
-    if evaluated, err := filepath.EvalSymlinks(resolved); err == nil {
-      resolved = filepath.Clean(evaluated)
-    }
     next, ok := resolveProjectPathAncestor(resolved)
     if !ok {
       return filepath.Clean(resolved)
@@ -230,15 +227,23 @@ func resolveProjectPathAncestor(target string) (string, bool) {
   original := filepath.Clean(target)
   probe := original
   suffix := make([]string, 0)
+  evaluateAncestor := true
   for {
-    if evaluated, err := filepath.EvalSymlinks(probe); err == nil {
-      candidate := filepath.Clean(evaluated)
-      for i := len(suffix) - 1; i >= 0; i-- {
-        candidate = filepath.Join(candidate, suffix[i])
-      }
-      candidate = filepath.Clean(candidate)
-      if candidate != original {
-        return candidate, true
+    if evaluateAncestor {
+      if evaluated, err := filepath.EvalSymlinks(probe); err == nil {
+        // EvalSymlinks resolves the probe's complete ancestry. If it leaves
+        // the spelling unchanged, retrying it on every parent cannot reveal
+        // anything new; retain only the os.Readlink walk for junctions that
+        // EvalSymlinks does not expose.
+        evaluateAncestor = false
+        candidate := filepath.Clean(evaluated)
+        for i := len(suffix) - 1; i >= 0; i-- {
+          candidate = filepath.Join(candidate, suffix[i])
+        }
+        candidate = filepath.Clean(candidate)
+        if candidate != original {
+          return candidate, true
+        }
       }
     }
     if _, err := os.Readlink(probe); err == nil {

@@ -12,12 +12,21 @@ func TestLSPCommandsAcceptWindowsShortCwd(t *testing.T) {
   t.Run("fix all", func(t *testing.T) {
     source := "var value = 1;\n"
     root := seedLintProject(t, source)
-    seedLintRules(t, root, map[string]string{"no-var": "error"})
     longRoot := realProjectPath(root)
     shortRoot := windowsShortPathForTest(t, longRoot)
+    configFile := filepath.Join(longRoot, "custom-lint.config.json")
+    writeFile(t, configFile, `{"rules":{"no-var":"error"}}`)
+    pluginsJSON := lintManifestWithConfig(t, map[string]any{"configFile": configFile})
     uri := lintTestFileURI(t, filepath.Join(longRoot, "src", "main.ts"))
 
-    got := executeLSPCommandAppliedTextForTest(t, shortRoot, uri, commandLintFixAll, source)
+    got := executeLSPCommandAppliedTextWithManifestForTest(
+      t,
+      shortRoot,
+      uri,
+      commandLintFixAll,
+      source,
+      pluginsJSON,
+    )
     if want := "const value = 1;\n"; got != want {
       t.Fatalf("LSP fix through short cwd: got %q, want %q", got, want)
     }

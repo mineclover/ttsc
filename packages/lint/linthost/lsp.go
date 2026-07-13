@@ -1095,8 +1095,8 @@ func remapLSPPluginsJSONForTempWorkspace(raw string, cwd string, tempRoot string
 }
 
 func tempPathFor(cwd string, tempRoot string, file string) (string, bool) {
-  rel, err := filepath.Rel(cwd, file)
-  if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+  rel, ok := projectRelativePath(realProjectPath(cwd), realProjectPath(file))
+  if !ok {
     return "", false
   }
   return filepath.Join(tempRoot, rel), true

@@ -57,7 +57,8 @@ export interface ITtscLintTypeScriptRules {
    *
    * Type-aware. The Checker resolves Promise and well-known-symbol protocols,
    * including each Promise aggregator input's synchronous iterator yield type.
-   * Only the ordinary `await` finding is autofixable.
+   * Ordinary `await` findings offer an opt-in editor suggestion, while
+   * automatic fix and fix-all paths leave the source unchanged.
    *
    * @reference https://typescript-eslint.io/rules/await-thenable
    */
@@ -72,6 +73,8 @@ export interface ITtscLintTypeScriptRules {
    * individually configurable as `boolean`, `"allow-with-description"`, or `{
    * descriptionFormat }`, with `minimumDescriptionLength` governing the
    * description-required forms.
+   * Banned `@ts-ignore` findings offer replacement with `@ts-expect-error` only
+   * as an opt-in editor suggestion.
    *
    * @reference https://typescript-eslint.io/rules/ban-ts-comment
    */

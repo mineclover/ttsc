@@ -72,9 +72,9 @@ func (awaitThenable) Check(ctx *Context, node *shimast.Node) {
 // checkAwaitThenableExpression handles the ordinary `await expr` arm. The
 // operand must be definitely non-awaitable before the rule reports. `any`,
 // `unknown`, unconstrained type parameters, and unions with a thenable member
-// remain clean because their awaitability is uncertain. The finding carries
-// an autofix that drops the redundant `await ` keyword, which is
-// behavior-preserving modulo one microtask hop.
+// remain clean because their awaitability is uncertain. The finding offers an
+// opt-in suggestion that drops only the `await` token. It is not an autofix:
+// even a non-thenable await creates an observable microtask boundary.
 func checkAwaitThenableExpression(ctx *Context, node *shimast.Node) {
   expr := node.AsAwaitExpression()
   if expr == nil || expr.Expression == nil {
@@ -88,20 +88,19 @@ func checkAwaitThenableExpression(ctx *Context, node *shimast.Node) {
     return
   }
   message := "Unexpected `await` of a non-Promise (non-\"Thenable\") value."
-  // Fix: drop the `await ` keyword and the following whitespace by
-  // replacing [node.Pos(), expr.Expression.Pos()) with empty text.
-  // `node.Pos()` may include leading trivia; use tokenRange to anchor
-  // the start at the actual `await` token.
+  // Match upstream's suggestion exactly: delete the keyword token while
+  // preserving all trivia between it and the operand.
   startPos, _ := tokenRange(ctx.File, node)
-  operandStart := expr.Expression.Pos()
-  if startPos < 0 || operandStart <= startPos {
+  awaitEnd := startPos + len("await")
+  if startPos < 0 || awaitEnd > expr.Expression.Pos() {
     ctx.Report(node, message)
     return
   }
-  ctx.ReportFix(
+  ctx.ReportSuggestion(
     node,
     message,
-    TextEdit{Pos: startPos, End: operandStart, Text: ""},
+    "Remove unnecessary `await`.",
+    TextEdit{Pos: startPos, End: awaitEnd, Text: ""},
   )
 }
 

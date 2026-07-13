@@ -11,12 +11,12 @@ import (
 //
 // Upstream's `ts-ignore: true` arm uses a dedicated message that steers
 // users toward `@ts-expect-error` (not the generic do-not-use text) and
-// attaches a single suggestion edit replacing exactly the directive token.
-// Pinning the message and the edit shape locks both against regression.
+// attaches a single opt-in suggestion replacing exactly the directive token.
+// Pinning the message and edit channel prevents it from becoming an autofix.
 //
 // 1. Lint `// @ts-ignore` above a statement with defaults.
 // 2. Assert one finding with the exact upgrade message.
-// 3. Assert one fix edit covering only `@ts-ignore` with the replacement text.
+// 3. Assert Fix is empty and one suggestion covers only `@ts-ignore`.
 func TestBanTsCommentDefaultReportsIgnoreWithUpgradeMessage(t *testing.T) {
   const message = "Use `@ts-expect-error` instead of `@ts-ignore`, as `@ts-ignore` will do nothing if the following line is error-free."
   source := "// @ts-ignore\nconst a: number = 1;\nJSON.stringify(a);\n"
@@ -33,10 +33,17 @@ func TestBanTsCommentDefaultReportsIgnoreWithUpgradeMessage(t *testing.T) {
   if finding.Pos != 0 || finding.End != len("// @ts-ignore") {
     t.Fatalf("want range [0,%d), got [%d,%d)", len("// @ts-ignore"), finding.Pos, finding.End)
   }
-  if len(finding.Fix) != 1 {
-    t.Fatalf("want exactly 1 fix edit, got %+v", finding.Fix)
+  if len(finding.Fix) != 0 || len(finding.Suggestions) != 1 {
+    t.Fatalf("fixes = %d, suggestions = %d", len(finding.Fix), len(finding.Suggestions))
   }
-  edit := finding.Fix[0]
+  suggestion := finding.Suggestions[0]
+  if suggestion.Title != "Replace \"@ts-ignore\" with \"@ts-expect-error\"." {
+    t.Fatalf("suggestion title = %q", suggestion.Title)
+  }
+  if len(suggestion.Edits) != 1 {
+    t.Fatalf("suggestion edits = %+v", suggestion.Edits)
+  }
+  edit := suggestion.Edits[0]
   if edit.Pos != len("// ") || edit.End != len("// @ts-ignore") || edit.Text != "@ts-expect-error" {
     t.Fatalf("want edit [%d,%d)=%q, got [%d,%d)=%q",
       len("// "), len("// @ts-ignore"), "@ts-expect-error", edit.Pos, edit.End, edit.Text)

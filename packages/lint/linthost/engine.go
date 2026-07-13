@@ -232,6 +232,28 @@ func (c *Context) ReportRangeFix(pos, end int, message string, edits ...TextEdit
   })
 }
 
+// ReportRangeSuggestion records an explicit-range finding with one opt-in
+// editor action. Suggestion edits stay separate from automatic fixes and are
+// ignored by `ttsc fix` and source.fixAll.ttsc.
+func (c *Context) ReportRangeSuggestion(pos, end int, message string, title string, edits ...TextEdit) {
+  if c.Severity == SeverityOff || c.File == nil {
+    return
+  }
+  if end <= pos {
+    end = pos + 1
+  }
+  c.collect(&Finding{
+    Rule:        c.rule.Name(),
+    Severity:    c.Severity,
+    File:        c.File,
+    Pos:         pos,
+    End:         end,
+    Message:     message,
+    Suggestions: newSuggestions(title, edits),
+    IsFormat:    c.isFormat,
+  })
+}
+
 // cloneTextEdits returns a shallow copy of `edits` so that the caller's
 // variadic slice cannot be mutated through the stored Finding. Returns nil
 // when the input is empty, keeping the Finding.Fix field nil rather than

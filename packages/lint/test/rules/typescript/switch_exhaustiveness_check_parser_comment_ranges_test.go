@@ -1,6 +1,9 @@
 package linthost
 
-import "testing"
+import (
+  "strings"
+  "testing"
+)
 
 // TestSwitchExhaustivenessCheckParserCommentRanges verifies the real command
 // path recognizes only a trailing parser-classified default marker.
@@ -25,7 +28,33 @@ switch (value) {
     "requireDefaultForNonUnion": true,
   }, 1, map[string]int{"Cases not matched: default": 1})
 
-  assertSwitchExhaustivenessCheckForTest(t, "\ndeclare const value: string;\nswitch (value) {\n  case \"known\": break;\u2028// No Default\u2029}\n", map[string]any{
+  markerSource := "\ndeclare const value: string;\nswitch (value) {\n  case \"known\": break;\u2028// No Default\u2029}\n"
+  assertSwitchExhaustivenessCheckForTest(t, markerSource, map[string]any{
     "requireDefaultForNonUnion": true,
   }, 0, nil)
+
+  file := parseTS(t, markerSource)
+  if file.Statements == nil || len(file.Statements.Nodes) != 2 {
+    t.Fatalf("want declaration and switch statements, got %+v", file.Statements)
+  }
+  switchNode := file.Statements.Nodes[1]
+  sw := switchNode.AsSwitchStatement()
+  if sw == nil || sw.CaseBlock == nil {
+    t.Fatalf("parser did not retain switch case block: %+v", switchNode)
+  }
+  block := sw.CaseBlock.AsCaseBlock()
+  if block == nil || block.Clauses == nil || len(block.Clauses.Nodes) != 1 {
+    t.Fatalf("parser did not retain the switch clause: %+v", sw.CaseBlock)
+  }
+  marker := switchExhaustivenessCheckCommentDefaultCase(
+    &Context{File: file},
+    sw.CaseBlock,
+    block.Clauses.Nodes[0],
+    switchExhaustivenessCheckDefaultCommentPattern,
+  )
+  start := strings.Index(markerSource, "// No Default")
+  end := start + len("// No Default")
+  if marker == nil || marker.pos != start || marker.end != end {
+    t.Fatalf("want exact marker range [%d,%d), got %+v", start, end, marker)
+  }
 }

@@ -979,12 +979,14 @@ func floatingPromiseMethodReturnIsUnhandled(
       return true
     }
     sawBranch = true
-    for _, signature := range signatures {
-      returnType := ctx.Checker.GetReturnTypeOfSignature(signature)
-      if isFloatingPromiseType(ctx, node, returnType, options) ||
-        isFloatingPromiseArray(ctx, node, returnType, options) {
-        return true
-      }
+    signature := shimchecker.Checker_resolveCallSignatures(ctx.Checker, node, signatures)
+    if signature == nil {
+      return true
+    }
+    returnType := ctx.Checker.GetReturnTypeOfSignature(signature)
+    if isFloatingPromiseType(ctx, node, returnType, options) ||
+      isFloatingPromiseArray(ctx, node, returnType, options) {
+      return true
     }
   }
   return !sawBranch

@@ -10,7 +10,8 @@ import (
 // other branch contributes its own method return type.
 //
 // The matrix covers dot, computed, and optional calls, intersection members,
-// generic return carriers, structural thenables, and both safe option families.
+// generic return carriers, overload selection, structural thenables, and both
+// safe option families.
 //
 //  1. Pair safe undefined returns with unsafe Promise returns in mixed calls.
 //  2. Repeat the distinction with thenable checks and configured safe values.
@@ -62,6 +63,18 @@ safeThen.then(undefined, () => undefined);
 unsafeThen.then(undefined, () => undefined);
 mixedFinally.finally(() => undefined);
 unrelated.catch(() => undefined);
+interface SafeOverloadedCatchResult {
+  catch(onRejected: (reason: unknown) => void): undefined;
+  catch(flag: number): Promise<void>;
+}
+interface UnsafeOverloadedCatchResult {
+  catch(onRejected: (reason: unknown) => void): Promise<void>;
+  catch(flag: number): undefined;
+}
+declare const safeOverloaded: Promise<void> | SafeOverloadedCatchResult;
+declare const unsafeOverloaded: Promise<void> | UnsafeOverloadedCatchResult;
+safeOverloaded.catch(() => undefined);
+unsafeOverloaded.catch(() => undefined);
 `, nil)
   if code != 2 || stdout != "" {
     t.Fatalf("mixed receiver run mismatch: code=%d stdout=%q stderr=%q", code, stdout, stderr)
@@ -75,6 +88,7 @@ unrelated.catch(() => undefined);
     "main.ts:44:",
     "main.ts:45:",
     "main.ts:46:",
+    "main.ts:58:",
   }
   if got := strings.Count(stderr, "[typescript/no-floating-promises]"); got != len(expectedLines) {
     t.Fatalf("expected %d mixed receiver findings, got %d:\n%s", len(expectedLines), got, stderr)

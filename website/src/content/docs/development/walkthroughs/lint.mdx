@@ -132,7 +132,7 @@ func run(args []string) int {
     fmt.Fprintf(os.Stderr, "@ttsc/lint: unknown command %q\n", args[0])
     return 2
   }
-  registerContributors()
+  registerContributorsOnce()
   switch args[0] {
   case "check":     return RunCheck(args[1:])
   case "fix":       return RunFix(args[1:])
@@ -152,7 +152,7 @@ func run(args []string) int {
 The two-switch shape is intentional:
 
 - The **first switch** validates the subcommand. Unknown commands and `version` exit before any side-effect (the `version` banner does not need to register rules, parse configs, or load a Program).
-- `registerContributors()` walks the public `rule.Registered()` slice and adapts every contributor rule onto the engine's internal `Rule` interface. See [Contributor adapter](#contributor-adapter) below.
+- `registerContributorsOnce()` uses `sync.Once` to inspect the public contributor registries and adapt every contributor rule onto the engine's internal maps during the first valid command. Concurrent callers wait for that bootstrap to finish, and later calls reuse the published maps. See [Contributor adapter](#contributor-adapter) below.
 - The **second switch** dispatches to the actual implementation in `compile.go` / `fix.go` / `format.go`.
 
 `Version` is a package-level `var Version = "dev"` overridden at link time by `-ldflags "-X github.com/samchon/ttsc/packages/lint/linthost.Version=…"`. The release pipeline sets it; local `go build` calls leave it as `"dev"`.
@@ -281,7 +281,7 @@ func Register(rule Rule) {
 }
 ```
 
-Every built-in rule registers from its file's `init()`. By the time `main.run` calls `RunCheck`, the registry holds every rule the binary will ever see. Contributors register the same way but go through `rule.Register` instead; `registerContributors` adapts them onto the internal `Rule` interface after every `init()` has fired.
+Every built-in rule registers from its file's `init()`. Contributors register the same way but go through `rule.Register` instead. After every `init()` has fired, `registerContributorsOnce` adapts them onto the internal `Rule` interface exactly once before the first valid command dispatch, so every later `run` call reads the same registry state.
 
 ### Dispatch table
 

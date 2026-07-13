@@ -195,7 +195,7 @@ func assertSwitchExhaustivenessSuggestedSourceForTest(t *testing.T, root string,
       "--plugins-json", lintManifest(t),
     })
   })
-  if code != 0 || stdout != "" || !isBenignContributorCollisionWarning(stderr) {
+  if code != 0 || stdout != "" || stderr != "" {
     t.Fatalf("suggested source did not re-check cleanly: code=%d stdout=%q stderr=%q\n%s", code, stdout, stderr, source)
   }
 }

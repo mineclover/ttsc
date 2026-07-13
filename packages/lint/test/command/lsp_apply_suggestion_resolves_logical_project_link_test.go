@@ -107,7 +107,7 @@ func TestLSPApplySuggestionResolvesLogicalProjectLink(t *testing.T) {
     t.Fatal("linked dependency target hid its node_modules boundary")
   }
   code, stdout, stderr = runLSPApplySuggestionForTest(t, physicalRoot, dependencyArguments)
-  if code != 0 || strings.TrimSpace(stdout) != "null" || !isBenignContributorCollisionWarning(stderr) {
+  if code != 0 || strings.TrimSpace(stdout) != "null" || stderr != "" {
     t.Fatalf("node_modules suggestion boundary: code=%d stdout=%q stderr=%q", code, stdout, stderr)
   }
 }

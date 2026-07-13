@@ -65,7 +65,7 @@ func runLSPCodeActionsForRangeForTest(
       "--context-json", contextJSON,
     })
   })
-  if code != 0 || !isBenignContributorCollisionWarning(stderr) {
+  if code != 0 || stderr != "" {
     t.Fatalf("lsp-code-actions mismatch: code=%d stdout=%q stderr=%q", code, stdout, stderr)
   }
   var actions []lspCodeAction

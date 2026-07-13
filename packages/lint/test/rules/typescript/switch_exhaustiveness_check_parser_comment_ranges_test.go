@@ -5,10 +5,10 @@ import "testing"
 // TestSwitchExhaustivenessCheckParserCommentRanges verifies the real command
 // path recognizes only a trailing parser-classified default marker.
 //
-// The shared enumerator now scans a whole SourceFile and filters the switch's
-// eligible trailing range. A Unicode-separated real comment must suppress the
-// open-switch diagnostic, while identical bytes inside a template in the last
-// clause must not escape their parser-owned token span.
+// The switch's AST-bounded trailing trivia gap is scanned independently. A
+// Unicode-separated real comment must suppress the open-switch diagnostic,
+// while identical bytes inside a template in the last clause remain outside
+// that eligible gap.
 //
 //  1. Put a template-shaped marker in one open switch and expect a diagnostic.
 //  2. Put a U+2028-separated real marker after another switch's last clause.

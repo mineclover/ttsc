@@ -1,7 +1,7 @@
 package linthost
 
 import (
-  "fmt"
+  "slices"
   "sort"
   "strings"
   "testing"
@@ -94,7 +94,7 @@ func assertExactCommentTokens(t *testing.T, file *shimast.SourceFile, source str
   forEachCommentToken(file, func(kind shimast.Kind, pos, end int) {
     actual = append(actual, commentToken{kind: kind, pos: pos, end: end})
   })
-  if fmt.Sprint(actual) != fmt.Sprint(expected) {
+  if !slices.Equal(actual, expected) {
     actualText := make([]string, 0, len(actual))
     for _, token := range actual {
       actualText = append(actualText, source[token.pos:token.end])

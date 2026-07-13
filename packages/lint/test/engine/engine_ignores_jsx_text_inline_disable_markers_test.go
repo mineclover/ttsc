@@ -26,7 +26,8 @@ func TestEngineIgnoresJsxTextInlineDisableMarkers(t *testing.T) {
     t.Fatalf("want 1 finding, got %d (%+v)", len(findings), findings)
   }
   start := strings.Index(source, "debugger;")
-  if findings[0].Pos != start || findings[0].End != start+len("debugger") {
-    t.Fatalf("want first debugger range [%d,%d), got [%d,%d)", start, start+len("debugger"), findings[0].Pos, findings[0].End)
+  end := start + len("debugger;")
+  if findings[0].Pos != start || findings[0].End != end {
+    t.Fatalf("want first debugger range [%d,%d), got [%d,%d)", start, end, findings[0].Pos, findings[0].End)
   }
 }

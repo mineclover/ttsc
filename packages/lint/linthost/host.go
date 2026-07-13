@@ -198,11 +198,52 @@ func absoluteProjectPath(cwd string, target string) string {
 }
 
 func realProjectPath(target string) string {
-  resolved, err := filepath.EvalSymlinks(target)
-  if err != nil {
-    return filepath.Clean(target)
+  original := filepath.Clean(target)
+  resolved := original
+  seen := make(map[string]struct{})
+  for range 255 {
+    key := filepath.Clean(resolved)
+    if _, exists := seen[key]; exists {
+      return original
+    }
+    seen[key] = struct{}{}
+
+    if evaluated, err := filepath.EvalSymlinks(resolved); err == nil {
+      resolved = filepath.Clean(evaluated)
+    }
+    next, ok := resolveProjectLinkAncestor(resolved)
+    if !ok {
+      return filepath.Clean(resolved)
+    }
+    resolved = next
   }
-  return resolved
+  return original
+}
+
+// resolveProjectLinkAncestor resolves the nearest symlink-like ancestor and
+// reattaches the remaining path. filepath.EvalSymlinks handles ordinary links,
+// but some Windows directory junctions are readable through os.Readlink while
+// EvalSymlinks either leaves the junction unchanged or fails on its children.
+// Walking ancestors keeps physical project identity and LSP containment checks
+// correct for both existing files and not-yet-created paths below such links.
+func resolveProjectLinkAncestor(target string) (string, bool) {
+  probe := filepath.Clean(target)
+  suffix := make([]string, 0)
+  for {
+    if _, err := os.Readlink(probe); err == nil {
+      destination := resolveDirLink(probe)
+      for i := len(suffix) - 1; i >= 0; i-- {
+        destination = filepath.Join(destination, suffix[i])
+      }
+      return filepath.Clean(destination), true
+    }
+    parent := filepath.Dir(probe)
+    if parent == probe {
+      return "", false
+    }
+    suffix = append(suffix, filepath.Base(probe))
+    probe = parent
+  }
 }
 
 func (p *program) runLintCycle(engine *Engine) []*Finding {

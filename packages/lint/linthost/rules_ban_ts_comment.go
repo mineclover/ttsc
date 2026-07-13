@@ -279,12 +279,9 @@ func (banTsComment) Check(ctx *Context, node *shimast.Node) {
 }
 
 // reportTsIgnoreInsteadOfExpectError reports a banned `@ts-ignore` with the
-// upstream suggestion attached as an autofix edit: rewrite the first
-// `@ts-ignore` occurrence in the comment body to `@ts-expect-error`. The
-// rewrite can never hide a compiler error — where `@ts-ignore` silently
-// suppressed one, `@ts-expect-error` suppresses the same one, and where
-// the next line was error-free the compiler now reports the unused
-// directive instead of staying silent.
+// upstream opt-in suggestion: rewrite the first `@ts-ignore` occurrence in
+// the comment body to `@ts-expect-error`. This must not be an autofix because
+// an error-free following line turns the rewrite into compiler error TS2578.
 func reportTsIgnoreInsteadOfExpectError(ctx *Context, text string, pos, end int) {
   const message = "Use `@ts-expect-error` instead of `@ts-ignore`, as `@ts-ignore` will do nothing if the following line is error-free."
   // Search the comment body (both `//` and `/*` delimiters are two bytes),
@@ -297,11 +294,17 @@ func reportTsIgnoreInsteadOfExpectError(ctx *Context, text string, pos, end int)
     return
   }
   editPos := pos + 2 + index
-  ctx.ReportRangeFix(pos, end, message, TextEdit{
-    Pos:  editPos,
-    End:  editPos + len("@ts-ignore"),
-    Text: "@ts-expect-error",
-  })
+  ctx.ReportRangeSuggestion(
+    pos,
+    end,
+    message,
+    "Replace \"@ts-ignore\" with \"@ts-expect-error\".",
+    TextEdit{
+      Pos:  editPos,
+      End:  editPos + len("@ts-ignore"),
+      Text: "@ts-expect-error",
+    },
+  )
 }
 
 func init() {

@@ -440,7 +440,7 @@ Arrays and tuples use Checker index or type-argument APIs, and generic `Iterable
 
 The `for await...of` and `await using` arms resolve `[Symbol.asyncIterator]` and `[Symbol.asyncDispose]` through `Checker_getPropertyNameForKnownSymbolName`, then verify that the resolved property type has a call signature.
 
-Those findings have no autofix because removing `await` changes runtime behavior.
+Those findings have no autofix because removing `await` changes runtime behavior. The ordinary `await` diagnostic exposes token removal only as an opt-in editor suggestion; `ttsc fix` and source fix-all never consume suggestion edits.
 
 For the full Checker surface and when to reach for `Checker_*` linkname wrappers, see [AST & Checker: Checker Basics](/docs/development/concepts/tsgo#checker-basics).
 

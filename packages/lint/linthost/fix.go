@@ -1,7 +1,7 @@
 // Autofix orchestration for the `@ttsc/lint fix` subcommand.
 //
 // RunFix drives the fix cascade: it repeatedly runs the native lint engine
-// and applies any emitted TextEdit suggestions until no more fixable
+// and applies any emitted automatic TextEdit fixes until no more fixable
 // findings remain or maxFixPasses is reached. After the cascade settles, it
 // runs a final diagnostic pass so remaining issues are surfaced in the
 // normal error stream.
@@ -156,7 +156,7 @@ func reloadFixProgram(current *program, opts *subcommandOpts, needsRuleChecker b
   return loadFixProgram(opts, needsRuleChecker)
 }
 
-// fileFixes groups all pending TextEdit suggestions for a single file.
+// fileFixes groups all pending automatic TextEdit fixes for a single file.
 // `text` is the source content at the time the findings were collected;
 // byte offsets in `edits` are relative to this snapshot.
 type fileFixes struct {

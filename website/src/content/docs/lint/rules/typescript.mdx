@@ -179,7 +179,7 @@ The Checker classifies awaitability as always, never, or uncertain; resolves agg
 
 Protocol lookups resolve through unions (any callable async constituent is accepted), intersections, type aliases, inherited members, and generic constraints.
 
-Autofixable only for ordinary non-thenable `await` operands because changing the other constructs can alter runtime behavior.
+Ordinary non-thenable `await` diagnostics offer an opt-in `quickfix.ttsc` action that removes the keyword. `ttsc fix` and `source.fixAll.ttsc` do not apply it because removing even a non-thenable await changes microtask ordering. The other constructs are diagnostic-only.
 
 Example:
 
@@ -206,7 +206,7 @@ async function bad(): Promise<number> {
 
 Reject `@ts-<directive>` comments or require descriptions after directives.
 
-The rule follows `@typescript-eslint`'s recommended defaults: `@ts-ignore` and `@ts-nocheck` are reported, `@ts-check` is allowed, and `@ts-expect-error` is allowed when followed by a description of at least three characters. `@ts-nocheck` is only reported where the compiler honors it — before the first statement. A reported `@ts-ignore` offers an autofix to the safer `@ts-expect-error`, which surfaces (never hides) a compiler error when the next line turns out to be error-free.
+The rule follows `@typescript-eslint`'s recommended defaults: `@ts-ignore` and `@ts-nocheck` are reported, `@ts-check` is allowed, and `@ts-expect-error` is allowed when followed by a description of at least three characters. `@ts-nocheck` is only reported where the compiler honors it — before the first statement. A reported `@ts-ignore` offers an opt-in `quickfix.ttsc` action that replaces it with `@ts-expect-error`. `ttsc fix` and `source.fixAll.ttsc` do not apply the replacement because an error-free following line would start producing TS2578.
 
 Options:
 

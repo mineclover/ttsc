@@ -9,6 +9,8 @@ import type {
 import type {
   ITtscLintCoreNoDuplicateImportsRuleOptions,
   ITtscLintCoreNoUnusedExpressionsRuleOptions,
+  ITtscLintNoFallthroughRuleOptions,
+  ITtscLintCorePreferConstRuleOptions,
 } from "./ITtscLintCoreRuleOptions";
 import type { ITtscLintCypressUnsafeToChainCommandRuleOptions } from "./ITtscLintCypressRuleOptions";
 import type {
@@ -57,6 +59,8 @@ import type { ITtscLintTestingLibraryConsistentDataTestIdRuleOptions } from "./I
 export interface ITtscLintRuleOptionsMap {
   "no-duplicate-imports": ITtscLintCoreNoDuplicateImportsRuleOptions;
   "no-unused-expressions": ITtscLintCoreNoUnusedExpressionsRuleOptions;
+  "no-fallthrough": ITtscLintNoFallthroughRuleOptions;
+  "prefer-const": ITtscLintCorePreferConstRuleOptions;
   "testing-library/consistent-data-testid": ITtscLintTestingLibraryConsistentDataTestIdRuleOptions;
   "functional/functional-parameters": ITtscLintFunctionalParametersRuleOptions;
   "functional/immutable-data": ITtscLintFunctionalImmutableDataRuleOptions;

@@ -79,3 +79,61 @@ export interface ITtscLintCoreNoUnusedExpressionsRuleOptions {
    */
   ignoreDirectives?: boolean;
 }
+
+/**
+ * `no-fallthrough` rule options.
+ *
+ * Mirrors the ESLint core rule's options schema.
+ *
+ * @reference https://eslint.org/docs/latest/rules/no-fallthrough
+ */
+export interface ITtscLintNoFallthroughRuleOptions {
+  /**
+   * Regular expression string that an intentional-fallthrough comment must
+   * match. Setting it replaces the default marker pattern
+   * (`/falls?\s?through/i`) entirely, so the standard `// falls through`
+   * spellings stop being accepted unless the custom pattern matches them.
+   *
+   * @default "falls?\\s?through" (case-insensitive)
+   */
+  commentPattern?: string;
+
+  /**
+   * Allow a case with no statements to be separated from the next label by
+   * blank lines. By default an empty case followed by a blank line is treated
+   * as an accidental fallthrough; adjacent labels (`case 0: case 1:`) are
+   * always allowed.
+   *
+   * @default false
+   */
+  allowEmptyCase?: boolean;
+
+  /**
+   * Report fallthrough marker comments on cases that cannot actually fall
+   * through (for example a `// falls through` after a `break`), since the
+   * comment documents behavior the code no longer has.
+   *
+   * @default false
+  */
+  reportUnusedFallthroughComment?: boolean;
+}
+
+/** `prefer-const` rule options. */
+export interface ITtscLintCorePreferConstRuleOptions {
+  /**
+   * Report each const-eligible binding in a destructuring pattern (`"any"`), or
+   * report the pattern only when every binding is const-eligible (`"all"`).
+   *
+   * @default "any"
+   */
+  destructuring?: "any" | "all";
+
+  /**
+   * Ignore a declaration-only binding when it is read before its first
+   * assignment. This avoids a conflict with `no-use-before-define` policies
+   * that require the declaration to stay at its original location.
+   *
+   * @default false
+  */
+  ignoreReadBeforeAssign?: boolean;
+}

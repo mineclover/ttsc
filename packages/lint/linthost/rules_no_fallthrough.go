@@ -611,19 +611,23 @@ func loopCompletion(
 // absorbed the same way; `continue` never targets a switch and passes
 // through.
 func switchCompletion(s *shimast.SwitchStatement, labels []string) caseCompletion {
-  if s == nil || s.CaseBlock == nil {
+  if s == nil {
     return caseCompletion{normal: true}
+  }
+  discriminant := executableNodeCompletion(s.Expression)
+  out := caseCompletion{normal: true, returns: discriminant.returns, throws: discriminant.throws}
+  if s.CaseBlock == nil {
+    return out
   }
   block := s.CaseBlock.AsCaseBlock()
   if block == nil || block.Clauses == nil || len(block.Clauses.Nodes) == 0 {
-    return caseCompletion{normal: true}
+    return out
   }
   clauses := block.Clauses.Nodes
   hasDefault := false
   exitByBreak := false
   lastNormal := false
-  discriminant := executableNodeCompletion(s.Expression)
-  out := caseCompletion{returns: discriminant.returns, throws: discriminant.throws}
+  out.normal = false
   for i, clauseNode := range clauses {
     if clauseNode == nil {
       continue

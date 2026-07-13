@@ -8,7 +8,7 @@ import "testing"
 // transition isolates the binding classifier through the real check command.
 //
 // 1. Exercise shorthand and aliased object bindings.
-// 2. Pair them with plain array and object-rest bindings.
+// 2. Pair them with array/rest bindings and for-of assignment patterns.
 // 3. Assert only the object property reads make the catch reachable.
 func TestNoFallthroughCommandTracksBindingReferenceEdges(t *testing.T) {
   assertNoFallthroughCommandMarkers(t, `function inspect(value: number): unknown {
@@ -40,6 +40,22 @@ func TestNoFallthroughCommandTracksBindingReferenceEdges(t *testing.T) {
         return;
       } catch {}
     case 7:
+      break;
+    case 8:
+      try {
+        let target = 0;
+        for ([target] of [[1]]) {}
+        return;
+      } catch {}
+    case 9:
+      break;
+    case 10:
+      try {
+        let target = 0;
+        for ({ property: target } of [{ property: 1 }]) {}
+        return;
+      } catch {}
+    case 11: // diagnostic
       break;
   }
 }

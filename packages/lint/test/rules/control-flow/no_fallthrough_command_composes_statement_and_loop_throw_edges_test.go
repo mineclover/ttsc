@@ -81,6 +81,20 @@ function inspect(value: number): unknown {
       } catch {}
     case 15: // diagnostic
       break;
+    case 16:
+      try {
+        switch (condition) {}
+        return;
+      } catch {}
+    case 17: // diagnostic
+      break;
+    case 18:
+      try {
+        switch (0) {}
+        return;
+      } catch {}
+    case 19:
+      break;
   }
 }
 

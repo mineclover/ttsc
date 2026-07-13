@@ -403,6 +403,9 @@ func isDestructuringAssignmentTarget(node *shimast.Node) bool {
       }
     case shimast.KindComputedPropertyName:
       return false
+    case shimast.KindForInStatement, shimast.KindForOfStatement:
+      statement := parent.AsForInOrOfStatement()
+      return statement != nil && statement.Initializer == child
     }
     if parent.Kind == shimast.KindBinaryExpression {
       expression := parent.AsBinaryExpression()

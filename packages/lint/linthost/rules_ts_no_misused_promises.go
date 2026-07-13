@@ -381,9 +381,13 @@ func noMisusedPromisesStaticMemberParts(node *shimast.Node) (*shimast.Node, stri
     if access == nil || access.ArgumentExpression == nil {
       return nil, "", false
     }
-    switch access.ArgumentExpression.Kind {
+    argument := stripParens(access.ArgumentExpression)
+    if argument == nil {
+      return nil, "", false
+    }
+    switch argument.Kind {
     case shimast.KindStringLiteral, shimast.KindNoSubstitutionTemplateLiteral:
-      method := stringLiteralText(access.ArgumentExpression)
+      method := stringLiteralText(argument)
       return access.Expression, method, method != ""
     }
   }

@@ -22,6 +22,8 @@ mutable["find"](async value => value > 0);
 // expect: typescript/no-misused-promises error
 mutable[`some`](async value => value > 0);
 // expect: typescript/no-misused-promises error
+mutable[("filter")](async value => value > 0);
+// expect: typescript/no-misused-promises error
 mutable?.["every"](async value => value > 0);
 // expect: typescript/no-misused-promises error
 maybeValues?.findIndex(async value => value > 0);

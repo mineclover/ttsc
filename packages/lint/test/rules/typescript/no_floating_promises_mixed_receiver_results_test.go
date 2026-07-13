@@ -25,6 +25,9 @@ interface ThenResult<T> {
 interface OptionalCatchResult<T> {
   catch?: (onRejected: (reason: unknown) => void) => T;
 }
+interface MissingCatchResult {
+  catch?: undefined;
+}
 interface FinallyResult<T> {
   finally(onFinally: () => void): T;
 }
@@ -37,6 +40,7 @@ declare const safeOptionalReceiver: Promise<void> | CatchResult<undefined> | und
 declare const unsafeOptionalReceiver: Promise<void> | CatchResult<Promise<void>> | undefined;
 declare const safeOptionalCall: Promise<void> | OptionalCatchResult<undefined>;
 declare const unsafeOptionalCall: Promise<void> | OptionalCatchResult<Promise<void>>;
+declare const missingOptionalCall: Promise<void> | MissingCatchResult;
 declare const safeIntersection: Promise<void> | TaggedCatchResult<undefined>;
 declare const unsafeIntersection: Promise<void> | TaggedCatchResult<Promise<void>>;
 declare const safeThen: Promise<void> | ThenResult<undefined>;
@@ -51,6 +55,7 @@ safeOptionalReceiver?.catch(() => undefined);
 unsafeOptionalReceiver?.catch(() => undefined);
 safeOptionalCall.catch?.(() => undefined);
 unsafeOptionalCall.catch?.(() => undefined);
+missingOptionalCall.catch?.(() => undefined);
 safeIntersection.catch(() => undefined);
 unsafeIntersection.catch(() => undefined);
 safeThen.then(undefined, () => undefined);
@@ -62,14 +67,14 @@ unrelated.catch(() => undefined);
     t.Fatalf("mixed receiver run mismatch: code=%d stdout=%q stderr=%q", code, stdout, stderr)
   }
   expectedLines := []string{
-    "main.ts:29:",
-    "main.ts:31:",
     "main.ts:33:",
     "main.ts:35:",
     "main.ts:37:",
     "main.ts:39:",
-    "main.ts:40:",
-    "main.ts:41:",
+    "main.ts:42:",
+    "main.ts:44:",
+    "main.ts:45:",
+    "main.ts:46:",
   }
   if got := strings.Count(stderr, "[typescript/no-floating-promises]"); got != len(expectedLines) {
     t.Fatalf("expected %d mixed receiver findings, got %d:\n%s", len(expectedLines), got, stderr)

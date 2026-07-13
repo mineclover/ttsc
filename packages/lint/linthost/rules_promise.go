@@ -960,12 +960,13 @@ func floatingPromiseMethodReturnIsUnhandled(
     return true
   }
 
-  sawCallable := false
+  sawBranch := false
   for _, part := range promiseUnionParts(propertyType) {
     if part == nil {
       continue
     }
     if call.QuestionDotToken != nil && part.Flags()&(shimchecker.TypeFlagsNull|shimchecker.TypeFlagsUndefined) != 0 {
+      sawBranch = true
       continue
     }
     signatures := ctx.Checker.GetSignaturesOfType(part, shimchecker.SignatureKindCall)
@@ -974,8 +975,11 @@ func floatingPromiseMethodReturnIsUnhandled(
         signatures = ctx.Checker.GetSignaturesOfType(apparent, shimchecker.SignatureKindCall)
       }
     }
+    if len(signatures) == 0 {
+      return true
+    }
+    sawBranch = true
     for _, signature := range signatures {
-      sawCallable = true
       returnType := ctx.Checker.GetReturnTypeOfSignature(signature)
       if isFloatingPromiseType(ctx, node, returnType, options) ||
         isFloatingPromiseArray(ctx, node, returnType, options) {
@@ -983,7 +987,7 @@ func floatingPromiseMethodReturnIsUnhandled(
       }
     }
   }
-  return !sawCallable
+  return !sawBranch
 }
 
 func floatingPromisePropertyAccessParts(node *shimast.Node) (*shimast.Node, string, bool) {

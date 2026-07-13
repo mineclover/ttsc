@@ -96,10 +96,11 @@ type Context struct {
   Severity         Severity
   Options          json.RawMessage
 
-  rule           Rule
-  isFormat       bool
-  collect        func(*Finding)
-  projectResults publicrule.ProjectResultReader
+  rule             Rule
+  isFormat         bool
+  quarantined      bool
+  collect          func(*Finding)
+  projectResults   publicrule.ProjectResultReader
 }
 
 // DecodeOptions unmarshals the rule's options blob into `out`. Returns
@@ -132,6 +133,8 @@ type Finding struct {
   Fix         []TextEdit
   Suggestions []Suggestion
   IsFormat    bool
+
+  engineFailure bool
 }
 
 // TextEdit is one byte-range source replacement used by a fix or suggestion.
@@ -588,6 +591,19 @@ type boundRule struct {
   ctx  *Context
 }
 
+// check invokes one bound rule unless an earlier invocation panicked in this
+// file. Context is shared by every kind bucket for the same file/rule pair, so
+// the quarantine covers later nodes and later registered kinds without leaking
+// into the next source file.
+func (b boundRule) check(node *shimast.Node, collect func(*Finding)) {
+  if b.ctx == nil || b.ctx.quarantined {
+    return
+  }
+  if runRuleCheck(b.rule, b.ctx, node, collect) {
+    b.ctx.quarantined = true
+  }
+}
+
 // lintFileWalker drives the per-file AST traversal. The struct exists so
 // the `ForEachChild` callback can be a method value cached in
 // `childCB`. A naive nested-closure walker re-allocates one callback
@@ -608,7 +624,7 @@ func (w *lintFileWalker) walk(node *shimast.Node) {
   }
   if k := int(node.Kind); k >= 0 && k < len(w.byKind) {
     for _, bound := range w.byKind[k] {
-      runRuleCheck(bound.rule, bound.ctx, node, w.collect)
+      bound.check(node, w.collect)
     }
   }
   node.ForEachChild(w.childCB)
@@ -714,7 +730,7 @@ func (e *Engine) runFile(
     // per SourceFile).
     if k := int(shimast.KindSourceFile); k >= 0 && k < len(byKind) {
       for _, bound := range byKind[k] {
-        runRuleCheck(bound.rule, bound.ctx, file.AsNode(), collect)
+        bound.check(file.AsNode(), collect)
       }
     }
 
@@ -751,13 +767,15 @@ func hasEnabledFileRules(rules RuleConfig) bool {
 // anyone; protecting the engine is the only way to bound the blast
 // radius of one bad rule. The recovered panic is surfaced as a
 // SeverityError finding tagged with the rule's name so the user sees
-// the failure in the normal diagnostic stream.
-func runRuleCheck(rule Rule, ctx *Context, node *shimast.Node, collect func(*Finding)) {
+// the failure in the normal diagnostic stream. The boolean result tells the
+// per-file binding to quarantine the rule after recovery.
+func runRuleCheck(rule Rule, ctx *Context, node *shimast.Node, collect func(*Finding)) (panicked bool) {
   defer func() {
     r := recover()
     if r == nil {
       return
     }
+    panicked = true
     if ctx == nil || ctx.File == nil {
       // Without source context there is nowhere to anchor the
       // diagnostic. Surface to stderr so the panic is at least
@@ -783,8 +801,10 @@ func runRuleCheck(rule Rule, ctx *Context, node *shimast.Node, collect func(*Fin
         "Rule %q panicked while checking this node: %v. Report this to the rule's author; ttsc skipped the rule on this file.",
         rule.Name(), r,
       ),
-      File: ctx.File,
+      File:          ctx.File,
+      engineFailure: true,
     })
   }()
   rule.Check(ctx, node)
+  return false
 }

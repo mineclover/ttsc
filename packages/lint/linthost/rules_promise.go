@@ -849,9 +849,6 @@ func analyzeFloatingPromiseCall(
       isNativePromiseInstanceLike(ctx.Checker, part) ||
       (options.CheckThenables && isCatchableThenableAtLocation(ctx.Checker, receiver, part)) {
       sawPromiseReceiver = true
-      if method == "finally" && !safePromise {
-        return floatingPromiseResult{unhandled: true}
-      }
       continue
     }
     nonPromiseReceivers = append(nonPromiseReceivers, part)
@@ -873,6 +870,9 @@ func analyzeFloatingPromiseCall(
       return result
     }
   case "finally":
+    if result := analyzeFloatingPromise(ctx, receiver, options); result.unhandled {
+      return result
+    }
   default:
     return floatingPromiseResult{unhandled: true}
   }

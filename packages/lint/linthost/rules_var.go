@@ -973,6 +973,18 @@ func preferConstAssignmentTargetHasMember(node *shimast.Node) bool {
     if expression := node.AsNonNullExpression(); expression != nil {
       return preferConstAssignmentTargetHasMember(expression.Expression)
     }
+  case shimast.KindAsExpression:
+    if expression := node.AsAsExpression(); expression != nil {
+      return preferConstAssignmentTargetHasMember(expression.Expression)
+    }
+  case shimast.KindTypeAssertionExpression:
+    if expression := node.AsTypeAssertion(); expression != nil {
+      return preferConstAssignmentTargetHasMember(expression.Expression)
+    }
+  case shimast.KindSatisfiesExpression:
+    if expression := node.AsSatisfiesExpression(); expression != nil {
+      return preferConstAssignmentTargetHasMember(expression.Expression)
+    }
   case shimast.KindArrayLiteralExpression:
     if array := node.AsArrayLiteralExpression(); array != nil && array.Elements != nil {
       for _, element := range array.Elements.Nodes {

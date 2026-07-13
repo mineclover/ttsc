@@ -344,9 +344,12 @@ func (w *descendantsWalker) visitChild(child *shimast.Node) bool {
 // array elements, object property values, shorthand properties, defaults
 // (`[a = 1]`, `{a = 1}`), nested patterns, and rest elements.
 //
-// Property names in `{key: target}` are read positions, not writes, so
-// only the property value contributes; member-access targets (`obj.x`)
-// declare no local binding and are skipped. Returns nil for other shapes.
+// TypeScript assertion wrappers are transparent in reference position, so
+// `as`, angle-bracket assertions, `satisfies`, non-null assertions, and
+// parentheses are unwrapped recursively wherever they appear in a target.
+// Property names in `{key: target}` are read positions, not writes, so only
+// the property value contributes; member-access targets (`obj.x`) declare no
+// local binding and are skipped. Returns nil for other shapes.
 func assignmentTargetIdentifiers(node *shimast.Node) []*shimast.Node {
   if node == nil {
     return nil
@@ -390,6 +393,18 @@ func collectAssignmentTargetIdentifiers(node *shimast.Node, identifiers *[]*shim
     collectAssignmentTargetIdentifiers(stripParens(node), identifiers)
   case shimast.KindNonNullExpression:
     if expression := node.AsNonNullExpression(); expression != nil {
+      collectAssignmentTargetIdentifiers(expression.Expression, identifiers)
+    }
+  case shimast.KindAsExpression:
+    if expression := node.AsAsExpression(); expression != nil {
+      collectAssignmentTargetIdentifiers(expression.Expression, identifiers)
+    }
+  case shimast.KindTypeAssertionExpression:
+    if expression := node.AsTypeAssertion(); expression != nil {
+      collectAssignmentTargetIdentifiers(expression.Expression, identifiers)
+    }
+  case shimast.KindSatisfiesExpression:
+    if expression := node.AsSatisfiesExpression(); expression != nil {
       collectAssignmentTargetIdentifiers(expression.Expression, identifiers)
     }
   case shimast.KindArrayLiteralExpression:

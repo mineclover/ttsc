@@ -44,10 +44,21 @@ interface PromiseAwareArrayLike<T> {
 declare const promiseAware: PromiseAwareArrayLike<number>;
 promiseAware.filter(async value => value > 0);
 
-type PromiseAwareReadonlyShape<T> = Omit<ReadonlyArray<T>, "filter"> & {
-  filter(predicate: (value: T) => Promise<boolean>): Promise<readonly T[]>;
-};
-declare const promiseAwareReadonly: PromiseAwareReadonlyShape<number>;
+interface PromiseAwareReadonlyArray<T> extends ReadonlyArray<T> {
+  filter<S extends T>(
+    predicate: (value: T, index: number, array: readonly T[]) => value is S,
+    thisArg?: any,
+  ): S[];
+  filter(
+    predicate: (value: T, index: number, array: readonly T[]) => unknown,
+    thisArg?: any,
+  ): T[];
+  filter(
+    predicate: (value: T, index: number, array: readonly T[]) => Promise<boolean>,
+    thisArg?: any,
+  ): Promise<readonly T[]>;
+}
+declare const promiseAwareReadonly: PromiseAwareReadonlyArray<number>;
 promiseAwareReadonly.filter(async value => value > 0);
 
 declare const union: number[] | readonly number[];

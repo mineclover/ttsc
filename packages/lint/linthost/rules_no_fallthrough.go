@@ -685,7 +685,13 @@ func blockNodeCompletion(node *shimast.Node) caseCompletion {
 // catch. Type syntax and separately analyzed function/class execution
 // contexts never leak throw edges into the enclosing statement.
 func executableNodePotentiallyThrows(node *shimast.Node) bool {
-  if node == nil || shimast.IsTypeNode(node) {
+  if node == nil {
+    return false
+  }
+  if node.Kind == shimast.KindExpressionWithTypeArguments {
+    return runtimeHeritageExpressionPotentiallyThrows(node)
+  }
+  if node.Kind >= shimast.KindFirstTypeNode && node.Kind <= shimast.KindLastTypeNode {
     return false
   }
   switch node.Kind {
@@ -717,6 +723,26 @@ func executableNodePotentiallyThrows(node *shimast.Node) bool {
     return false
   })
   return found
+}
+
+// runtimeHeritageExpressionPotentiallyThrows retains the value expression in
+// a class extends clause while excluding interface heritage and implements
+// clauses, which are type-only even though they share the same AST node kind.
+func runtimeHeritageExpressionPotentiallyThrows(node *shimast.Node) bool {
+  if node == nil || node.Parent == nil || node.Parent.Kind != shimast.KindHeritageClause {
+    return false
+  }
+  clauseNode := node.Parent
+  clause := clauseNode.AsHeritageClause()
+  if clause == nil || clause.Token != shimast.KindExtendsKeyword || clauseNode.Parent == nil {
+    return false
+  }
+  if clauseNode.Parent.Kind != shimast.KindClassDeclaration &&
+    clauseNode.Parent.Kind != shimast.KindClassExpression {
+    return false
+  }
+  expression := node.AsExpressionWithTypeArguments()
+  return expression != nil && executableNodePotentiallyThrows(expression.Expression)
 }
 
 // classElementHeaderPotentiallyThrows keeps class member bodies and field

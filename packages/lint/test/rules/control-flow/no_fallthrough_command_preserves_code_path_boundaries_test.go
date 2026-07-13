@@ -14,6 +14,7 @@ func TestNoFallthroughCommandPreservesCodePathBoundaries(t *testing.T) {
   assertNoFallthroughCommandMarkers(t, `declare const identifier: number;
 declare const key: string;
 declare class Base {}
+interface Shape {}
 
 function inspect(value: number): unknown {
   switch (value) {
@@ -33,7 +34,8 @@ function inspect(value: number): unknown {
       break;
     case 4:
       try {
-        class Nested {
+        const typedOnly: Shape | null = null;
+        class Nested implements Shape {
           field = identifier;
           method(): number {
             return identifier;

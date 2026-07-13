@@ -35,7 +35,7 @@ func TestLSPCodeActionsShortCircuitsUnownedContextOnly(t *testing.T) {
       "--context-json", `{"only":["quickfix.other"]}`,
     })
   })
-  if code != 0 || stdout != "[]\n" || !isBenignContributorCollisionWarning(stderr) {
+  if code != 0 || stdout != "[]\n" || stderr != "" {
     t.Fatalf("lsp-code-actions mismatch: code=%d stdout=%q stderr=%q", code, stdout, stderr)
   }
 }

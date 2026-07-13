@@ -417,12 +417,6 @@ func lintTestFileURI(t *testing.T, file string) string {
   return (&url.URL{Scheme: "file", Path: uriPath}).String()
 }
 
-func isBenignContributorCollisionWarning(stderr string) bool {
-  trimmed := strings.TrimSpace(stderr)
-  return trimmed == "" ||
-    trimmed == `@ttsc/lint: contributor rule "demo/option-consumer" collides with an existing rule; dropping contributor entry`
-}
-
 // assertFixSnapshot runs one rule's findings through the native fix applier.
 //
 // Fixer tests need the real file-writing path, not just in-memory edit

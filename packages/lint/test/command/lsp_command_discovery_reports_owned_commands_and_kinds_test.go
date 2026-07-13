@@ -19,7 +19,7 @@ func TestLSPCommandDiscoveryReportsOwnedCommandsAndKinds(t *testing.T) {
   code, stdout, stderr := captureCommandOutput(t, func() int {
     return run([]string{"lsp-command-ids"})
   })
-  if code != 0 || !isBenignContributorCollisionWarning(stderr) {
+  if code != 0 || stderr != "" {
     t.Fatalf("lsp-command-ids mismatch: code=%d stdout=%q stderr=%q", code, stdout, stderr)
   }
   var commands []string
@@ -37,7 +37,7 @@ func TestLSPCommandDiscoveryReportsOwnedCommandsAndKinds(t *testing.T) {
   code, stdout, stderr = captureCommandOutput(t, func() int {
     return run([]string{"lsp-code-action-kinds"})
   })
-  if code != 0 || !isBenignContributorCollisionWarning(stderr) {
+  if code != 0 || stderr != "" {
     t.Fatalf("lsp-code-action-kinds mismatch: code=%d stdout=%q stderr=%q", code, stdout, stderr)
   }
   var kinds []string

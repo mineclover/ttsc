@@ -926,7 +926,7 @@ func noFallthroughNodeIsJSXTagName(node *shimast.Node) bool {
   case shimast.KindJsxOpeningElement,
     shimast.KindJsxSelfClosingElement,
     shimast.KindJsxClosingElement:
-    return true
+    return current.Parent.TagName() == current
   default:
     return false
   }

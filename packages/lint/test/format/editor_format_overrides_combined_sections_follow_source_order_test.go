@@ -25,13 +25,13 @@ func TestEditorFormatOverridesCombinedSectionsFollowSourceOrder(t *testing.T) {
   "[typescript]": {
     "editor.tabSize": 2
   },
+  "[json][typescript]": {
+    "editor.tabSize": 3,
+    "editor.insertSpaces": false
+  },
   "[javascript][typescript]": {
     "editor.tabSize": 4,
     "editor.insertSpaces": true
-  },
-  "[json][typescript]": {
-    "editor.tabSize": 3,
-    "files.eol": "\n"
   }
 }`
   writeFile(t, filepath.Join(root, ".vscode", "settings.json"), settings)
@@ -41,9 +41,9 @@ func TestEditorFormatOverridesCombinedSectionsFollowSourceOrder(t *testing.T) {
     t.Fatalf("exact language tabWidth should win with 2, got %v", got["tabWidth"])
   }
   if got["useTabs"] != false {
-    t.Fatalf("first combined section should set useTabs=false, got %v", got["useTabs"])
+    t.Fatalf("later combined section should set useTabs=false, got %v", got["useTabs"])
   }
-  if got["endOfLine"] != "lf" {
-    t.Fatalf("later combined section should set endOfLine=lf, got %v", got["endOfLine"])
+  if got["endOfLine"] != "crlf" {
+    t.Fatalf("unshadowed top-level endOfLine should remain crlf, got %v", got["endOfLine"])
   }
 }

@@ -207,7 +207,9 @@ func loadNearestVSCodeSettings(startDir string) (vscodeSettings, bool) {
 // decodeVSCodeSettings decodes the top-level JSON object without discarding
 // declaration order. encoding/json maps are intentionally unordered, while VS
 // Code merges matching combined language sections in the order they appear in
-// settings.json and applies the exact single-language section afterwards.
+// settings.json and applies the exact single-language section afterwards. A
+// repeated property keeps its first insertion position and final value, as it
+// does in VS Code's parsed settings object.
 func decodeVSCodeSettings(data []byte) (vscodeSettings, error) {
   decoder := json.NewDecoder(bytes.NewReader(data))
   token, err := decoder.Token()
@@ -218,7 +220,8 @@ func decodeVSCodeSettings(data []byte) (vscodeSettings, error) {
     return vscodeSettings{}, errors.New("VS Code settings must be a JSON object")
   }
 
-  settings := vscodeSettings{values: map[string]any{}}
+  orderedKeys := []string{}
+  values := map[string]any{}
   for decoder.More() {
     token, err := decoder.Token()
     if err != nil {
@@ -232,19 +235,10 @@ func decodeVSCodeSettings(data []byte) (vscodeSettings, error) {
     if err := decoder.Decode(&value); err != nil {
       return vscodeSettings{}, err
     }
-    identifiers, isLanguageSection := languageSectionIdentifiers(key)
-    if !isLanguageSection {
-      settings.values[key] = value
-      continue
+    if _, exists := values[key]; !exists {
+      orderedKeys = append(orderedKeys, key)
     }
-    section, ok := value.(map[string]any)
-    if !ok {
-      continue
-    }
-    settings.languageSections = append(settings.languageSections, vscodeLanguageSection{
-      identifiers: identifiers,
-      values:      section,
-    })
+    values[key] = value
   }
   token, err = decoder.Token()
   if err != nil {
@@ -258,6 +252,23 @@ func decodeVSCodeSettings(data []byte) (vscodeSettings, error) {
       return vscodeSettings{}, err
     }
     return vscodeSettings{}, errors.New("VS Code settings contain trailing JSON")
+  }
+  settings := vscodeSettings{values: map[string]any{}}
+  for _, key := range orderedKeys {
+    value := values[key]
+    identifiers, isLanguageSection := languageSectionIdentifiers(key)
+    if !isLanguageSection {
+      settings.values[key] = value
+      continue
+    }
+    section, ok := value.(map[string]any)
+    if !ok {
+      continue
+    }
+    settings.languageSections = append(settings.languageSections, vscodeLanguageSection{
+      identifiers: identifiers,
+      values:      section,
+    })
   }
   return settings, nil
 }

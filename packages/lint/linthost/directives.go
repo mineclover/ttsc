@@ -98,7 +98,7 @@ func filterInlineDisabledFindingsWithDirectives(file *shimast.SourceFile, findin
   }
   filtered := findings[:0]
   for _, finding := range findings {
-    if finding == nil || !directives.suppresses(file, finding) {
+    if finding == nil || finding.engineFailure || !directives.suppresses(file, finding) {
       filtered = append(filtered, finding)
     }
   }

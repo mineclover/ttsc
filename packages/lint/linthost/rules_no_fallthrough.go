@@ -723,7 +723,23 @@ func executableNodeCompletion(node *shimast.Node) expressionCompletion {
     return expressionCompletion{}
   }
   if node.Kind == shimast.KindExpressionWithTypeArguments {
+    if node.Parent != nil &&
+      ((node.Parent.Kind >= shimast.KindFirstJSDocNode && node.Parent.Kind <= shimast.KindLastJSDocNode) ||
+        (node.Parent.Kind >= shimast.KindFirstJSDocTagNode && node.Parent.Kind <= shimast.KindLastJSDocTagNode)) {
+      return expressionCompletion{}
+    }
+    if node.Parent == nil || node.Parent.Kind != shimast.KindHeritageClause {
+      expression := node.AsExpressionWithTypeArguments()
+      if expression == nil {
+        return expressionCompletion{}
+      }
+      return executableNodeCompletion(expression.Expression)
+    }
     return runtimeHeritageExpressionCompletion(node)
+  }
+  if (node.Kind >= shimast.KindFirstJSDocNode && node.Kind <= shimast.KindLastJSDocNode) ||
+    (node.Kind >= shimast.KindFirstJSDocTagNode && node.Kind <= shimast.KindLastJSDocTagNode) {
+    return expressionCompletion{}
   }
   if node.Kind >= shimast.KindFirstTypeNode && node.Kind <= shimast.KindLastTypeNode {
     return expressionCompletion{}

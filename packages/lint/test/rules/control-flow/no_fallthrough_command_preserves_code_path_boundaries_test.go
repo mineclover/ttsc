@@ -4,17 +4,18 @@ import "testing"
 
 // TestNoFallthroughCommandPreservesCodePathBoundaries verifies nested
 // functions, class fields, and static blocks do not leak return or throw paths
-// into the enclosing try. Immediately evaluated class heritage and computed
-// names remain part of the enclosing path, as do the abrupt resumptions of a
-// yield expression in the current generator.
+// into the enclosing try. Immediately evaluated class heritage, computed
+// names, and generic instantiation expressions remain part of the enclosing
+// path, as do abrupt resumptions of a yield in the current generator.
 //
 // 1. Put identifier reads inside every deferred function/class execution path.
-// 2. Pair them with class heritage, computed names, async, and generator paths.
+// 2. Pair them with runtime generic/class expressions, async, and generator paths.
 // 3. Assert only immediately evaluated references make catches reachable.
 func TestNoFallthroughCommandPreservesCodePathBoundaries(t *testing.T) {
   assertNoFallthroughCommandMarkers(t, `declare const identifier: number;
 declare const key: string;
 declare class Base {}
+declare function generic<T>(): T;
 interface Shape {}
 
 function inspect(value: number): unknown {
@@ -63,6 +64,13 @@ function inspect(value: number): unknown {
         return;
       } catch {}
     case 9: // diagnostic
+      break;
+    case 10:
+      try {
+        const instantiated = generic<number>;
+        return;
+      } catch {}
+    case 11: // diagnostic
       break;
   }
 }

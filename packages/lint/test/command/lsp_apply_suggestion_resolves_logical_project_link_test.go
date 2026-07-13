@@ -16,9 +16,9 @@ import (
 //
 // NativePluginSource runs the lint sidecar from PhysicalProjectRoot but keeps
 // the logical URI supplied by an editor that opened a symlink or junction.
-// Code-action discovery already accepts that pairing after resolving both
-// paths. Execution must not reject the action, read a different path, or relax
-// the outside-project and node_modules guards while doing the same resolution.
+// Code-action discovery and execution must resolve both paths consistently
+// without rejecting the action, reading a different file, or relaxing the
+// outside-project and node_modules guards.
 //
 //  1. Expose one physical project through a logical directory link.
 //  2. Discover and execute a manual suggestion for the logical URI.
@@ -36,6 +36,10 @@ func TestLSPApplySuggestionResolvesLogicalProjectLink(t *testing.T) {
   createLSPDirectoryLinkForTest(t, physicalRoot, logicalRoot)
   logicalFile := filepath.Join(logicalRoot, "src", "main.ts")
   logicalURI := lintTestFileURI(t, logicalFile)
+  logicalOptions := &lspCommandOptions{cwd: physicalRoot, uri: logicalURI}
+  if lspProjectTargetOutsideCwd(logicalOptions) || lspProjectTargetHasSegment(logicalOptions, "node_modules") {
+    t.Fatalf("logical project link was classified outside the source project")
+  }
 
   actions := runLSPCodeActionsForRangeForTest(
     t,
@@ -70,9 +74,20 @@ func TestLSPApplySuggestionResolvesLogicalProjectLink(t *testing.T) {
   }
   assertFileText(t, filepath.Join(physicalRoot, "src", "main.ts"), source)
 
-  outside := filepath.Join(t.TempDir(), "outside.ts")
+  outsideRoot := t.TempDir()
+  outside := filepath.Join(outsideRoot, "outside.ts")
   writeFile(t, outside, source)
-  outsideArguments := replaceLSPCommandURIForTest(t, command.Arguments, lintTestFileURI(t, outside))
+  outsideLink := filepath.Join(physicalRoot, "outside-link")
+  createLSPDirectoryLinkForTest(t, outsideRoot, outsideLink)
+  outsideURI := lintTestFileURI(t, filepath.Join(outsideLink, "outside.ts"))
+  outsideArguments := replaceLSPCommandURIForTest(
+    t,
+    command.Arguments,
+    outsideURI,
+  )
+  if !lspProjectTargetOutsideCwd(&lspCommandOptions{cwd: physicalRoot, uri: outsideURI}) {
+    t.Fatal("linked outside target was classified inside the source project")
+  }
   code, stdout, stderr := runLSPApplySuggestionForTest(t, physicalRoot, outsideArguments)
   if code != 2 || stdout != "" || !strings.Contains(stderr, "outside cwd") {
     t.Fatalf("outside suggestion boundary: code=%d stdout=%q stderr=%q", code, stdout, stderr)
@@ -80,7 +95,17 @@ func TestLSPApplySuggestionResolvesLogicalProjectLink(t *testing.T) {
 
   dependency := filepath.Join(physicalRoot, "node_modules", "demo", "index.ts")
   writeFile(t, dependency, source)
-  dependencyArguments := replaceLSPCommandURIForTest(t, command.Arguments, lintTestFileURI(t, dependency))
+  dependencyLink := filepath.Join(physicalRoot, "dependency-link")
+  createLSPDirectoryLinkForTest(t, filepath.Dir(dependency), dependencyLink)
+  dependencyURI := lintTestFileURI(t, filepath.Join(dependencyLink, "index.ts"))
+  dependencyArguments := replaceLSPCommandURIForTest(
+    t,
+    command.Arguments,
+    dependencyURI,
+  )
+  if !lspProjectTargetHasSegment(&lspCommandOptions{cwd: physicalRoot, uri: dependencyURI}, "node_modules") {
+    t.Fatal("linked dependency target hid its node_modules boundary")
+  }
   code, stdout, stderr = runLSPApplySuggestionForTest(t, physicalRoot, dependencyArguments)
   if code != 0 || strings.TrimSpace(stdout) != "null" || !isBenignContributorCollisionWarning(stderr) {
     t.Fatalf("node_modules suggestion boundary: code=%d stdout=%q stderr=%q", code, stdout, stderr)

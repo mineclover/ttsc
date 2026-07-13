@@ -579,11 +579,13 @@ func lspWorkspaceEditForSuggestion(opts *lspCommandOptions) (*lspWorkspaceEdit, 
     fmt.Fprintln(os.Stderr, err)
     return nil, 2
   }
-  if _, ok := projectRelativePath(opts.cwd, target); !ok {
-    fmt.Fprintf(os.Stderr, "@ttsc/lint: LSP command target %s is outside cwd %s\n", target, opts.cwd)
+  physicalCwd := realProjectPath(opts.cwd)
+  physicalTarget := realProjectPath(target)
+  if _, ok := projectRelativePath(physicalCwd, physicalTarget); !ok {
+    fmt.Fprintf(os.Stderr, "@ttsc/lint: LSP command target %s is outside cwd %s\n", physicalTarget, physicalCwd)
     return nil, 2
   }
-  if projectPathHasSegment(opts.cwd, target, "node_modules") {
+  if lspProjectTargetHasSegment(opts, "node_modules") {
     return nil, 0
   }
   selection, err := suggestionSelectionArgument(opts.argumentsJSON)
@@ -591,7 +593,7 @@ func lspWorkspaceEditForSuggestion(opts *lspCommandOptions) (*lspWorkspaceEdit, 
     fmt.Fprintln(os.Stderr, err)
     return nil, 2
   }
-  current, err := os.ReadFile(target)
+  current, err := os.ReadFile(physicalTarget)
   if err != nil || lspSourceHash(string(current)) != selection.SourceHash {
     return nil, 0
   }
@@ -602,6 +604,7 @@ func lspWorkspaceEditForSuggestion(opts *lspCommandOptions) (*lspWorkspaceEdit, 
   if code != 0 {
     return nil, code
   }
+  findings = filterFindingsForPath(findings, physicalTarget)
   for _, finding := range findings {
     if finding == nil || finding.Rule != selection.Rule ||
       finding.Message != selection.Message ||
@@ -630,7 +633,7 @@ func lspWorkspaceEditForSuggestion(opts *lspCommandOptions) (*lspWorkspaceEdit, 
         NewText: edit.Text,
       })
     }
-    current, err := os.ReadFile(target)
+    current, err := os.ReadFile(physicalTarget)
     if err != nil || lspSourceHash(string(current)) != selection.SourceHash {
       return nil, 0
     }

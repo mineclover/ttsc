@@ -2555,7 +2555,20 @@ list.map(
 
 ### `prefer-const`
 
-Require `const` for variables that are never reassigned after declaration. Autofixable for single-declaration `let`s.
+Require `const` for lexical bindings that are never reassigned after their initial value is established. Same-spelled bindings in sibling, nested, and shadowing scopes are analyzed independently. A declaration followed by one assignment in the same scope is reported without an automatic rewrite.
+
+The default options match ESLint:
+
+```json
+{
+  "destructuring": "any",
+  "ignoreReadBeforeAssign": false
+}
+```
+
+`destructuring: "any"` reports each const-eligible leaf of a destructuring pattern. Set it to `"all"` to report the pattern only when every leaf is const-eligible. Set `ignoreReadBeforeAssign` to `true` to keep declaration-only bindings that are read before their first assignment out of the findings.
+
+The fixer changes the shared `let` keyword only for a single initialized declaration when every binding affected by that keyword is const-eligible. Findings that would require moving an assignment, splitting a declaration, or preserving comments across statements are diagnostic-only.
 
 Example:
 
@@ -2564,6 +2577,14 @@ Example:
 let stable = 1;
 let changing = 1;
 changing = 2;
+
+let assignedLater: number;
+// reports: prefer-const (error, diagnostic-only)
+assignedLater = 1;
+
+const input = { first: 1, second: 2 };
+let { first, second } = input; // reports `second`
+first += 1;
 ```
 
 <a id="rule-prefer-destructuring"></a>

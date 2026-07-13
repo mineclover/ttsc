@@ -117,3 +117,23 @@ export interface ITtscLintNoFallthroughRuleOptions {
   */
   reportUnusedFallthroughComment?: boolean;
 }
+
+/** `prefer-const` rule options. */
+export interface ITtscLintCorePreferConstRuleOptions {
+  /**
+   * Report each const-eligible binding in a destructuring pattern (`"any"`), or
+   * report the pattern only when every binding is const-eligible (`"all"`).
+   *
+   * @default "any"
+   */
+  destructuring?: "any" | "all";
+
+  /**
+   * Ignore a declaration-only binding when it is read before its first
+   * assignment. This avoids a conflict with `no-use-before-define` policies
+   * that require the declaration to stay at its original location.
+   *
+   * @default false
+  */
+  ignoreReadBeforeAssign?: boolean;
+}

@@ -6,6 +6,7 @@ import type {
   ITtscLintCoreNoDuplicateImportsRuleOptions,
   ITtscLintCoreNoUnusedExpressionsRuleOptions,
   ITtscLintNoFallthroughRuleOptions,
+  ITtscLintCorePreferConstRuleOptions,
 } from "./ITtscLintCoreRuleOptions";
 
 /**
@@ -1242,12 +1243,15 @@ export interface ITtscLintCoreRules {
   "prefer-arrow-callback"?: TtscLintRuleSetting;
 
   /**
-   * Require `const` for variables that are never reassigned after declaration.
-   * Autofixable for single-declaration `let`s.
+   * Require `const` for lexical bindings that are never reassigned after their
+   * initial value is established. Declaration-only and destructured bindings
+   * follow ESLint's `ignoreReadBeforeAssign` and `destructuring` options.
+   * Autofixable when one initialized declaration can safely change its shared
+   * `let` keyword.
    *
    * @reference https://eslint.org/docs/latest/rules/prefer-const
    */
-  "prefer-const"?: TtscLintRuleSetting;
+  "prefer-const"?: TtscLintRuleOptionsSetting<ITtscLintCorePreferConstRuleOptions>;
 
   /**
    * Reject single-property and single-index variable declarations (`const a =

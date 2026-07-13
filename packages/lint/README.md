@@ -325,7 +325,7 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/).
 - [`object-shorthand`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/object-shorthand.ts): requires object property shorthand where possible.
 - [`operator-assignment`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/operator-assignment.ts): prefers compound assignment operators.
 - [`prefer-arrow-callback`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-arrow-callback.ts): reject `function() { ... }` expressions passed as callback arguments. Prefer the arrow form.
-- [`prefer-const`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-const.ts): prefers `const` for `let` bindings that are never reassigned.
+- [`prefer-const`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-const.ts): prefers `const` for lexical `let` bindings that are never reassigned, including declaration-only and destructured bindings with ESLint-compatible options.
 - [`prefer-destructuring`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-destructuring.ts): reject single-property and single-index variable declarations (`const a = obj.a`, `const x = arr[0]`) that destructuring would replace verbatim.
 - [`prefer-exponentiation-operator`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-exponentiation-operator.ts): prefers `**` over `Math.pow`.
 - [`prefer-for-of`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/prefer-for-of.ts): prefers `for...of` for simple array iteration.

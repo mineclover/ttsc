@@ -27,6 +27,7 @@ import assert from "node:assert/strict";
  *   on `no-duplicate-imports`) is rejected.
  * - Typo'd option key on another options-bearing core rule (`allowTernery` for
  *   `allowTernary` on `no-unused-expressions`) is rejected.
+ * - An unsupported `prefer-const` destructuring policy is rejected.
  * - Cross-rule option leakage (`testIdPattern` on
  *   `cypress/unsafe-to-chain-command`) is rejected.
  * - A lint-only rule (`no-var`) cannot carry an options object.
@@ -54,6 +55,10 @@ export const test_lib_index_d_ts_rule_options_autocomplete_per_rule = () => {
       "no-unused-expressions": [
         "error",
         { allowShortCircuit: true, allowTaggedTemplates: true },
+      ],
+      "prefer-const": [
+        "error",
+        { destructuring: "all", ignoreReadBeforeAssign: true },
       ],
       "cypress/unsafe-to-chain-command": [
         "warning",
@@ -121,6 +126,12 @@ export const test_lib_index_d_ts_rule_options_autocomplete_per_rule = () => {
       "no-unused-expressions": ["error", { allowTernery: true }],
     },
   };
+  const preferConstOptionValue: ITtscLintConfig = {
+    rules: {
+      // @ts-expect-error — prefer-const accepts only the official `any` and `all` destructuring policies.
+      "prefer-const": ["error", { destructuring: "some" }],
+    },
+  };
   const crossRuleShape: ITtscLintConfig = {
     rules: {
       // @ts-expect-error — `testIdPattern` belongs to testing-library/consistent-data-testid; cypress/unsafe-to-chain-command's option shape rejects it.
@@ -147,6 +158,7 @@ export const test_lib_index_d_ts_rule_options_autocomplete_per_rule = () => {
   assert.ok(noDuplicateImportsOptionKeyTypo);
   assert.ok(noDuplicateImportsOptionValueShape);
   assert.ok(noUnusedExpressionsOptionKeyTypo);
+  assert.ok(preferConstOptionValue);
   assert.ok(crossRuleShape);
   assert.ok(lintRuleWithOptions);
   assert.ok(camelBuiltinName);

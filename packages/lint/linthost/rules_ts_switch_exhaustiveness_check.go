@@ -569,10 +569,13 @@ func switchExhaustivenessCheckCommentDefaultCase(
   candidateKind := shimast.KindUnknown
   candidatePos := -1
   candidateEnd := -1
-  forEachCommentToken(text[from:to], func(kind shimast.Kind, pos, end int) {
+  forEachCommentToken(ctx.File, func(kind shimast.Kind, pos, end int) {
+    if pos < from || end > to {
+      return
+    }
     candidateKind = kind
-    candidatePos = from + pos
-    candidateEnd = from + end
+    candidatePos = pos
+    candidateEnd = end
   })
   if candidatePos < 0 || candidateEnd <= candidatePos {
     return nil

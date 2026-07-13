@@ -48,10 +48,13 @@ export interface ITtscLintTypeScriptRules {
   "typescript/array-type"?: TtscLintRuleSetting;
 
   /**
-   * Reject `await` on operands that are not thenable.
+   * Reject non-awaitable ordinary `await` operands and native Promise
+   * aggregator members.
    *
-   * Type-aware — the Checker decides whether the awaited expression has a
-   * `then` method. Autofixable: drops the `await`.
+   * Also reject sync-only `for await...of` and `await using` constructs.
+   *
+   * Type-aware. The Checker resolves Promise and well-known-symbol protocols.
+   * Only the ordinary `await` finding is autofixable.
    *
    * @reference https://typescript-eslint.io/rules/await-thenable
    */
@@ -643,11 +646,14 @@ export interface ITtscLintTypeScriptRules {
   "typescript/no-unsafe-argument"?: TtscLintRuleSetting;
 
   /**
-   * Reject assigning an `any`-typed value into a concretely typed location —
-   * variable initializer with an explicit annotation, or a reassignment whose
-   * left-hand side has a static type.
+   * Reject direct and nested `any` values escaping through assignment
+   * boundaries. Covers annotated and inferred variables, reassignments,
+   * defaults, class members, contextual properties, spreads, and
+   * destructuring.
    *
-   * Type-aware via the Checker. `unknown` is not flagged.
+   * Type-aware via the Checker. Matching generic references are compared
+   * recursively with cycle protection. `any` may flow into `unknown`, including
+   * a corresponding nested generic argument. The rule has no options.
    *
    * @reference https://typescript-eslint.io/rules/no-unsafe-assignment
    */

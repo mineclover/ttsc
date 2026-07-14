@@ -1121,8 +1121,12 @@ func floatingPromiseSignatureParametersHaveSameSyntax(
     }
     leftType := leftParameters[index].Type()
     rightType := rightParameters[index].Type()
-    if leftType == nil || rightType == nil ||
-      leftType.Kind != rightType.Kind || leftType.Text() != rightType.Text() {
+    if leftType == nil || rightType == nil || leftType.Kind != rightType.Kind {
+      return false
+    }
+    leftText := shimast.NodeText(leftType)
+    rightText := shimast.NodeText(rightType)
+    if leftText == "" || rightText == "" || leftText != rightText {
       return false
     }
   }

@@ -2,7 +2,6 @@ package scanner
 
 import (
   "github.com/microsoft/typescript-go/internal/ast"
-  "github.com/microsoft/typescript-go/internal/core"
   "github.com/microsoft/typescript-go/internal/diagnostics"
 )
 
@@ -16,7 +15,6 @@ func IsValidRegularExpressionLiteral(text string) bool {
   scanner.SetOnError(func(_ *diagnostics.Message, _, _ int, _ ...any) {
     valid = false
   })
-  scanner.SetScriptTarget(core.ScriptTargetLatest)
   scanner.SetText(text)
   token := scanner.Scan()
   if token != ast.KindSlashToken && token != ast.KindSlashEqualsToken {

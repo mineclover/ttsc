@@ -201,6 +201,25 @@ interface UncertainOverloadedCatch {
   catch(onRejected: () => void): undefined;
   catch<T>(onRejected: (reason: T) => void): Promise<void>;
 }
+interface PredicateGenericCatch {
+  catch<T>(onRejected: (value: unknown) => value is T): T;
+}
+interface AssertionGenericCatch {
+  catch<T>(onRejected: (value: unknown) => asserts value is T): T;
+}
+interface TupleRestCatch {
+  catch(...args: [(reason: unknown) => void]): undefined;
+}
+interface FunctionCatch {
+  catch(onRejected: Function): undefined;
+}
+class PrivateTag {
+  private tag!: true;
+}
+type PrivateFactory<T> = (() => T) & PrivateTag;
+interface PrivateGenericCatch {
+  catch<T>(onRejected: PrivateFactory<T>): T;
+}
 declare const fixedValid: Promise<void> | FixedGenericThen;
 declare const fixedMismatch: Promise<void> | FixedGenericThen;
 declare const callbackValid: Promise<void> | CallbackGenericThen;
@@ -215,6 +234,13 @@ declare const taggedValid: Promise<void> | TaggedGenericCatch;
 declare const taggedMismatch: Promise<void> | TaggedGenericCatch;
 declare const taggedFactory: TaggedFactory<undefined>;
 declare const uncertainOverload: Promise<void> | UncertainOverloadedCatch;
+declare const predicateMismatch: Promise<void> | PredicateGenericCatch;
+declare const predicateTargetMismatch: Promise<void> | PredicateGenericCatch;
+declare const assertionMismatch: Promise<void> | AssertionGenericCatch;
+declare const tupleRestOverflow: Promise<void> | TupleRestCatch;
+declare const functionContractSafe: Promise<void> | FunctionCatch;
+declare const privateMismatch: Promise<void> | PrivateGenericCatch;
+declare const publicTaggedFactory: (() => undefined) & { tag: true };
 fixedValid.then(1, () => undefined);
 fixedMismatch.then("not a number", () => undefined);
 callbackValid.then(1, (reason: unknown) => undefined);
@@ -228,11 +254,23 @@ nonGenericCallbackMismatch.catch((reason: string) => undefined);
 taggedValid.catch(taggedFactory);
 taggedMismatch.catch(() => undefined);
 uncertainOverload.catch(() => undefined);
+predicateMismatch.catch<undefined>((value: unknown): boolean => true);
+predicateTargetMismatch.catch<undefined>((value: unknown): value is string => true);
+assertionMismatch.catch<undefined>((value: unknown): void => {});
+tupleRestOverflow.catch(() => undefined, () => undefined);
+functionContractSafe.catch(() => undefined);
+privateMismatch.catch(publicTaggedFactory);
 function checkUncertain<U>(
   uncertainResult: Promise<void> | ExplicitGenericCatch,
   factory: () => U,
 ): void {
   uncertainResult.catch(factory);
+}
+function checkUncertainArray<U>(
+  uncertainArrayResult: Promise<void> | ExplicitGenericCatch,
+  factory: () => [U],
+): void {
+  uncertainArrayResult.catch(factory);
 }
 `
   code, stdout, stderr := runNoFloatingPromisesCase(t, source, nil)
@@ -247,7 +285,13 @@ function checkUncertain<U>(
     "nonGenericCallbackMismatch.catch",
     "taggedMismatch.catch",
     "uncertainOverload.catch",
+    "predicateMismatch.catch",
+    "predicateTargetMismatch.catch",
+    "assertionMismatch.catch",
+    "tupleRestOverflow.catch",
+    "privateMismatch.catch",
     "uncertainResult.catch",
+    "uncertainArrayResult.catch",
   }
   if got := strings.Count(stderr, "[typescript/no-floating-promises]"); got != len(unsafeMarkers) {
     t.Fatalf("expected %d generic applicability findings, got %d:\n%s", len(unsafeMarkers), got, stderr)

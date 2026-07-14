@@ -60,6 +60,10 @@ declare const nestedCached: Promise<void> | SafeCatch;
 declare const nestedUncached: Promise<void> | SafeCatch;
 contextual(() => nestedCached.catch(() => undefined));
 contextual(() => nestedUncached.catch(() => undefined));
+declare const nestedFunctionCached: Promise<void> | SafeCatch;
+declare const nestedFunctionUncached: Promise<void> | SafeCatch;
+contextual(function () { return nestedFunctionCached.catch(() => undefined); });
+contextual(function () { return nestedFunctionUncached.catch(() => undefined); });
 `)
 
   prog, diags, err := loadProgram(root, "tsconfig.json", loadProgramOptions{
@@ -106,6 +110,10 @@ contextual(() => nestedUncached.catch(() => undefined));
   nestedUncached := callAt("nestedUncached.catch")
   contextualCached := callAt("contextual(() => nestedCached")
   contextualUncached := callAt("contextual(() => nestedUncached")
+  nestedFunctionCached := callAt("nestedFunctionCached.catch")
+  nestedFunctionUncached := callAt("nestedFunctionUncached.catch")
+  contextualFunctionCached := callAt("contextual(function () { return nestedFunctionCached")
+  contextualFunctionUncached := callAt("contextual(function () { return nestedFunctionUncached")
 
   type canonical struct {
     signature  *shimchecker.Signature
@@ -147,6 +155,8 @@ contextual(() => nestedUncached.catch(() => undefined));
   cachedFailedCanonical := remember(cachedFailed)
   nestedCachedCanonical := remember(nestedCached)
   contextualCachedCanonical := remember(contextualCached)
+  nestedFunctionCachedCanonical := remember(nestedFunctionCached)
+  contextualFunctionCachedCanonical := remember(contextualFunctionCached)
   contextualCachedCall := contextualCached.AsCallExpression()
   contextualUncachedCall := contextualUncached.AsCallExpression()
   if contextualCachedCall == nil || contextualCachedCall.Arguments == nil || len(contextualCachedCall.Arguments.Nodes) != 1 ||
@@ -158,6 +168,20 @@ contextual(() => nestedUncached.catch(() => undefined));
   contextualCachedArrowType := prog.checker.GetTypeAtLocation(contextualCachedArrow)
   if contextualCachedArrowType == nil {
     t.Fatal("cached contextual arrow has no type")
+  }
+  contextualFunctionCachedCall := contextualFunctionCached.AsCallExpression()
+  contextualFunctionUncachedCall := contextualFunctionUncached.AsCallExpression()
+  if contextualFunctionCachedCall == nil || contextualFunctionCachedCall.Arguments == nil ||
+    len(contextualFunctionCachedCall.Arguments.Nodes) != 1 ||
+    contextualFunctionUncachedCall == nil || contextualFunctionUncachedCall.Arguments == nil ||
+    len(contextualFunctionUncachedCall.Arguments.Nodes) != 1 {
+    t.Fatal("contextual function fixture calls do not each have one function argument")
+  }
+  contextualFunctionCachedArgument := contextualFunctionCachedCall.Arguments.Nodes[0]
+  contextualFunctionUncachedArgument := contextualFunctionUncachedCall.Arguments.Nodes[0]
+  contextualFunctionCachedType := prog.checker.GetTypeAtLocation(contextualFunctionCachedArgument)
+  if contextualFunctionCachedType == nil {
+    t.Fatal("cached contextual function expression has no type")
   }
   ctx := &Context{File: file, Checker: prog.checker, CurrentDirectory: root}
   options := noFloatingPromisesOptions{}
@@ -189,6 +213,26 @@ contextual(() => nestedUncached.catch(() => undefined));
   }
   assertSameCanonicalShape("uncached nested call", nestedUncachedCanonical, nestedCachedCanonical)
   assertSameCanonicalShape("uncached contextual ancestor", contextualUncachedCanonical, contextualCachedCanonical)
+  if result := analyzeFloatingPromise(ctx, nestedFunctionUncached, options); result.unhandled {
+    t.Fatal("uncached nested function-expression mixed receiver was reported")
+  }
+  nestedFunctionUncachedCanonical := remember(nestedFunctionUncached)
+  contextualFunctionUncachedCanonical := remember(contextualFunctionUncached)
+  contextualFunctionUncachedType := prog.checker.GetTypeAtLocation(contextualFunctionUncachedArgument)
+  if contextualFunctionUncachedType == nil ||
+    prog.checker.TypeToString(contextualFunctionUncachedType) != prog.checker.TypeToString(contextualFunctionCachedType) {
+    t.Fatal("uncached contextual function expression did not retain canonical generic behavior")
+  }
+  assertSameCanonicalShape(
+    "uncached nested function-expression call",
+    nestedFunctionUncachedCanonical,
+    nestedFunctionCachedCanonical,
+  )
+  assertSameCanonicalShape(
+    "uncached contextual function-expression ancestor",
+    contextualFunctionUncachedCanonical,
+    contextualFunctionCachedCanonical,
+  )
 
   if result := analyzeFloatingPromise(ctx, cachedSafe, options); result.unhandled {
     t.Fatal("cached safe mixed receiver was reported")
@@ -202,6 +246,9 @@ contextual(() => nestedUncached.catch(() => undefined));
   if result := analyzeFloatingPromise(ctx, nestedCached, options); result.unhandled {
     t.Fatal("nested safe mixed receiver was reported")
   }
+  if result := analyzeFloatingPromise(ctx, nestedFunctionCached, options); result.unhandled {
+    t.Fatal("nested cached function-expression mixed receiver was reported")
+  }
 
   assertCanonical(cachedSafe, cachedSafeCanonical)
   assertCanonical(uncachedSafe, uncachedSafeCanonical)
@@ -213,8 +260,15 @@ contextual(() => nestedUncached.catch(() => undefined));
   assertCanonical(nestedUncached, nestedUncachedCanonical)
   assertCanonical(contextualCached, contextualCachedCanonical)
   assertCanonical(contextualUncached, contextualUncachedCanonical)
+  assertCanonical(nestedFunctionCached, nestedFunctionCachedCanonical)
+  assertCanonical(nestedFunctionUncached, nestedFunctionUncachedCanonical)
+  assertCanonical(contextualFunctionCached, contextualFunctionCachedCanonical)
+  assertCanonical(contextualFunctionUncached, contextualFunctionUncachedCanonical)
   if got := prog.checker.GetTypeAtLocation(contextualCachedArrow); got != contextualCachedArrowType {
     t.Fatal("cached contextual arrow type changed after mixed-receiver analysis")
+  }
+  if got := prog.checker.GetTypeAtLocation(contextualFunctionCachedArgument); got != contextualFunctionCachedType {
+    t.Fatal("cached contextual function-expression type changed after mixed-receiver analysis")
   }
 
   if result := analyzeFloatingPromise(ctx, cachedSafe, options); result.unhandled {

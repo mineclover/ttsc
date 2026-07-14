@@ -1028,9 +1028,9 @@ func floatingPromiseApplicableSignature(
 type floatingPromiseCallApplicability uint8
 
 const (
-  floatingPromiseCallIncompatible floatingPromiseCallApplicability = iota
+  floatingPromiseCallUncertain floatingPromiseCallApplicability = iota
+  floatingPromiseCallIncompatible
   floatingPromiseCallApplicable
-  floatingPromiseCallUncertain
 )
 
 func floatingPromiseEquivalentOverloads(
@@ -1088,7 +1088,13 @@ func floatingPromiseSignatureApplicability(
   if len(arguments) < shimchecker.Checker_getMinArgumentCount(checker, signature) {
     return floatingPromiseCallIncompatible
   }
-  if len(arguments) > len(parameters) && !signature.HasRestParameter() {
+  // Array and tuple rest parameters require TypeScript's position-sensitive
+  // effective-rest expansion, including a bounded tuple's maximum arity. A
+  // number-index union cannot prove either property without the resolver.
+  if signature.HasRestParameter() {
+    return floatingPromiseCallUncertain
+  }
+  if len(arguments) > len(parameters) {
     return floatingPromiseCallIncompatible
   }
   typeArguments := call.AsNode().TypeArguments()
@@ -1097,7 +1103,7 @@ func floatingPromiseSignatureApplicability(
     return floatingPromiseCallIncompatible
   }
   if len(typeParameters) != 0 {
-    return floatingPromiseGenericSignatureAcceptsCall(
+    return floatingPromiseGenericSignatureApplicability(
       checker,
       call,
       signature,
@@ -1123,6 +1129,9 @@ func floatingPromiseSignatureApplicability(
         return floatingPromiseCallUncertain
       }
       if !floatingPromiseTypeMayAcceptFunction(checker, parameterType) {
+        if checker.IsTypeAssignableTo(argumentType, parameterType) {
+          continue
+        }
         return floatingPromiseCallIncompatible
       }
       if parameterType.Flags()&(shimchecker.TypeFlagsAny|shimchecker.TypeFlagsUnknown) != 0 {
@@ -1152,13 +1161,13 @@ func floatingPromiseSignatureApplicability(
   return floatingPromiseCallApplicable
 }
 
-// floatingPromiseGenericSignatureAcceptsCall proves the deliberately small
+// floatingPromiseGenericSignatureApplicability proves the deliberately small
 // generic subset whose result can be correlated without instantiating a
 // candidate through TypeScript's private resolver. Every argument must match a
 // fixed parameter or provide a direct, constraint-valid inference for a naked
 // type parameter. Callback inference is accepted only after its complete input
 // contract and return are checked.
-func floatingPromiseGenericSignatureAcceptsCall(
+func floatingPromiseGenericSignatureApplicability(
   checker *shimchecker.Checker,
   call *shimast.CallExpression,
   signature *shimchecker.Signature,
@@ -1349,11 +1358,19 @@ func floatingPromiseCallableArgumentApplicability(
     len(expected.TypeParameters()) != 0 || len(actual.TypeParameters()) != 0 {
     return floatingPromiseCallUncertain
   }
+  if checker.GetTypePredicateOfSignature(expected) != nil ||
+    checker.GetTypePredicateOfSignature(actual) != nil {
+    return floatingPromiseCallUncertain
+  }
   if len(checker.GetSignaturesOfType(expectedType, shimchecker.SignatureKindConstruct)) != 0 ||
     len(checker.GetIndexInfosOfType(expectedType)) != 0 {
     return floatingPromiseCallUncertain
   }
   for _, expectedProperty := range shimchecker.Checker_getPropertiesOfType(checker, expectedType) {
+    if declaration := expectedProperty.ValueDeclaration; declaration != nil &&
+      declaration.ModifierFlags()&(shimast.ModifierFlagsPrivate|shimast.ModifierFlagsProtected) != 0 {
+      return floatingPromiseCallUncertain
+    }
     actualProperty := checker.GetPropertyOfType(actualType, expectedProperty.Name)
     if actualProperty == nil {
       if expectedProperty.Flags&shimast.SymbolFlagsOptional != 0 {
@@ -1700,6 +1717,7 @@ func floatingPromiseSignatureReturnIsUnhandled(
     }
     for _, inferredType := range inferred {
       if floatingPromiseInferenceIsUncertain(inferredType, nil) ||
+        floatingPromiseTypeContainsAnyTypeParameter(ctx.Checker, inferredType, nil, node, nil) ||
         isFloatingPromiseType(ctx, node, inferredType, options) ||
         isFloatingPromiseArray(ctx, node, inferredType, options) {
         return true

@@ -4,8 +4,8 @@ go 1.26
 
 // The plugin's TypeScript integration depends only on the
 // `microsoft/typescript-go/shim/*` modules so that `go mod tidy` works against
-// the public proxy. The
-// bootstrap glue (Program creation, diagnostic rendering, emit) is
+// the public proxy. The bootstrap glue (Program creation, diagnostic
+// rendering, emit) is
 // inlined under ./plugin/host.go to avoid a transitive dependency on the
 // in-tree `github.com/samchon/ttsc/packages/ttsc` module — that module
 // has no public version tag and would only resolve through ttsc's

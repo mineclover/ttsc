@@ -180,6 +180,17 @@ func TestUnicornSwitchCaseBreakPositionRequiresSoleNonEmptyBlockThenDirectTermin
 `,
     },
     {
+      name: "statement after terminator is dead code not this layout rule",
+      source: `switch (key) {
+  case "first": {
+    use(key);
+  }
+  break;
+  use(key);
+}
+`,
+    },
+    {
       name: "nested terminator is not direct",
       source: `switch (key) {
   case "first": {

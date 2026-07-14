@@ -292,6 +292,9 @@ func TestUnicornPreventAbbreviationsPreservesAstralFirstRuneCasing(t *testing.T)
   if actual := upperUnicornPreventAbbreviationsFirst(astralLower); actual != astralLower {
     t.Fatalf("upper-first must preserve an astral first rune: %q", actual)
   }
+  if !unicornPreventAbbreviationsStartsUpper(astralLower) {
+    t.Fatal("an astral first rune must match JavaScript's upper-first classification")
+  }
 }
 
 func TestUnicornPreventAbbreviationsUsesJavaScriptFullUnicodeCasing(t *testing.T) {

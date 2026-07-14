@@ -71,6 +71,16 @@ func TestUnicornPreventAbbreviationsAvoidsCompilerProvidedGlobalBindings(t *test
   )
 }
 
+func TestUnicornPreventAbbreviationsRenamesClassInnerAndOuterReferencesTogether(t *testing.T) {
+  source := "class err {\n  static create(): err {\n    return new err();\n  }\n}\nvoid err;\n"
+  assertFixSnapshot(
+    t,
+    unicornPreventAbbreviationsRuleName,
+    source,
+    "class error {\n  static create(): error {\n    return new error();\n  }\n}\nvoid error;\n",
+  )
+}
+
 func TestUnicornPreventAbbreviationsUsesFunctionScopeForVarCollisions(t *testing.T) {
   source := "function render(condition: boolean): string {\n  if (condition) {\n    var err = \"first\";\n  }\n  if (!condition) {\n    var error = \"second\";\n  }\n  return err + error;\n}\nvoid render;\n"
   assertFixSnapshot(

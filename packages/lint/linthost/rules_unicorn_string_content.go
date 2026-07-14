@@ -604,61 +604,59 @@ func unicornStringContentLiteralEdits(source string, node *shimast.Node, fixed s
   return []TextEdit{{Pos: start, End: end, Text: unicornStringContentQuoteJsString(fixed, quote)}}
 }
 
-// unicornStringContentIsJsescWhitespace reports the exotic-whitespace code
-// points jsesc still escapes in minimal mode (its `regexWhitespace` class);
-// TAB / LF / CR are excluded because they take named escapes first.
-func unicornStringContentIsJsescWhitespace(codePoint rune) bool {
-  switch codePoint {
-  case 0x00A0, 0x1680, 0x202F, 0x205F, 0x3000, 0x2028, 0x2029:
-    return true
-  }
-  return codePoint >= 0x2000 && codePoint <= 0x200A
+// unicornStringContentIsUnsafeRune reports the code points upstream's
+// `quote-js-string` package treats as unsafe to write raw into a JavaScript
+// string literal: the C0 control range (<= U+001F), DEL (U+007F), the
+// U+2028 / U+2029 line separators, and lone surrogates.
+func unicornStringContentIsUnsafeRune(codePoint rune) bool {
+  return codePoint <= 0x1F ||
+    codePoint == 0x7F ||
+    codePoint == 0x2028 ||
+    codePoint == 0x2029 ||
+    (codePoint >= 0xD800 && codePoint <= 0xDFFF)
 }
 
-// unicornStringContentQuoteJsString ports upstream's escapeString helper —
-// `jsesc(value, {quotes, wrap: true, es6: true, minimal: true})`. Minimal
-// mode escapes only the delimiter quote, the backslash, the named escapes
-// (`\b \f \n \r \t`), a NUL not followed by a decimal digit (as `\0`; a
-// digit-adjacent NUL stays a raw byte because `\0` would parse as a legacy
-// octal escape), and jsesc's exotic-whitespace class as uppercase-hex `\xXX`
-// / `\uXXXX`. Everything else — including `\v`, other C0 controls, DEL, and
-// all non-ASCII text — passes through raw, which is exactly what upstream
-// writes. Lone surrogates cannot reach this function: the tsgo scanner cooks
-// them to U+FFFD, which passes through like any other text.
+// unicornStringContentQuoteJsString ports upstream's escapeString helper,
+// which delegates to the `quote-js-string` package
+// (https://github.com/sindresorhus/quote-js-string). It escapes the
+// backslash, the delimiter quote, and every "unsafe" code point — writing the
+// named escapes `\n \r \t \b \f \v` where they apply and a braced ES6
+// code-point escape `\u{HEX}` (lowercase hex, `\u{0}` for NUL) for every other
+// unsafe code point. All other text — ordinary C1 controls above DEL,
+// non-ASCII letters, exotic Unicode whitespace such as NBSP, and astral
+// symbols — passes through raw, exactly as upstream writes it. Lone surrogates
+// cannot reach this function: the tsgo scanner cooks them to U+FFFD, which is
+// safe and passes through like any other text.
 func unicornStringContentQuoteJsString(value string, quote byte) string {
-  runes := []rune(value)
   var out strings.Builder
   out.Grow(len(value) + 2)
   out.WriteByte(quote)
-  for index, character := range runes {
+  for _, character := range value {
     switch {
     case character == '\\':
       out.WriteString(`\\`)
     case character == rune(quote):
       out.WriteByte('\\')
       out.WriteByte(quote)
-    case character == '\b':
-      out.WriteString(`\b`)
-    case character == '\f':
-      out.WriteString(`\f`)
-    case character == '\n':
-      out.WriteString(`\n`)
-    case character == '\r':
-      out.WriteString(`\r`)
-    case character == '\t':
-      out.WriteString(`\t`)
-    case character == 0 && !(index+1 < len(runes) && runes[index+1] >= '0' && runes[index+1] <= '9'):
-      out.WriteString(`\0`)
-    case unicornStringContentIsJsescWhitespace(character):
-      hex := strings.ToUpper(strconv.FormatInt(int64(character), 16))
-      if len(hex) > 2 {
-        out.WriteString(`\u`)
-        out.WriteString(strings.Repeat("0", 4-len(hex)))
-      } else {
-        out.WriteString(`\x`)
-        out.WriteString(strings.Repeat("0", 2-len(hex)))
+    case unicornStringContentIsUnsafeRune(character):
+      switch character {
+      case '\n':
+        out.WriteString(`\n`)
+      case '\r':
+        out.WriteString(`\r`)
+      case '\t':
+        out.WriteString(`\t`)
+      case '\b':
+        out.WriteString(`\b`)
+      case '\f':
+        out.WriteString(`\f`)
+      case '\v':
+        out.WriteString(`\v`)
+      default:
+        out.WriteString(`\u{`)
+        out.WriteString(strconv.FormatInt(int64(character), 16))
+        out.WriteString(`}`)
       }
-      out.WriteString(hex)
     default:
       out.WriteRune(character)
     }

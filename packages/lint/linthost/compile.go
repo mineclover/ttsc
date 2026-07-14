@@ -98,6 +98,10 @@ func RunTransform(args []string) int {
     return 2
   }
   engine := NewEngineWithResolver(rules)
+  if err := engine.ConfigError(); err != nil {
+    fmt.Fprintln(os.Stderr, err)
+    return 2
+  }
   engine.SetSerial(*singleThreaded)
 
   prog, parseDiags, err := loadProgram(resolvedCwd, *tsconfig, loadProgramOptions{
@@ -274,6 +278,10 @@ func runProject(opts *subcommandOpts) int {
     return 2
   }
   engine := NewEngineWithResolver(rules)
+  if err := engine.ConfigError(); err != nil {
+    fmt.Fprintln(os.Stderr, err)
+    return 2
+  }
   engine.SetSerial(opts.singleThreaded)
 
   prog, parseDiags, err := loadProgram(opts.cwd, opts.tsconfig, loadProgramOptions{

@@ -12,7 +12,10 @@
 package linthost
 
 import (
+  "encoding/json"
+  "fmt"
   "regexp"
+  "sort"
 
   shimast "github.com/microsoft/typescript-go/shim/ast"
 )
@@ -35,13 +38,111 @@ func (noParamReassign) NeedsTypeChecker() bool {
 }
 func (noParamReassign) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindSourceFile} }
 
+func (noParamReassign) ValidateOptions(raw json.RawMessage) error {
+  if len(raw) == 0 {
+    return nil
+  }
+
+  var decoded any
+  if err := json.Unmarshal(raw, &decoded); err != nil {
+    return fmt.Errorf("options must be valid JSON: %w", err)
+  }
+  options, ok := decoded.(map[string]any)
+  if !ok {
+    return fmt.Errorf("options must be an object")
+  }
+
+  unknown := make([]string, 0)
+  for name := range options {
+    switch name {
+    case "props", "ignorePropertyModificationsFor", "ignorePropertyModificationsForRegex":
+    default:
+      unknown = append(unknown, name)
+    }
+  }
+  if len(unknown) > 0 {
+    sort.Strings(unknown)
+    return fmt.Errorf("unknown option %q", unknown[0])
+  }
+
+  props := false
+  propsPresent := false
+  if value, present := options["props"]; present {
+    propsPresent = true
+    configured, valid := value.(bool)
+    if !valid {
+      return fmt.Errorf("option %q must be a boolean", "props")
+    }
+    props = configured
+  }
+
+  _, exactPresent, err := noParamReassignStringListOption(
+    options,
+    "ignorePropertyModificationsFor",
+  )
+  if err != nil {
+    return err
+  }
+  patterns, regexPresent, err := noParamReassignStringListOption(
+    options,
+    "ignorePropertyModificationsForRegex",
+  )
+  if err != nil {
+    return err
+  }
+  for index, pattern := range patterns {
+    if _, err := regexp.Compile(pattern); err != nil {
+      return fmt.Errorf(
+        "option %q[%d] must be a valid regular expression: %w",
+        "ignorePropertyModificationsForRegex",
+        index,
+        err,
+      )
+    }
+  }
+  if propsPresent && !props && (exactPresent || regexPresent) {
+    return fmt.Errorf("ignore options cannot be combined with %q set to false", "props")
+  }
+  return nil
+}
+
+func noParamReassignStringListOption(
+  options map[string]any,
+  name string,
+) ([]string, bool, error) {
+  value, present := options[name]
+  if !present {
+    return nil, false, nil
+  }
+  values, valid := value.([]any)
+  if !valid {
+    return nil, true, fmt.Errorf("option %q must be an array of strings", name)
+  }
+  decoded := make([]string, 0, len(values))
+  seen := make(map[string]struct{}, len(values))
+  for index, item := range values {
+    text, valid := item.(string)
+    if !valid {
+      return nil, true, fmt.Errorf("option %q[%d] must be a string", name, index)
+    }
+    if _, duplicate := seen[text]; duplicate {
+      return nil, true, fmt.Errorf("option %q contains duplicate value %q", name, text)
+    }
+    seen[text] = struct{}{}
+    decoded = append(decoded, text)
+  }
+  return decoded, true, nil
+}
+
 func (noParamReassign) Check(ctx *Context, node *shimast.Node) {
   if ctx == nil || ctx.Checker == nil || node == nil {
     return
   }
 
   var options noParamReassignOptions
-  _ = ctx.DecodeOptions(&options)
+  if err := ctx.DecodeOptions(&options); err != nil {
+    return
+  }
 
   parameters := make(map[*shimast.Symbol]noParamReassignParameter)
   parameterNames := make(map[string]struct{})
@@ -136,9 +237,11 @@ func (noParamReassign) Check(ctx *Context, node *shimast.Node) {
   }
   ignoredPatterns := make([]*regexp.Regexp, 0, len(options.IgnorePropertyModificationsForRegex))
   for _, pattern := range options.IgnorePropertyModificationsForRegex {
-    if compiled, err := regexp.Compile(pattern); err == nil {
-      ignoredPatterns = append(ignoredPatterns, compiled)
+    compiled, err := regexp.Compile(pattern)
+    if err != nil {
+      return
     }
+    ignoredPatterns = append(ignoredPatterns, compiled)
   }
 
   walkDescendants(node, func(child *shimast.Node) {

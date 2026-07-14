@@ -48,6 +48,10 @@ func runFormat(opts *subcommandOpts) int {
     return 2
   }
   engine := NewEngineWithResolver(resolver)
+  if err := engine.ConfigError(); err != nil {
+    fmt.Fprintln(os.Stderr, err)
+    return 2
+  }
   engine.SetSerial(opts.singleThreaded)
   needsRuleChecker := engine.NeedsTypeChecker()
 

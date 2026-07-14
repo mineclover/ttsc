@@ -154,6 +154,26 @@ func TestUnicornTemplateIndentFixPreservesQuasisSubstitutionsEscapesAndBlankLine
   assertRuleSkipsSource(t, unicornTemplateIndentRuleName, expected)
 }
 
+func TestUnicornTemplateIndentFixesEmptyBoundaryQuasisWithInsertions(t *testing.T) {
+  source := "declare const value: string;\n" +
+    "declare const other: string;\n" +
+    "const query = gql`${value}\none${other}`;\n"
+  expected := "declare const value: string;\n" +
+    "declare const other: string;\n" +
+    "const query = gql`\n ${value}\n one${other}\n`;\n"
+
+  _, _, findings := runRuleFindingsSnapshot(t, unicornTemplateIndentRuleName, source, nil)
+  if len(findings) != 1 || len(findings[0].Fix) != 3 {
+    t.Fatalf("empty boundary quasis must produce three edits, got %+v", findings)
+  }
+  if findings[0].Fix[0].Pos != findings[0].Fix[0].End ||
+    findings[0].Fix[2].Pos != findings[0].Fix[2].End {
+    t.Fatalf("boundary quasi edits must be zero-width insertions, got %+v", findings[0].Fix)
+  }
+  assertFixSnapshot(t, unicornTemplateIndentRuleName, source, expected)
+  assertRuleSkipsSource(t, unicornTemplateIndentRuleName, expected)
+}
+
 func TestUnicornTemplateIndentFixesNestedTemplatesWithoutTouchingExpressions(t *testing.T) {
   source := "declare const ready: boolean;\n" +
     "declare const value: string;\n" +
@@ -359,12 +379,15 @@ func TestUnicornTemplateIndentSkipsUnselectedSingleLineAndAlreadyCorrectTemplate
     "const computed = utils[\"dedent\"]`\n        one\n        `;\n",
     "const calledTag = makeTag()`\n        one\n        `;\n",
     "const lineComment = // indent\n`\n        one\n        `;\n",
+    "const closerBlockCommentWins = /* indent */ /* other */ `\n        one\n        `;\n",
+    "const closerLineCommentWins = /* indent */ // other\n`\n        one\n        `;\n",
+    "const commentBeforeTagIsNotBeforeTemplate = /* indent */ other`\n        one\n        `;\n",
     "const nestedFunctionArgument = stripIndent([`\n        one\n        `]);\n",
     "if (ready) {\n  use();\n}\nconst correct = gql`\n  one\n    child\n`;\n",
     "const existingTemplateIndent = gql`\n        one\n        two\n`;\n",
   }
   for index, source := range sources {
-    t.Run(fmtTestName(index), func(t *testing.T) {
+    t.Run(unicornTemplateIndentSkipTestName(index), func(t *testing.T) {
       assertRuleSkipsSource(t, unicornTemplateIndentRuleName, source)
     })
   }
@@ -425,13 +448,16 @@ func TestCommandFixUnicornTemplateIndentConvergesAndIsIdempotent(t *testing.T) {
   }
 }
 
-func fmtTestName(index int) string {
+func unicornTemplateIndentSkipTestName(index int) string {
   names := []string{
     "single-line",
     "unselected-tag",
     "computed-tag",
     "call-result-tag",
     "line-comment",
+    "closer-block-comment",
+    "closer-line-comment",
+    "comment-before-tag",
     "non-direct-function-argument",
     "already-correct",
     "existing-template-indent-fallback",

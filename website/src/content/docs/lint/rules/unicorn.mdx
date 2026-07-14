@@ -168,7 +168,7 @@ Rules whose native port is registered but intentionally diagnostic-free are mark
 - [`unicorn/import-style`](#rule-unicorn-import-style): Restrict each module's allowed import styles.
 - [`unicorn/isolated-functions`](#rule-unicorn-isolated-functions): Reject references to outer-scope variables inside functions marked as isolated.
 - [`unicorn/new-for-builtins`](#rule-unicorn-new-for-builtins): Require `new` when calling builtin constructors like `Error`, `Map`, `Set`, `Date`.
-- [`unicorn/number-literal-case`](#rule-unicorn-number-literal-case): Enforce one consistent case for the prefix and digits of hex / binary / octal literals.
+- [`unicorn/number-literal-case`](#rule-unicorn-number-literal-case): Enforce one consistent case for a numeric literal's prefix, hex digits, and exponent.
 - [`unicorn/numeric-separators-style`](#rule-unicorn-numeric-separators-style): Enforce `_` separator grouping in numeric literals.
 - [`unicorn/prevent-abbreviations`](#rule-unicorn-prevent-abbreviations): Apply canonical replacement semantics to bindings, compound names, opt-in property checks, and filenames.
 - [`unicorn/relative-url-style`](#rule-unicorn-relative-url-style): Enforce a single style for relative URLs passed to `new URL`.
@@ -1355,13 +1355,13 @@ const n = 1.0;
 
 ### `unicorn/number-literal-case`
 
-Enforce one consistent case for the prefix and digits of hex / binary / octal literals (`0xFF` over `0xff`).
+Enforce one consistent case for every letter of a numeric literal: a lowercase radix prefix (`0x`, `0b`, `0o`), uppercase hex digits, and a lowercase exponent (`0xFF` over `0xff`, `1e10` over `1E10`). BigInt literals are covered too, and their `n` suffix stays lowercase (`0xFFn`). The autofix rewrites the literal in place. Only letter case changes, so the value is preserved.
 
 Example:
 
 ```ts
 // reports: unicorn/number-literal-case (error)
-const n = 0xff;
+const n = 1E10;
 ```
 
 <a id="rule-unicorn-numeric-separators-style"></a>

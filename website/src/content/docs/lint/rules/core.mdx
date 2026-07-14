@@ -84,7 +84,7 @@ Examples come from the checked [lint corpus](https://github.com/samchon/ttsc/tre
 - [`no-object-constructor`](#rule-no-object-constructor): Reject `new Object()` and `Object()` constructor calls.
 - [`no-octal`](#rule-no-octal): Reject legacy octal literals.
 - [`no-octal-escape`](#rule-no-octal-escape): Reject octal escape sequences in string literals.
-- [`no-param-reassign`](#rule-no-param-reassign): Reject reassigning a function parameter inside the body of the function it belongs to.
+- [`no-param-reassign`](#rule-no-param-reassign): Reject writes to parameter bindings and, optionally, their properties.
 - [`no-plusplus`](#rule-no-plusplus): Reject `++` and `--` operators.
 - [`no-promise-executor-return`](#rule-no-promise-executor-return): Reject values returned by global Promise executors.
 - [`no-proto`](#rule-no-proto): Reject access to `obj.__proto__`; use `Object.getPrototypeOf` / `Object.setPrototypeOf`.
@@ -1438,9 +1438,9 @@ Options:
 
 ### `no-func-assign`
 
-Reject reassignment of function declarations (`function f() {}; f = 0;`).
+Reject writes to bindings introduced by function declarations and named function expressions.
 
-The hoisted binding looks final to most readers; overwriting it makes the original implementation unreachable from other references.
+The rule follows lexical binding identity, so same-spelled parameters, block variables, catch variables, and sibling bindings remain independent. Direct and compound assignments, updates, destructuring targets, and for-in/of targets all count as writes.
 
 Example:
 

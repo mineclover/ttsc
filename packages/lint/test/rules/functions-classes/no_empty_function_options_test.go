@@ -58,9 +58,13 @@ class Example extends Base { override method() {} }`,
 // inside each function body's braces and works for every primary function kind.
 func TestNoEmptyFunctionCommentsPreserveEveryKind(t *testing.T) {
   source := `function ordinary() { /* intentional */ }
+const expression = function () { /* intentional */ };
 const arrow = () => { /* intentional */ };
 function* generator() { /* intentional */ }
+const generatorExpression = function* () { /* intentional */ };
 async function asynchronous() { /* intentional */ }
+const asyncExpression = async function () { /* intentional */ };
+const asyncGeneratorExpression = async function* () { /* intentional */ };
 class Example {
   constructor() { /* intentional */ }
   method() { /* intentional */ }
@@ -69,7 +73,8 @@ class Example {
   get value() { /* intentional */ }
   set value(_value: unknown) { /* intentional */ }
 }
-void [ordinary, arrow, generator, asynchronous, Example];`
+void [ordinary, expression, arrow, generator, generatorExpression,
+  asynchronous, asyncExpression, asyncGeneratorExpression, Example];`
   _, _, findings := runRuleFindingsSnapshot(t, "no-empty-function", source, nil)
   if len(findings) != 0 {
     t.Fatalf("commented function bodies produced findings: %+v", findings)
@@ -138,6 +143,30 @@ class Example extends Base {
       source: `class Example { async *method() {} }`,
       allow:  []string{"asyncMethods"},
       want:   1,
+    },
+    {
+      name:   "async function expressions use async function category",
+      source: `const empty = async function () {};`,
+      allow:  []string{"asyncFunctions"},
+    },
+    {
+      name:   "async generator functions use generator category",
+      source: `const empty = async function* () {};`,
+      allow:  []string{"generatorFunctions"},
+    },
+    {
+      name:   "async function category excludes async generators",
+      source: `const empty = async function* () {};`,
+      allow:  []string{"asyncFunctions"},
+      want:   1,
+    },
+    {
+      name:   "concise arrows have no empty block body",
+      source: `const identity = (value: unknown) => value;`,
+    },
+    {
+      name:   "nonempty functions remain accepted",
+      source: `function work() { return; }`,
     },
     {
       name:   "exterior comments do not preserve function",

@@ -410,8 +410,6 @@ func checkUnicornStringContentNode(
   // Template quasis match on their RAW text so escape spelling and
   // substitution boundaries stay untouched. Foreign-language tags are
   // exempt even when the quasi was reached through a configured selector.
-  // The raw text is LF-normalized like acorn's, so a reported quasi that
-  // contained CRLF comes back LF-only after the fix, exactly like upstream.
   if unicornStringContentHasIgnoredTag(node) {
     return
   }
@@ -419,6 +417,9 @@ func checkUnicornStringContentNode(
   if !ok {
     return
   }
+  // Matching and rewriting both run on the acorn-normalized raw text, so a
+  // reported quasi that contained CRLF comes back LF-only after the fix,
+  // exactly like upstream.
   raw := normalizeTemplateRaw(source[innerPos:innerEnd])
   if raw == "" {
     return

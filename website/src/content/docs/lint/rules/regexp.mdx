@@ -24,7 +24,7 @@ Examples come from the checked [lint corpus](https://github.com/samchon/ttsc/tre
 - [`regexp/no-misleading-unicode-character`](#rule-regexp-no-misleading-unicode-character): Reject misleading Unicode characters in regex classes.
 - [`regexp/no-useless-character-class`](#rule-regexp-no-useless-character-class): Reject single-character character classes such as `/[x]/`, `/x/` is equivalent.
 - [`regexp/no-useless-escape`](#rule-regexp-no-useless-escape): Reject unnecessary escapes inside regex literals.
-- [`regexp/no-useless-flag`](#rule-regexp-no-useless-flag): Reject regex flags that the literal does not exercise, `i` on a pattern.
+- [`regexp/no-useless-flag`](#rule-regexp-no-useless-flag): Reject regex flags that the literal does not exercise, `i` with nothing to re-case or `m` with nothing to re-anchor.
 - [`regexp/no-useless-quantifier`](#rule-regexp-no-useless-quantifier): Reject quantifiers that do not change the match, constant-one counts (`/a{1}/`).
 - [`regexp/no-useless-two-nums-quantifier`](#rule-regexp-no-useless-two-nums-quantifier): Reject equal min/max quantifiers in favor of `/a{2}/`.
 - [`regexp/no-zero-quantifier`](#rule-regexp-no-zero-quantifier): Reject zero-repeat quantifiers , the atom never matches.
@@ -181,15 +181,22 @@ const escape = /\a/;
 
 ### `regexp/no-useless-flag`
 
-Reject regex flags that the literal does not exercise, `i` on a pattern without case-variable characters, `m` without `^`/`$`, `s` without `.`, and similar dead flags on `g`/`y`.
+Reject regex flags that the literal does not exercise: `i` on a pattern with no case-variable character, and `m` on a pattern with no `^`/`$` assertion.
 
 Cleans up flag combos that suggest behavior the pattern can never trigger.
+
+A character is case-variable when the `i` flag widens what it matches, wherever it sits: `/[a-z]/i`, `/[abc]/i` and `/^[a-z]+$/i` all keep their flag, as do escapes that decode to a cased character (`/[\x41]/i`), non-ASCII case pairs, and `\w`/`\b` under `u` or `v`. A `^` or `$` inside a character class is a plain character, so it does not save the `m` flag.
+
+Undecidable patterns are left alone rather than reported: a Unicode property escape (`/\p{Nd}/iu`), a backreference (`i` makes the backreference comparison itself case-insensitive, so `/(.)\1/i` genuinely needs the flag), and a `v`-mode set-notation class all count as using the flag.
 
 Example:
 
 ```ts
 // reports: regexp/no-useless-flag (error)
-const value = /\d+/i;
+const deadIgnoreCase = /\d+/i;
+
+// not reported: `i` is what extends the class to A-Z
+const liveLowercaseRange = /[a-z]/i;
 ```
 
 <a id="rule-regexp-no-useless-quantifier"></a>

@@ -1,6 +1,5 @@
 import TtscWebsiteBenchmarkGraphCommon from "../../../components/benchmark/graph/TtscWebsiteBenchmarkGraphCommon";
 import TtscWebsiteBenchmarkGraphDedicated from "../../../components/benchmark/graph/TtscWebsiteBenchmarkGraphDedicated";
-import TtscWebsiteBenchmarkGraphStructural from "../../../components/benchmark/graph/TtscWebsiteBenchmarkGraphStructural";
 import TtscWebsiteBenchmarkGraphTime from "../../../components/benchmark/graph/TtscWebsiteBenchmarkGraphTime";
 
 # Code Graph (MCP)
@@ -38,20 +37,6 @@ The wait is not evenly distributed. On VS Code's three million lines, `codegraph
 Every tool is given the index its own documentation prescribes: `codegraph init`, `codebase-memory-mcp index_repository` in its default `full` mode (the mode the token charts above also ran), and `serena project index`, which serena recommends for larger projects. Repositories are ordered by the size of the program each index was built from.
 
 <TtscWebsiteBenchmarkGraphTime />
-
-### VS Code, alone
-
-Three million lines is where the index question stops being academic: it is the difference between a tool that answers while you pour a coffee and one you configure before lunch. The same bars as above, isolated.
-
-<TtscWebsiteBenchmarkGraphTime project="vscode" />
-
-## Structural Coverage
-
-This panel shows what `@ttsc/graph` resolves before any agent prompt runs.
-
-It is not a Common or Dedicated prompt lane. It reports graph shape, edge coverage, and setup timing so the token charts have a structural baseline.
-
-<TtscWebsiteBenchmarkGraphStructural />
 
 ## How to read it
 

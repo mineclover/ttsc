@@ -98,6 +98,8 @@ function repoLabel(repo: string): string {
       return "Vue";
     case "zod":
       return "Zod";
+    case "shopping-backend":
+      return "Shopping";
     default:
       return repo;
   }

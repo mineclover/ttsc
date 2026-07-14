@@ -388,7 +388,7 @@ export const test_lib_index_d_ts_rule_options_autocomplete_per_rule = () => {
       "unicorn/template-indent": [
         "error",
         {
-          // @ts-expect-error ??`tagz` is a typo of `tags`; the rule exposes no arbitrary option keys.
+          // @ts-expect-error — `tagz` is a typo of `tags`; the rule exposes no arbitrary option keys.
           tagz: ["gql"],
         },
       ],

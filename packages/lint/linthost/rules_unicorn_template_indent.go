@@ -573,12 +573,24 @@ func unicornTemplateIndentParentMargin(source string, pos int) string {
   if pos < 0 || pos > len(source) {
     return ""
   }
-  lineStart := strings.LastIndexByte(source[:pos], '\n') + 1
-  lineEnd := strings.IndexByte(source[pos:], '\n')
-  if lineEnd < 0 {
-    lineEnd = len(source)
-  } else {
-    lineEnd += pos
+  lineStart := 0
+  for index := 0; index < pos; {
+    if width := unicornTemplateIndentSourceLineBreakWidth(source, index); width > 0 {
+      lineStart = index + width
+      index += width
+      continue
+    }
+    _, width := utf8.DecodeRuneInString(source[index:])
+    index += width
+  }
+  lineEnd := len(source)
+  for index := pos; index < len(source); {
+    if width := unicornTemplateIndentSourceLineBreakWidth(source, index); width > 0 {
+      lineEnd = index
+      break
+    }
+    _, width := utf8.DecodeRuneInString(source[index:])
+    index += width
   }
   line := source[lineStart:lineEnd]
   index := 0
@@ -645,12 +657,7 @@ func unicornTemplateIndentOnlyHorizontalSpace(text string) bool {
 }
 
 func unicornTemplateIndentIgnoredLines(source string, templates []*shimast.Node) map[int]struct{} {
-  starts := []int{0}
-  for index := 0; index < len(source); index++ {
-    if source[index] == '\n' {
-      starts = append(starts, index+1)
-    }
-  }
+  starts := unicornTemplateIndentSourceLineStarts(source)
   ignored := make(map[int]struct{})
   for _, template := range templates {
     start := shimscanner.SkipTrivia(source, template.Pos())
@@ -670,6 +677,40 @@ func unicornTemplateIndentIgnoredLines(source string, templates []*shimast.Node)
   return ignored
 }
 
+func unicornTemplateIndentSourceLineStarts(source string) []int {
+  starts := []int{0}
+  for index := 0; index < len(source); {
+    if width := unicornTemplateIndentSourceLineBreakWidth(source, index); width > 0 {
+      index += width
+      starts = append(starts, index)
+      continue
+    }
+    _, width := utf8.DecodeRuneInString(source[index:])
+    index += width
+  }
+  return starts
+}
+
+func unicornTemplateIndentSourceLineBreakWidth(source string, index int) int {
+  if index < 0 || index >= len(source) {
+    return 0
+  }
+  switch source[index] {
+  case '\r':
+    if index+1 < len(source) && source[index+1] == '\n' {
+      return 2
+    }
+    return 1
+  case '\n':
+    return 1
+  }
+  character, width := utf8.DecodeRuneInString(source[index:])
+  if character == '\u2028' || character == '\u2029' {
+    return width
+  }
+  return 0
+}
+
 func unicornTemplateIndentLineAt(starts []int, pos int) int {
   index := sort.Search(len(starts), func(index int) bool { return starts[index] > pos })
   if index == 0 {
@@ -679,7 +720,19 @@ func unicornTemplateIndentLineAt(starts []int, pos int) int {
 }
 
 func unicornTemplateIndentSourceForDetection(source string, ignored map[int]struct{}) string {
-  return unicornTemplateIndentLinesForDetection(strings.ReplaceAll(source, "\r\n", "\n"), ignored)
+  var normalized strings.Builder
+  normalized.Grow(len(source))
+  for index := 0; index < len(source); {
+    if width := unicornTemplateIndentSourceLineBreakWidth(source, index); width > 0 {
+      normalized.WriteByte('\n')
+      index += width
+      continue
+    }
+    _, width := utf8.DecodeRuneInString(source[index:])
+    normalized.WriteString(source[index : index+width])
+    index += width
+  }
+  return unicornTemplateIndentLinesForDetection(normalized.String(), ignored)
 }
 
 func unicornTemplateIndentTextForDetection(text string) string {

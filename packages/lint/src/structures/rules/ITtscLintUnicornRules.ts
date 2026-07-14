@@ -1125,8 +1125,8 @@ export interface ITtscLintUnicornRules {
   "unicorn/switch-case-break-position"?: TtscLintRuleSetting;
 
   /**
-   * Re-indent the body of tagged template literals (`html`, `gql`, `sql`) to
-   * the indentation of the opening backtick.
+   * Normalize selected multiline template bodies while preserving
+   * substitutions and raw escape spelling.
    *
    * @reference https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/template-indent.md
    */

@@ -241,6 +241,38 @@ func TestUnicornTemplateIndentPreservesMixedInteriorLineEndings(t *testing.T) {
   assertRuleSkipsSource(t, unicornTemplateIndentRuleName, expected)
 }
 
+func TestUnicornTemplateIndentRecognizesEveryECMAScriptSourceLineSeparator(t *testing.T) {
+  separators := []struct {
+    name string
+    text string
+  }{
+    {name: "carriage-return", text: "\r"},
+    {name: "line-separator", text: "\u2028"},
+    {name: "paragraph-separator", text: "\u2029"},
+  }
+  for _, separator := range separators {
+    t.Run(separator.name+"-source-indent", func(t *testing.T) {
+      source := "if (ready) {" + separator.text + "\tuse();" + separator.text + "}" + separator.text +
+        "const query = gql`\none\n`;\n"
+      expected := "if (ready) {" + separator.text + "\tuse();" + separator.text + "}" + separator.text +
+        "const query = gql`\n\tone\n`;\n"
+      assertFixSnapshot(t, unicornTemplateIndentRuleName, source, expected)
+      assertRuleSkipsSource(t, unicornTemplateIndentRuleName, expected)
+    })
+
+    t.Run(separator.name+"-parent-margin", func(t *testing.T) {
+      source := "if (ready) {" + separator.text +
+        "  const query = gql`\none\n`;" + separator.text +
+        "}" + separator.text
+      expected := "if (ready) {" + separator.text +
+        "  const query = gql`\n   one\n  `;" + separator.text +
+        "}" + separator.text
+      assertFixSnapshot(t, unicornTemplateIndentRuleName, source, expected)
+      assertRuleSkipsSource(t, unicornTemplateIndentRuleName, expected)
+    })
+  }
+}
+
 func TestUnicornTemplateIndentFallsBackToOneSpaceWithoutAnyIndentSignal(t *testing.T) {
   source := "const query = gql`\none\ntwo\n`;\n"
   expected := "const query = gql`\n one\n two\n`;\n"

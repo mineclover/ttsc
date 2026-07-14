@@ -1090,12 +1090,7 @@ func floatingPromiseSignatureApplicability(
   }
   parameters := signature.Parameters()
   if len(arguments) < shimchecker.Checker_getMinArgumentCount(checker, signature) {
-    // TypeScript still accepts an omitted required parameter when every
-    // missing position admits void. The public surface does not expose the
-    // resolver's position-sensitive acceptsVoid check, so another overload
-    // must not become uniquely safe merely because this candidate is short on
-    // arguments.
-    return floatingPromiseCallUncertain
+    return floatingPromiseCallIncompatible
   }
   // Array and tuple rest parameters require TypeScript's position-sensitive
   // effective-rest expansion, including a bounded tuple's maximum arity. A

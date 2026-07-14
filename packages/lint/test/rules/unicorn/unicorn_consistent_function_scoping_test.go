@@ -49,7 +49,7 @@ func TestUnicornConsistentFunctionScopingUsesBindingIdentityAndIgnoresSelfRecurs
     function capturesBlock(): number { return blockLocal; }
     void capturesBlock;
   }
-  void [capturesParameter, capturesLocal, capturesType, movable];
+  void [capturesParameter, capturesLocal, capturesType];
 }
 void outer;
 `
@@ -57,6 +57,21 @@ void outer;
   if len(findings) != 1 || findings[0].Message != "Move function 'movable' to the outer scope." {
     t.Fatalf("want only the recursive movable function, got %+v", findings)
   }
+}
+
+func TestUnicornConsistentFunctionScopingOuterReferencePinsRecursiveFunction(t *testing.T) {
+  // Upstream applies the parent-scope reference check before the recursive
+  // function-name exemption: once the surrounding scope calls or reads the
+  // recursive function directly, the definition must stay beside that use.
+  source := `function outer(): void {
+  function movable(value: number): number {
+    return value === 0 ? 0 : movable(value - 1);
+  }
+  void movable;
+}
+void outer;
+`
+  assertRuleSkipsSource(t, unicornConsistentFunctionScopingRuleName, source)
 }
 
 func TestUnicornConsistentFunctionScopingKeepsSharedOuterReferencesTogether(t *testing.T) {
@@ -213,6 +228,67 @@ jest.mock("module", () => {
   })
 }
 
+func TestUnicornConsistentFunctionScopingChainsBlocksInsideLoopBodies(t *testing.T) {
+  // Loop bodies live in IterationStatementBase.Statement, so the loop-body
+  // chain must not rely on Node.Body(). Upstream reports definitions at the
+  // top of while/do bodies yet keeps ones whose captures live anywhere on
+  // the block chain inside the loop body.
+  source := `declare const condition: boolean;
+declare function consume(value: unknown): void;
+while (condition) {
+  const movableWhile = (): boolean => true;
+  consume(movableWhile);
+}
+do {
+  const movableDo = (): boolean => true;
+  consume(movableDo);
+} while (condition);
+function outer(): void {
+  for (;;) {
+    const pinned = 1;
+    {
+      {
+        const capturesLoopBody = (): number => pinned;
+        consume(capturesLoopBody);
+      }
+    }
+  }
+}
+void outer;
+`
+  _, _, findings := runRuleFindingsSnapshot(t, unicornConsistentFunctionScopingRuleName, source, nil)
+  if len(findings) != 2 ||
+    findings[0].Message != "Move arrow function 'movableWhile' to the outer scope." ||
+    findings[1].Message != "Move arrow function 'movableDo' to the outer scope." {
+    t.Fatalf("loop body chain mismatch: %+v", findings)
+  }
+}
+
+func TestUnicornConsistentFunctionScopingReadsClassHeadPositionsAsLexicalEnvironment(t *testing.T) {
+  // Computed member keys and heritage expressions of a class evaluate in the
+  // enclosing lexical environment, while field initializers and method bodies
+  // rebind `this`. Upstream keeps the first two arrows and reports the third.
+  source := `function outer(): void {
+  const capturesComputedKey = () =>
+    class WithKey {
+      [this.x](): void {}
+    };
+  const capturesHeritage = () => class WithBase extends (this.Base as new () => object) {};
+  const rebindsThis = () =>
+    class WithField {
+      value = this;
+    };
+  void [capturesComputedKey, capturesHeritage, rebindsThis];
+}
+void outer;
+`
+  _, _, findings := runRuleFindingsSnapshot(t, unicornConsistentFunctionScopingRuleName, source, nil)
+  if len(findings) != 1 ||
+    findings[0].Message != "Move arrow function 'rebindsThis' to the outer scope." {
+    t.Fatalf("class head position mismatch: %+v", findings)
+  }
+}
+
 func TestUnicornConsistentFunctionScopingProtectsSuperAndPrivateNames(t *testing.T) {
   source := `class Base {
   protected read(): number { return 1; }
@@ -277,7 +353,7 @@ func TestUnicornConsistentFunctionScopingValidatesThePublicOptionShape(t *testin
   valid := []json.RawMessage{nil, json.RawMessage(`{}`), json.RawMessage(`{"checkArrowFunctions":true}`), json.RawMessage(`{"checkArrowFunctions":false}`)}
   for _, options := range valid {
     engine := NewEngineWithResolver(InlineRuleResolver{
-      Rules: RuleConfig{unicornConsistentFunctionScopingRuleName: SeverityError},
+      Rules:   RuleConfig{unicornConsistentFunctionScopingRuleName: SeverityError},
       Options: RuleOptionsMap{unicornConsistentFunctionScopingRuleName: options},
     })
     if err := engine.ConfigError(); err != nil {
@@ -300,7 +376,7 @@ func TestUnicornConsistentFunctionScopingValidatesThePublicOptionShape(t *testin
   }
   for _, test := range invalid {
     engine := NewEngineWithResolver(InlineRuleResolver{
-      Rules: RuleConfig{unicornConsistentFunctionScopingRuleName: SeverityError},
+      Rules:   RuleConfig{unicornConsistentFunctionScopingRuleName: SeverityError},
       Options: RuleOptionsMap{unicornConsistentFunctionScopingRuleName: test.options},
     })
     err := engine.ConfigError()

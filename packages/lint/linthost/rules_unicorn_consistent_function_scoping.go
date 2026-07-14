@@ -8,8 +8,17 @@
 // exceptions. Loop header and body scopes are considered together, returned
 // arrow chains are checked from the returner's scope, and immediate children
 // of React hooks and IIFEs are left in place. Jest mock factories are excluded
-// at every depth because Jest forbids their out-of-scope references. Arrow
-// functions that capture lexical this, super, or arguments are also immovable.
+// at every depth because Jest forbids their out-of-scope references.
+//
+// Two deliberate deviations extend upstream, both demanded by the issue
+// contract and both conservative (they only suppress reports):
+//   - Arrow functions that capture lexical super or `arguments` are immovable
+//     alongside upstream's lexical-this check, and private-name uses pin any
+//     candidate; the constructs cannot survive relocation.
+//   - The block a function is defined in always joins the pin set, not only
+//     when it chains up to a loop body: a binding declared beside the
+//     function would go out of scope if the function moved.
+//
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/consistent-function-scoping.js
 package linthost
 
@@ -139,12 +148,27 @@ func newUnicornConsistentFunctionScopingAnalysis(
       }
       return
     }
-    if unicornConsistentFunctionScopingIsDeclarationName(node, symbol) {
+    if unicornConsistentFunctionScopingIsImplicitArguments(node, symbol) ||
+      unicornConsistentFunctionScopingIsDeclarationName(node, symbol) {
       return
     }
     analysis.referencesBySymbol[symbol] = append(analysis.referencesBySymbol[symbol], node)
   })
   return analysis
+}
+
+// The checker resolves every plain `arguments` reference to one shared
+// implicit symbol without declarations, so the grouped reference map would
+// fuse unrelated functions' `arguments` objects into a single binding and
+// let a parent's own `arguments` pin a nested function. Each non-arrow
+// function rebinds `arguments`; only the arrow lexical-environment check may
+// treat the implicit symbol as a capture.
+func unicornConsistentFunctionScopingIsImplicitArguments(
+  node *shimast.Node,
+  symbol *shimast.Symbol,
+) bool {
+  return node.Kind == shimast.KindIdentifier && identifierText(node) == "arguments" &&
+    symbol.ValueDeclaration == nil && len(symbol.Declarations) == 0
 }
 
 func (analysis *unicornConsistentFunctionScopingAnalysis) isReference(node *shimast.Node) bool {
@@ -282,16 +306,15 @@ func (analysis *unicornConsistentFunctionScopingAnalysis) capturesParentScope(
         privateReference = privateReference || reference.Kind == shimast.KindPrivateIdentifier
       }
     }
-    if !usedInside || unicornConsistentFunctionScopingSymbolDeclaredInside(symbol, function) {
+    if !usedInside {
       continue
-    }
-    if privateReference || unicornConsistentFunctionScopingSymbolDeclaredInScopes(symbol, scopes) {
-      return true
     }
 
     // Upstream keeps a nested function beside direct uses of the same binding
-    // in the surrounding scope. Inspect all resolved references, but require an
-    // exact scope owner so a sibling closure does not masquerade as its parent.
+    // in the surrounding scope, and it applies this check before the
+    // recursive-name exemption, so an outer call of a self-recursive function
+    // pins it in place. Require an exact scope owner so a sibling closure
+    // does not masquerade as its parent.
     for _, reference := range references {
       if noLoopFuncNodeContains(function, reference) {
         continue
@@ -299,6 +322,12 @@ func (analysis *unicornConsistentFunctionScopingAnalysis) capturesParentScope(
       if scopes.contains(unicornConsistentFunctionScopingScopeOwner(reference)) {
         return true
       }
+    }
+    if unicornConsistentFunctionScopingSymbolDeclaredInside(symbol, function) {
+      continue
+    }
+    if privateReference || unicornConsistentFunctionScopingSymbolDeclaredInScopes(symbol, scopes) {
+      return true
     }
   }
   return false
@@ -329,17 +358,31 @@ func unicornConsistentFunctionScopingSymbolDeclaredInScopes(
   if symbol == nil {
     return false
   }
-  if symbol.ValueDeclaration != nil &&
-    scopes.contains(unicornConsistentFunctionScopingDeclarationScope(symbol.ValueDeclaration)) {
+  if unicornConsistentFunctionScopingDeclarationPins(symbol.ValueDeclaration, scopes) {
     return true
   }
   for _, declaration := range symbol.Declarations {
-    if declaration != nil &&
-      scopes.contains(unicornConsistentFunctionScopingDeclarationScope(declaration)) {
+    if unicornConsistentFunctionScopingDeclarationPins(declaration, scopes) {
       return true
     }
   }
   return false
+}
+
+// declarationPins mirrors two upstream checks at once: `resolved.scope` in
+// the parent scopes (a binding declared beside the function) and
+// `scopeManager.acquire(definition.node)` in the parent scopes (a function
+// whose own scope IS a parent scope, i.e. the name of the function the
+// candidate is nested in).
+func unicornConsistentFunctionScopingDeclarationPins(
+  declaration *shimast.Node,
+  scopes unicornConsistentFunctionScopingScopeSet,
+) bool {
+  if declaration == nil {
+    return false
+  }
+  return scopes.contains(declaration) ||
+    scopes.contains(unicornConsistentFunctionScopingDeclarationScope(declaration))
 }
 
 func unicornConsistentFunctionScopingDeclarationScope(declaration *shimast.Node) *shimast.Node {
@@ -347,66 +390,185 @@ func unicornConsistentFunctionScopingDeclarationScope(declaration *shimast.Node)
     return nil
   }
   switch declaration.Kind {
-  case shimast.KindFunctionDeclaration, shimast.KindClassDeclaration:
+  case shimast.KindFunctionDeclaration,
+    shimast.KindClassDeclaration,
+    shimast.KindTypeAliasDeclaration,
+    shimast.KindInterfaceDeclaration,
+    shimast.KindEnumDeclaration,
+    shimast.KindModuleDeclaration:
+    // These declarations open their own scope; the binding they introduce
+    // lives in the surrounding one.
     return unicornConsistentFunctionScopingScopeOwner(declaration.Parent)
+  }
+  if root := unicornConsistentFunctionScopingRootVariableDeclaration(declaration); root != nil &&
+    shimast.GetCombinedNodeFlags(root)&shimast.NodeFlagsBlockScoped == 0 {
+    return unicornConsistentFunctionScopingVarScope(root)
   }
   return unicornConsistentFunctionScopingScopeOwner(declaration)
 }
 
+// rootVariableDeclaration resolves destructuring binding elements to the
+// variable declaration that owns them; parameter destructuring yields nil so
+// the caller falls back to the syntactic scope walk.
+func unicornConsistentFunctionScopingRootVariableDeclaration(node *shimast.Node) *shimast.Node {
+  for node != nil && node.Kind == shimast.KindBindingElement {
+    if node.Parent == nil {
+      return nil
+    }
+    node = node.Parent.Parent
+  }
+  if node == nil || node.Kind != shimast.KindVariableDeclaration {
+    return nil
+  }
+  return node
+}
+
+// varScope returns the binding scope of a `var` declaration: the nearest
+// enclosing function, class static block, namespace body, or source file.
+// eslint-scope resolves such bindings to the hoisted home even when the
+// declaration is written inside a nested block, so the pin comparison must
+// not use the syntactic position.
+func unicornConsistentFunctionScopingVarScope(declaration *shimast.Node) *shimast.Node {
+  for ancestor := declaration.Parent; ancestor != nil; ancestor = ancestor.Parent {
+    if isFunctionLikeKind(ancestor) {
+      return ancestor
+    }
+    switch ancestor.Kind {
+    case shimast.KindClassStaticBlockDeclaration,
+      shimast.KindModuleBlock,
+      shimast.KindSourceFile:
+      return ancestor
+    }
+  }
+  return nil
+}
+
+// arrowCapturesLexicalEnvironment ports upstream's isNodeContainsLexicalThis
+// descent, extended to super and the implicit arguments object per the issue
+// contract. The walk covers the arrow's parameters and body, descends through
+// nested arrows (which share the lexical environment), stops at non-arrow
+// functions and class bodies (which rebind this/arguments and scope super to
+// their own methods), and still inspects the head positions that evaluate in
+// the enclosing environment: computed member keys, heritage expressions, and
+// (deviation, conservative) decorators.
 func (analysis *unicornConsistentFunctionScopingAnalysis) arrowCapturesLexicalEnvironment(
   arrow *shimast.Node,
 ) bool {
-  captured := false
-  walkDescendants(arrow, func(node *shimast.Node) {
-    if captured || node == arrow {
-      return
+  walker := unicornConsistentFunctionScopingLexicalWalker{analysis: analysis}
+  walker.childCB = walker.visit
+  arrow.ForEachChild(walker.childCB)
+  return walker.captured
+}
+
+type unicornConsistentFunctionScopingLexicalWalker struct {
+  analysis *unicornConsistentFunctionScopingAnalysis
+  captured bool
+  childCB  func(*shimast.Node) bool
+}
+
+// visit returns true (aborting ForEachChild) once a capture is found.
+func (walker *unicornConsistentFunctionScopingLexicalWalker) visit(node *shimast.Node) bool {
+  if walker.captured {
+    return true
+  }
+  if node == nil {
+    return false
+  }
+  switch node.Kind {
+  case shimast.KindThisKeyword, shimast.KindSuperKeyword:
+    walker.captured = true
+  case shimast.KindIdentifier:
+    walker.captured = walker.analysis.isImplicitArgumentsReference(node)
+  case shimast.KindClassDeclaration, shimast.KindClassExpression:
+    walker.visitClassOuterPositions(node)
+  default:
+    if isFunctionLikeKind(node) && node.Kind != shimast.KindArrowFunction {
+      walker.visitFunctionHeadPositions(node)
+      break
     }
-    switch node.Kind {
-    case shimast.KindThisKeyword, shimast.KindSuperKeyword:
-      captured = unicornConsistentFunctionScopingLexicalReferenceBelongsToArrow(node, arrow)
-    case shimast.KindIdentifier:
-      if identifierText(node) != "arguments" || !analysis.isReference(node) ||
-        !unicornConsistentFunctionScopingLexicalReferenceBelongsToArrow(node, arrow) {
+    node.ForEachChild(walker.childCB)
+  }
+  return walker.captured
+}
+
+// visitFunctionHeadPositions inspects the pieces of a non-arrow function that
+// still evaluate in the enclosing lexical environment: a computed member key
+// and any decorators (own or parameter), which run at class-definition time.
+// Everything else inside the function rebinds this, super, and arguments.
+func (walker *unicornConsistentFunctionScopingLexicalWalker) visitFunctionHeadPositions(
+  function *shimast.Node,
+) {
+  if name := function.Name(); name != nil && name.Kind == shimast.KindComputedPropertyName {
+    walker.visit(name)
+  }
+  walker.visitDecorators(function)
+  for _, parameter := range function.Parameters() {
+    walker.visitDecorators(parameter)
+  }
+}
+
+// visitClassOuterPositions mirrors the upstream class case: heritage
+// expressions and computed member keys evaluate in the enclosing lexical
+// environment, while member bodies, field initializers, and static blocks
+// rebind it. Decorators join as a conservative deviation because legacy
+// TypeScript decorators also evaluate beside the class definition.
+func (walker *unicornConsistentFunctionScopingLexicalWalker) visitClassOuterPositions(
+  class *shimast.Node,
+) {
+  walker.visitDecorators(class)
+  if data := class.ClassLikeData(); data != nil && data.HeritageClauses != nil {
+    for _, clause := range data.HeritageClauses.Nodes {
+      if walker.visit(clause) {
         return
       }
-      symbol := unicornConsistentFunctionScopingSymbol(analysis.ctx, node)
-      captured = symbol == nil || !unicornConsistentFunctionScopingSymbolDeclaredInside(symbol, arrow)
     }
-  })
-  return captured
-}
-
-func unicornConsistentFunctionScopingLexicalReferenceBelongsToArrow(
-  reference *shimast.Node,
-  arrow *shimast.Node,
-) bool {
-  for ancestor := reference.Parent; ancestor != nil; ancestor = ancestor.Parent {
-    if ancestor == arrow {
-      return true
+  }
+  for _, member := range class.Members() {
+    if walker.captured {
+      return
     }
-    if isFunctionLikeKind(ancestor) && ancestor.Kind != shimast.KindArrowFunction {
-      return false
+    if name := member.Name(); name != nil && name.Kind == shimast.KindComputedPropertyName {
+      walker.visit(name)
     }
-    if ancestor.Kind == shimast.KindClassDeclaration || ancestor.Kind == shimast.KindClassExpression {
-      if !unicornConsistentFunctionScopingClassPositionUsesOuterLexicalEnvironment(reference, ancestor) {
-        return false
+    walker.visitDecorators(member)
+    if isFunctionLikeKind(member) {
+      for _, parameter := range member.Parameters() {
+        walker.visitDecorators(parameter)
       }
     }
   }
-  return false
 }
 
-func unicornConsistentFunctionScopingClassPositionUsesOuterLexicalEnvironment(
-  reference *shimast.Node,
-  class *shimast.Node,
-) bool {
-  for ancestor := reference.Parent; ancestor != nil && ancestor != class; ancestor = ancestor.Parent {
-    switch ancestor.Kind {
-    case shimast.KindComputedPropertyName, shimast.KindHeritageClause, shimast.KindDecorator:
-      return true
+func (walker *unicornConsistentFunctionScopingLexicalWalker) visitDecorators(
+  node *shimast.Node,
+) {
+  modifiers := node.Modifiers()
+  if modifiers == nil {
+    return
+  }
+  for _, modifier := range modifiers.Nodes {
+    if walker.captured {
+      return
+    }
+    if modifier != nil && modifier.Kind == shimast.KindDecorator {
+      walker.visit(modifier)
     }
   }
-  return false
+}
+
+// The checker resolves plain arguments references to one shared implicit
+// symbol; inside the descent no non-arrow function boundary has been
+// crossed, so such a reference reads the enclosing function's arguments
+// object. User-declared bindings named arguments stay with the ordinary
+// reference analysis instead.
+func (analysis *unicornConsistentFunctionScopingAnalysis) isImplicitArgumentsReference(
+  node *shimast.Node,
+) bool {
+  if identifierText(node) != "arguments" || !analysis.isReference(node) {
+    return false
+  }
+  symbol := unicornConsistentFunctionScopingSymbol(analysis.ctx, node)
+  return symbol == nil || unicornConsistentFunctionScopingIsImplicitArguments(node, symbol)
 }
 
 func unicornConsistentFunctionScopingIsCandidate(node *shimast.Node) bool {
@@ -425,7 +587,12 @@ func unicornConsistentFunctionScopingParentScopes(
 ) (unicornConsistentFunctionScopingScopeSet, bool) {
   parent, block := unicornConsistentFunctionScopingDefinitionParent(function)
   main := unicornConsistentFunctionScopingAcquiredScope(parent)
-  if main == nil {
+  chain := unicornConsistentFunctionScopingLoopScopeChain(block)
+  // Upstream proceeds when either the acquired parent scope or the loop-body
+  // chain contributes a scope (a while/do body has no acquirable statement
+  // scope but its block still counts); with neither, the function stays
+  // unchecked.
+  if main == nil && len(chain) == 0 {
     return unicornConsistentFunctionScopingScopeSet{}, false
   }
 
@@ -434,11 +601,13 @@ func unicornConsistentFunctionScopingParentScopes(
     main:   main,
   }
   scopes.add(main)
+  for _, owner := range chain {
+    scopes.add(owner)
+  }
   if block != nil {
+    // Deviation from upstream: the definition block always joins the pin
+    // set, not only through the loop-body chain (see the package comment).
     scopes.add(unicornConsistentFunctionScopingScopeIdentity(block))
-    for _, owner := range unicornConsistentFunctionScopingLoopScopeChain(block) {
-      scopes.add(owner)
-    }
   }
   return scopes, true
 }
@@ -516,23 +685,35 @@ func unicornConsistentFunctionScopingOuterExpression(node *shimast.Node) *shimas
   return current
 }
 
+// unicornConsistentFunctionScopingAcquiredScope mirrors eslint-scope's
+// `scopeManager.acquire`: it yields a scope only for nodes that create one.
+// A function body block never carries its own block scope, so a definition
+// sitting one standalone block below it has no acquirable parent scope and
+// stays unchecked, and namespace bodies attach their scope to the module
+// declaration, which the TypeScript scope manager likewise never surfaces as
+// a checkable parent.
 func unicornConsistentFunctionScopingAcquiredScope(node *shimast.Node) *shimast.Node {
   if node == nil {
     return nil
   }
   switch node.Kind {
   case shimast.KindSourceFile,
-    shimast.KindBlock,
-    shimast.KindModuleBlock,
     shimast.KindCatchClause,
     shimast.KindClassStaticBlockDeclaration,
-    shimast.KindForStatement,
-    shimast.KindForInStatement,
-    shimast.KindForOfStatement,
     shimast.KindSwitchStatement,
     shimast.KindClassDeclaration,
     shimast.KindClassExpression:
-    return unicornConsistentFunctionScopingScopeIdentity(node)
+    return node
+  case shimast.KindBlock:
+    if parent := node.Parent; parent != nil && isFunctionLikeKind(parent) && parent.Body() == node {
+      return nil
+    }
+    return node
+  case shimast.KindForStatement, shimast.KindForInStatement, shimast.KindForOfStatement:
+    if unicornConsistentFunctionScopingIsLexicalLoop(node) {
+      return node
+    }
+    return nil
   }
   if isFunctionLikeKind(node) {
     return node
@@ -540,6 +721,36 @@ func unicornConsistentFunctionScopingAcquiredScope(node *shimast.Node) *shimast.
   return nil
 }
 
+// isLexicalLoop reports whether a for/for-in/for-of statement declares
+// let/const bindings in its head. eslint-scope creates a for scope only in
+// that case; `var` heads and plain assignment targets resolve into the
+// surrounding scope instead.
+func unicornConsistentFunctionScopingIsLexicalLoop(loop *shimast.Node) bool {
+  if loop == nil {
+    return false
+  }
+  var initializer *shimast.Node
+  switch loop.Kind {
+  case shimast.KindForStatement:
+    if statement := loop.AsForStatement(); statement != nil {
+      initializer = statement.Initializer
+    }
+  case shimast.KindForInStatement, shimast.KindForOfStatement:
+    if statement := loop.AsForInOrOfStatement(); statement != nil {
+      initializer = statement.Initializer
+    }
+  }
+  return initializer != nil && initializer.Kind == shimast.KindVariableDeclarationList &&
+    initializer.Flags&shimast.NodeFlagsBlockScoped != 0
+}
+
+// unicornConsistentFunctionScopingScopeOwner returns the innermost node that
+// owns the scope a reference reads from, the analogue of `reference.from` in
+// eslint-scope. Beyond runtime scopes it stops at type-level scope holders
+// (function/constructor types, signatures, conditional and mapped types, and
+// type/interface/enum declarations): the TypeScript scope manager gives those
+// their own scopes, so an annotation nested in them does not read from the
+// surrounding function scope.
 func unicornConsistentFunctionScopingScopeOwner(node *shimast.Node) *shimast.Node {
   for ancestor := node; ancestor != nil; ancestor = ancestor.Parent {
     if isFunctionLikeKind(ancestor) {
@@ -548,17 +759,28 @@ func unicornConsistentFunctionScopingScopeOwner(node *shimast.Node) *shimast.Nod
     switch ancestor.Kind {
     case shimast.KindBlock:
       return unicornConsistentFunctionScopingScopeIdentity(ancestor)
+    case shimast.KindForStatement, shimast.KindForInStatement, shimast.KindForOfStatement:
+      if unicornConsistentFunctionScopingIsLexicalLoop(ancestor) {
+        return ancestor
+      }
     case shimast.KindModuleBlock,
       shimast.KindCatchClause,
       shimast.KindClassStaticBlockDeclaration,
-      shimast.KindForStatement,
-      shimast.KindForInStatement,
-      shimast.KindForOfStatement,
       shimast.KindSwitchStatement,
       shimast.KindClassDeclaration,
       shimast.KindClassExpression,
       shimast.KindPropertyDeclaration,
-      shimast.KindSourceFile:
+      shimast.KindSourceFile,
+      shimast.KindFunctionType,
+      shimast.KindConstructorType,
+      shimast.KindCallSignature,
+      shimast.KindConstructSignature,
+      shimast.KindMethodSignature,
+      shimast.KindConditionalType,
+      shimast.KindMappedType,
+      shimast.KindTypeAliasDeclaration,
+      shimast.KindInterfaceDeclaration,
+      shimast.KindEnumDeclaration:
       return ancestor
     }
   }
@@ -587,10 +809,41 @@ func unicornConsistentFunctionScopingLoopScopeChain(block *shimast.Node) []*shim
       shimast.KindForStatement,
       shimast.KindForInStatement,
       shimast.KindForOfStatement:
-      if parent.Body() == current {
-        scopes = append(scopes, parent)
+      if unicornConsistentFunctionScopingLoopBody(parent) == current {
+        // The loop statement carries a scope of its own only when its head
+        // declares let/const bindings; while/do statements and `var` heads
+        // contribute nothing beyond the body blocks.
+        if unicornConsistentFunctionScopingIsLexicalLoop(parent) {
+          scopes = append(scopes, parent)
+        }
         return scopes
       }
+    }
+  }
+  return nil
+}
+
+// unicornConsistentFunctionScopingLoopBody returns a loop statement's body.
+// Loop statements store it in IterationStatementBase.Statement; Node.Body()
+// covers only the function-like BodyData carriers and silently yields nil
+// for loops, which would sever every loop-body scope chain.
+func unicornConsistentFunctionScopingLoopBody(loop *shimast.Node) *shimast.Node {
+  switch loop.Kind {
+  case shimast.KindDoStatement:
+    if statement := loop.AsDoStatement(); statement != nil {
+      return statement.Statement
+    }
+  case shimast.KindWhileStatement:
+    if statement := loop.AsWhileStatement(); statement != nil {
+      return statement.Statement
+    }
+  case shimast.KindForStatement:
+    if statement := loop.AsForStatement(); statement != nil {
+      return statement.Statement
+    }
+  case shimast.KindForInStatement, shimast.KindForOfStatement:
+    if statement := loop.AsForInOrOfStatement(); statement != nil {
+      return statement.Statement
     }
   }
   return nil
@@ -757,29 +1010,43 @@ func unicornConsistentFunctionScopingReportRange(
   if file == nil || function == nil {
     return -1, -1
   }
+  source := file.Text()
   if function.Kind == shimast.KindArrowFunction {
     arrow := function.AsArrowFunction()
     if arrow == nil || arrow.EqualsGreaterThanToken == nil {
       return -1, -1
     }
-    return arrow.EqualsGreaterThanToken.Pos(), arrow.EqualsGreaterThanToken.End()
+    // Token positions include leading trivia; the finding must cover the
+    // bare `=>` the way upstream's getFunctionHeadLocation does.
+    start := shimscanner.SkipTrivia(source, arrow.EqualsGreaterThanToken.Pos())
+    end := arrow.EqualsGreaterThanToken.End()
+    if start < 0 || end < start || end > len(source) {
+      return -1, -1
+    }
+    return start, end
   }
 
-  source := file.Text()
   start := shimscanner.SkipTrivia(source, function.Pos())
   if start < 0 || start >= len(source) {
     return -1, -1
   }
-  if name := function.Name(); name != nil && name.End() >= start && name.End() <= len(source) {
-    return start, name.End()
+  // Upstream's getFunctionHeadLocation ends the head at the opening paren of
+  // the parameters: the token after the name for named functions, the first
+  // paren in the node otherwise.
+  scanFrom := start
+  if name := function.Name(); name != nil && name.End() > start && name.End() <= len(source) {
+    scanFrom = name.End()
+  }
+  if scanFrom >= function.End() || function.End() > len(source) {
+    return -1, -1
   }
   scanner := shimscanner.NewScanner()
-  scanner.SetText(source[start:function.End()])
+  scanner.SetText(source[scanFrom:function.End()])
   scanner.SetSkipTrivia(true)
   for {
     switch scanner.Scan() {
-    case shimast.KindFunctionKeyword:
-      return start + scanner.TokenStart(), start + scanner.TokenEnd()
+    case shimast.KindOpenParenToken:
+      return start, scanFrom + scanner.TokenStart()
     case shimast.KindEndOfFile:
       return -1, -1
     }

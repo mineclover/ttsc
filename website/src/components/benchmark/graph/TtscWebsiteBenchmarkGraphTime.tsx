@@ -177,6 +177,33 @@ function TimeTooltip({
   );
 }
 
+/** Same crown the token chart draws, marking the fastest first answer. */
+function CrownMark({ active }: { active: boolean }) {
+  return (
+    <span
+      className={`inline-flex h-3 w-3 shrink-0 items-center justify-center ${
+        active ? "text-[#36e2ee]" : "text-transparent"
+      }`}
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none">
+        <path
+          d="M2.5 5.5 5.4 8l2.6-4 2.6 4 2.9-2.5-.8 6H3.3l-.8-6Z"
+          stroke="currentColor"
+          strokeLinejoin="round"
+          strokeWidth="1.35"
+        />
+        <path
+          d="M3.5 12.5h9"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="1.35"
+        />
+      </svg>
+    </span>
+  );
+}
+
 function Bars({
   row,
   max,
@@ -186,30 +213,46 @@ function Bars({
   max: number;
   thick: boolean;
 }) {
+  // Winner is the fastest first answer: the smallest index-build + LLM total.
+  const bestTotal = Math.min(
+    ...row.bars.map((bar) => (bar.buildMs ?? 0) + bar.answerMs),
+  );
   return (
     <div className={thick ? "space-y-2" : "space-y-1"}>
       {row.bars.map((bar) => {
         const tool = TOOLS.find((item) => item.id === bar.tool)!;
         const build = bar.buildMs ?? 0;
         const total = build + bar.answerMs;
+        const best = total === bestTotal;
         return (
           <div key={bar.tool} className="group relative flex items-center gap-2">
             <span
-              className="w-32 shrink-0 truncate font-mono text-[11px]"
+              className={`inline-flex w-32 shrink-0 items-center gap-1 truncate font-mono text-[12px] ${
+                best ? "font-semibold" : ""
+              }`}
               style={{ color: tool.text }}
             >
-              {tool.label}
+              <CrownMark active={best} />
+              <span className="truncate">{tool.label}</span>
             </span>
             <div
-              className={`relative flex-1 overflow-hidden rounded-sm bg-[#0c0e13] ${thick ? "h-6" : "h-3.5"}`}
+              className={`relative flex-1 overflow-hidden rounded-sm bg-[#0c0e13] ring-1 ring-inset ${
+                thick ? "h-7" : "h-4"
+              } ${
+                best
+                  ? "shadow-[0_0_14px_rgba(54,226,238,0.16)] ring-[#d7f9ff]/70"
+                  : "ring-white/[0.04]"
+              }`}
             >
+              {/* Rectangular two-tone: the faded index / solid LLM split must
+                  read as a clean vertical seam, so no pill rounding here. */}
               <span
                 className="absolute inset-y-0 left-0 flex"
                 style={{ width: `${Math.max(1.5, (total / max) * 100)}%` }}
               >
                 {build > 0 ? (
                   <span
-                    className="h-full rounded-l-sm opacity-40"
+                    className="h-full opacity-[0.55]"
                     style={{
                       width: `${(build / total) * 100}%`,
                       background: tool.fill,
@@ -217,12 +260,16 @@ function Bars({
                   />
                 ) : null}
                 <span
-                  className="h-full flex-1 rounded-r-sm"
+                  className="h-full flex-1"
                   style={{ background: tool.fill }}
                 />
               </span>
             </div>
-            <span className="w-28 shrink-0 text-right font-mono text-[12px] tabular-nums text-neutral-200">
+            <span
+              className={`w-28 shrink-0 text-right font-mono text-[13px] tabular-nums ${
+                best ? "text-neutral-50" : "text-neutral-200"
+              }`}
+            >
               {fmtCompact(build)} / {fmtCompact(bar.answerMs)}
             </span>
             <TimeTooltip row={row} bar={bar} tool={tool} />
@@ -240,24 +287,22 @@ function Bars({
 function ShadeLegend() {
   return (
     <div className="flex items-center gap-3 border-b border-[#1c212b] px-5 py-2.5">
-      <span className="flex h-4 overflow-hidden rounded-sm font-mono text-[9px] font-bold leading-4">
-        <span
-          className="px-2 text-center text-neutral-100"
-          style={{
-            background: TtscWebsiteBenchmarkGraphUi.TTSC_FILL as string,
-            opacity: 0.4,
-          }}
-        >
-          index
+      <span className="flex h-5 overflow-hidden rounded-sm font-mono text-[10px] font-bold leading-5">
+        <span className="relative flex items-center px-2 text-neutral-100">
+          <span
+            className="absolute inset-0 opacity-40"
+            style={{ background: TtscWebsiteBenchmarkGraphUi.TTSC_FILL as string }}
+          />
+          <span className="relative">index</span>
         </span>
         <span
-          className="px-2 text-center text-[#0b0f14]"
+          className="flex items-center px-2 text-[#0b0f14]"
           style={{ background: TtscWebsiteBenchmarkGraphUi.TTSC_FILL as string }}
         >
           LLM
         </span>
       </span>
-      <span className="text-[11px] text-neutral-400">
+      <span className="text-[12px] text-neutral-300">
         faded = index build, solid = LLM answering — each bar is labelled index
         / LLM
       </span>
@@ -318,18 +363,26 @@ export default function TtscWebsiteBenchmarkGraphTime({
             : "Cold time to a first answer"
         }
         description="Build the tool's index once, then ask. The faded segment is the index build, the solid one the median wall clock the LLM spent answering."
-        aside="LLM time is the median across four models and both prompt families, so every tool faces the same mix."
       />
       <ShadeLegend />
-      <div className="space-y-4 px-5 py-4">
-        {rows.map((row) => (
-          <div key={row.project} className="space-y-1.5">
+      <div className="space-y-1.5 px-3 py-3">
+        {rows.map((row, index) => (
+          <div
+            key={row.project}
+            className="space-y-1.5 rounded-lg px-3.5 py-2.5"
+            style={{
+              // Alternating bands, like the SVG chart, so each project reads as
+              // a block before the eye starts picking tools out of it.
+              backgroundColor:
+                index % 2 === 0 ? "rgba(17,26,36,0.6)" : "rgba(17,26,36,0.25)",
+            }}
+          >
             <div className="flex items-baseline justify-between gap-3">
               <span className="font-mono text-[13px] font-semibold text-neutral-100">
                 {row.label}
               </span>
               {row.lines > 0 ? (
-                <span className="font-mono text-[11px] tabular-nums text-neutral-500">
+                <span className="font-mono text-[12px] tabular-nums text-neutral-400">
                   {row.lines.toLocaleString()} lines
                 </span>
               ) : null}

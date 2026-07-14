@@ -30,7 +30,7 @@ function commonRowsForModel(
       tools: TtscWebsiteBenchmarkGraphReductionTools(model),
     });
   }
-  return rows;
+  return rows.sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function TtscWebsiteBenchmarkGraphCommonChart({

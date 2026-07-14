@@ -54,19 +54,29 @@ function TtscWebsiteBenchmarkGraphDedicatedGroup({
 }: {
   mode: PromptModeGroup;
 }) {
+  const projects = useMemo(
+    () =>
+      [...mode.projects].sort((a, b) =>
+        TtscWebsiteBenchmarkGraphData.repoLabel(a.repo).localeCompare(
+          TtscWebsiteBenchmarkGraphData.repoLabel(b.repo),
+        ),
+      ),
+    [mode],
+  );
+
   const [activeProjectId, setActiveProjectId] = useState<string | null>(() =>
     TtscWebsiteBenchmarkGraphSearchParam.initial("graphDedicatedProject"),
   );
   const activeProject =
     (activeProjectId
-      ? mode.projects.find((project) => project.id === activeProjectId)
-      : undefined) ?? mode.projects[0];
+      ? projects.find((project) => project.id === activeProjectId)
+      : undefined) ?? projects[0];
 
   return (
     <section className="space-y-3">
       <TtscWebsiteBenchmarkGraphTabs
         label="Project"
-        items={mode.projects.map((project) => ({
+        items={projects.map((project) => ({
           id: project.id,
           label: TtscWebsiteBenchmarkGraphData.repoLabel(project.repo),
         }))}

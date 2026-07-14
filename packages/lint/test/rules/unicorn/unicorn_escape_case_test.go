@@ -2,6 +2,8 @@ package linthost
 
 import "testing"
 
+const unicornEscapeCaseRuleName = "unicorn/escape-case"
+
 // TestRuleCorpusUnicornEscapeCase verifies unicorn/escape-case reports a
 // string literal whose `\xHH` escape uses lowercase hex digits.
 //

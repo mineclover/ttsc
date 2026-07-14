@@ -2,6 +2,8 @@ package linthost
 
 import "testing"
 
+const unicornNoHexEscapeRuleName = "unicorn/no-hex-escape"
+
 // TestRuleCorpusUnicornNoHexEscape verifies unicorn/no-hex-escape reports a
 // string literal that contains a `\xHH` escape.
 //

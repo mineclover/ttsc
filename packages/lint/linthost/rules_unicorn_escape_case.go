@@ -4,12 +4,15 @@
 // mix `\xa9` and `\xA9`. Canonical form uses uppercase hex digits; the
 // rule fires when any hex escape's A-F digits are lowercase.
 //
-// AST-only: visit `KindStringLiteral` and `KindNoSubstitutionTemplateLiteral`,
-// read the raw source text via `nodeText` (the parser already decodes
-// escapes into the `.Text` value), and match against a regex that finds
-// `\xHH`, `\uHHHH`, or `\u{HEX...}` whose hex portion contains an a-f
-// letter. The match is hex-only — `\n` and other identifier escapes are
-// untouched.
+// AST-only: visit `KindStringLiteral`, `KindNoSubstitutionTemplateLiteral`,
+// and the `KindTemplateHead`/`Middle`/`Tail` elements an interpolated
+// template (or a template literal type) is built from, read each token's raw
+// source text via `nodeText` (the parser already decodes escapes into the
+// `.Text` value), and match against a regex that finds `\xHH`, `\uHHHH`, or
+// `\u{HEX...}` whose hex portion contains an a-f letter. The match is
+// hex-only — `\n` and other identifier escapes are untouched — and tagged
+// templates are skipped because their tag observes the raw text, where the
+// two spellings differ.
 //
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/escape-case.md
 package linthost
@@ -34,9 +37,18 @@ type unicornEscapeCase struct{}
 
 func (unicornEscapeCase) Name() string { return "unicorn/escape-case" }
 func (unicornEscapeCase) Visits() []shimast.Kind {
-  return []shimast.Kind{shimast.KindStringLiteral, shimast.KindNoSubstitutionTemplateLiteral}
+  return []shimast.Kind{
+    shimast.KindStringLiteral,
+    shimast.KindNoSubstitutionTemplateLiteral,
+    shimast.KindTemplateHead,
+    shimast.KindTemplateMiddle,
+    shimast.KindTemplateTail,
+  }
 }
 func (unicornEscapeCase) Check(ctx *Context, node *shimast.Node) {
+  if isTaggedTemplateElement(node) {
+    return
+  }
   source := nodeText(ctx.File, node)
   if source == "" {
     return

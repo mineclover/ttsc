@@ -78,11 +78,16 @@ func resolveNoInnerDeclarationsOptions(ctx *Context) noInnerDeclarationsOptions 
   if len(raw) == 0 {
     return resolved
   }
-  slots := []json.RawMessage{raw}
+  var slots []json.RawMessage
   if raw[0] == '[' {
+    // Decode into a zero-value slice. Seeding it with raw would let the first
+    // RawMessage reuse and overwrite Context.Options' backing bytes, changing
+    // the option seen by every later declaration in the same file.
     if err := json.Unmarshal(raw, &slots); err != nil {
       return resolved
     }
+  } else {
+    slots = []json.RawMessage{raw}
   }
 
   if len(slots) > 0 {

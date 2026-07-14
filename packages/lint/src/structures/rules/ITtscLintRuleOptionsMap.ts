@@ -44,6 +44,7 @@ import type {
   ITtscLintTypeScriptNoRestrictedTypesRuleOptions,
   ITtscLintTypeScriptSwitchExhaustivenessCheckRuleOptions,
 } from "./ITtscLintTypeScriptRuleOptions";
+import type { ITtscLintUnicornTemplateIndentRuleOptions } from "./ITtscLintUnicornRuleOptions";
 
 /**
  * Index from typed rule name to its single options-object slot.
@@ -69,6 +70,7 @@ import type {
  * surface.
  */
 export interface ITtscLintRuleOptionsMap {
+  "unicorn/template-indent": ITtscLintUnicornTemplateIndentRuleOptions;
   "typescript/no-floating-promises": ITtscLintTypeScriptNoFloatingPromisesRuleOptions;
   "no-duplicate-imports": ITtscLintCoreNoDuplicateImportsRuleOptions;
   "no-empty": ITtscLintCoreNoEmptyRuleOptions;

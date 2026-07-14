@@ -34,6 +34,8 @@ import assert from "node:assert/strict";
  * - Cross-rule option leakage (`testIdPattern` on
  *   `cypress/unsafe-to-chain-command`) is rejected.
  * - A typo in a switch-exhaustiveness option is rejected.
+ * - `unicorn/template-indent` exposes its tag/function/selector/comment and
+ *   indentation options without leaking arbitrary keys.
  * - An empty object policy for `typescript/ban-ts-comment` is rejected because
  *   the object form requires `descriptionFormat`.
  * - A lint-only rule (`no-var`) cannot carry an options object.
@@ -145,6 +147,16 @@ export const test_lib_index_d_ts_rule_options_autocomplete_per_rule = () => {
           considerDefaultExhaustiveForUnions: true,
           defaultCaseCommentPattern: "^skip\\s+default$",
           requireDefaultForNonUnion: true,
+        },
+      ],
+      "unicorn/template-indent": [
+        "warning",
+        {
+          comments: ["GRAPHQL"],
+          functions: ["utils.stripIndent"],
+          indent: "\t",
+          selectors: ["TaggedTemplateExpression > TemplateLiteral"],
+          tags: ["utils.gql"],
         },
       ],
     },
@@ -371,6 +383,17 @@ export const test_lib_index_d_ts_rule_options_autocomplete_per_rule = () => {
       ],
     },
   };
+  const templateIndentOptionTypo: ITtscLintConfig = {
+    rules: {
+      "unicorn/template-indent": [
+        "error",
+        {
+          // @ts-expect-error ??`tagz` is a typo of `tags`; the rule exposes no arbitrary option keys.
+          tagz: ["gql"],
+        },
+      ],
+    },
+  };
   const banTsCommentMissingDescriptionFormat: ITtscLintConfig = {
     rules: {
       "typescript/ban-ts-comment": [
@@ -413,6 +436,7 @@ export const test_lib_index_d_ts_rule_options_autocomplete_per_rule = () => {
   assert.ok(crossRuleShape);
   assert.ok(lintRuleWithOptions);
   assert.ok(switchOptionTypo);
+  assert.ok(templateIndentOptionTypo);
   assert.ok(banTsCommentMissingDescriptionFormat);
   assert.ok(camelBuiltinName);
 };

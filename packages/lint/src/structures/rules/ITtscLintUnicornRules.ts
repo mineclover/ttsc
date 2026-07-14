@@ -1,4 +1,10 @@
-import type { TtscLintRuleSetting } from "../TtscLintRuleSetting";
+import type {
+  TtscLintRuleOptionsSetting,
+  TtscLintRuleSetting,
+} from "../TtscLintRuleSetting";
+import type {
+  ITtscLintUnicornTemplateIndentRuleOptions,
+} from "./ITtscLintUnicornRuleOptions";
 
 /**
  * Modernization and style rules from `eslint-plugin-unicorn`.
@@ -1124,7 +1130,7 @@ export interface ITtscLintUnicornRules {
    *
    * @reference https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/template-indent.md
    */
-  "unicorn/template-indent"?: TtscLintRuleSetting;
+  "unicorn/template-indent"?: TtscLintRuleOptionsSetting<ITtscLintUnicornTemplateIndentRuleOptions>;
 
   /**
    * Enforce a canonical case for text-encoding identifiers — `"utf-8"` (not

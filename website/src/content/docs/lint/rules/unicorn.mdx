@@ -2282,7 +2282,16 @@ switch (state) {
 
 ### `unicorn/template-indent`
 
-Re-indent the body of tagged template literals (`html`, `gql`, `sql`) to the indentation of the opening backtick.
+Normalize whitespace-insensitive multiline template bodies relative to the
+source line containing the opening backtick. Substitutions, nested expressions,
+raw escapes, blank lines, and the source line-ending style are preserved.
+
+By default, the rule checks the `outdent`, `dedent`, `gql`, `sql`, `html`, and
+`styled` tags; template arguments passed directly to `dedent` or `stripIndent`;
+templates preceded by `/* HTML */` or `/* indent */`; and Jest inline snapshots.
+The options object can replace the `tags`, `functions`, `comments`, and
+`selectors` lists. `indent` accepts either a positive number of spaces or an
+exact non-empty whitespace string such as `"\t"`.
 
 Illustrative shape:
 

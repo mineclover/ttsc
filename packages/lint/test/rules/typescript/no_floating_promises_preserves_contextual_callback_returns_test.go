@@ -125,8 +125,8 @@ genericContextual<"narrow">(() => "narrow");
     t.Fatalf("expected two candidate signatures, got %d", len(signatures))
   }
   callback := contextualExpression.Arguments.Nodes[0]
-  if !prog.checker.IsContextSensitive(callback) {
-    t.Fatal("callback fixture is not context sensitive")
+  if prog.checker.IsContextSensitive(callback) {
+    t.Fatal("zero-parameter literal callback unexpectedly uses the Checker's narrow context-sensitive classification")
   }
   actualType := prog.checker.GetTypeAtLocation(callback)
   if actualType == nil {
@@ -160,8 +160,8 @@ genericContextual<"narrow">(() => "narrow");
     t.Fatalf("generic contextual fixture mismatch: signatures=%d", len(genericSignatures))
   }
   genericCallback := genericContextualExpression.Arguments.Nodes[0]
-  if !prog.checker.IsContextSensitive(genericCallback) {
-    t.Fatal("generic callback fixture is not context sensitive")
+  if prog.checker.IsContextSensitive(genericCallback) {
+    t.Fatal("generic literal callback unexpectedly uses the Checker's narrow context-sensitive classification")
   }
   if got := floatingPromiseSignatureApplicability(
     prog.checker,

@@ -200,9 +200,9 @@ export const test_lib_index_d_ts_rule_options_autocomplete_per_rule = () => {
   };
   const noParamReassignIgnoreWithoutProps: ITtscLintConfig = {
     rules: {
-      // @ts-expect-error — an explicit `props: false` cannot carry property ignore lists.
       "no-param-reassign": [
         "error",
+        // @ts-expect-error — an explicit `props: false` cannot carry property ignore lists.
         { props: false, ignorePropertyModificationsFor: ["draft"] },
       ],
     },

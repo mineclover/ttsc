@@ -16,20 +16,24 @@ import (
 // after the receiver and spread calls are partial-application shapes, even for
 // arrows.
 //
-// 1. Exercise direct, zero-argument, partial, spread, and dynamic-member calls.
+// 1. Exercise direct, zero, partial, spread, dynamic, and non-bind call shapes.
 // 2. Place `this` across function, method, computed-key, and class-owned scopes.
 // 3. Assert only the truly unnecessary regular-function binds are reported.
 func TestRuleNoExtraBindFunctionBody(t *testing.T) {
   source := `declare const receiver: { value: number };
 declare const bindArguments: [unknown];
 declare const dynamicKey: string;
+declare function namedTarget(): number;
 
 const direct = function () { return 1; }.bind(receiver); // diagnostic
+const arrowThis = (() => this).bind(receiver); // diagnostic
 const noReceiver = function () { return 2; }.bind();
 const partial = function (value: number) { return value; }.bind(null, 1);
 const arrowPartial = ((value: number) => value).bind(null, 1);
 const spread = function () { return 3; }.bind(...bindArguments);
 const dynamic = function () { return 4; }[dynamicKey](receiver);
+const otherMember = function () { return 5; }.call(receiver);
+const namedFunction = namedTarget.bind(receiver);
 const parameterDefault = function (this: { value: number }, value = this.value) { return value; }.bind(receiver);
 const nestedArrow = function (this: { value: number }) { return () => this.value; }.bind(receiver);
 const nestedRegular = function () { return function (this: { value: number }) { return this.value; }; }.bind(receiver); // diagnostic

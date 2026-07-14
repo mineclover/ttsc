@@ -20,7 +20,7 @@ import (
 // resolver-side guard that closes that gap.
 //
 //  1. Build a `*ConfigStore` whose single entry has both `rules` and an
-//     `ignores` list, and whose options map registers a `format/*` rule.
+//     `ignores` list plus a `format/*` option tuple.
 //  2. Resolve rules for an ignored path and for an unrelated path.
 //  3. Assert the ignored path receives no format-rule upgrade and the
 //     unrelated path receives the standard warn-severity upgrade.
@@ -31,12 +31,13 @@ func TestFormatCommandResolverSkipsUpgradeForEntryIgnoredFile(t *testing.T) {
         BaseDir: "/project",
         Ignores: []string{"src/driver/mongodb/typings.ts"},
         Rules: RuleConfig{
-          "no-var": SeverityError,
+          "no-var":      SeverityError,
+          "format/semi": SeverityOff,
+        },
+        Options: RuleOptionsMap{
+          "format/semi": json.RawMessage(`{"prefer":"always"}`),
         },
       },
-    },
-    options: RuleOptionsMap{
-      "format/semi": json.RawMessage(`{"prefer":"always"}`),
     },
   }
   resolver := formatCommandResolver{inner: store}

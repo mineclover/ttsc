@@ -250,9 +250,32 @@ func (r formatCommandResolver) ResolveRules(fileName string) ResolvedRuleConfig 
   if resolved.Rules == nil {
     resolved.Rules = RuleConfig{}
   }
+  if resolved.Options == nil {
+    resolved.Options = RuleOptionsMap{}
+  }
   for _, name := range r.formatOptionRuleNames() {
+    _, declaredForFile := resolved.Rules[normalizeBuiltinRuleName(name)]
+    if r.defaultOptions == nil && !declaredForFile {
+      // A configured format block is still a normal config entry: its files
+      // and ignores selectors scope the complete rule setting. Only the
+      // synthetic default set is allowed to introduce an undeclared rule.
+      continue
+    }
     if resolved.Rules.Severity(name) == SeverityOff {
       resolved.Rules[name] = SeverityWarn
+    }
+    if len(resolved.RuleOptions(name)) == 0 {
+      var raw json.RawMessage
+      if resolved.OptionsResolved {
+        raw = r.defaultOptions[name]
+      } else {
+        // Legacy custom resolvers have no authoritative per-file options, so
+        // retain their file-agnostic override before consulting defaults.
+        raw = r.RuleOptions(name)
+      }
+      if len(raw) > 0 {
+        resolved.Options[name] = append(json.RawMessage(nil), raw...)
+      }
     }
   }
   return resolved
@@ -424,6 +447,31 @@ func (r formatCommandResolver) RuleOptions(name string) json.RawMessage {
   return nil
 }
 
+func (r formatCommandResolver) RuleOptionsVariants(name string) []json.RawMessage {
+  variants := resolvedRuleOptionsVariants(r.inner, name)
+  defaultOptions := r.defaultOptions[name]
+  if len(defaultOptions) == 0 {
+    return variants
+  }
+  effective := make([]json.RawMessage, 0, len(variants)+1)
+  defaultIncluded := false
+  for _, raw := range variants {
+    if len(raw) == 0 {
+      raw = defaultOptions
+      defaultIncluded = true
+    } else if string(raw) == string(defaultOptions) {
+      defaultIncluded = true
+    }
+    effective = append(effective, append(json.RawMessage(nil), raw...))
+  }
+  if !defaultIncluded {
+    // A scoped custom resolver may enumerate only its explicit tuples even
+    // though the default remains reachable for every other file.
+    effective = append(effective, append(json.RawMessage(nil), defaultOptions...))
+  }
+  return effective
+}
+
 // ResolveProjectRules forwards project declarations unchanged. Format defaults
 // are file rules and cannot create or scope project-rule state.
 func (r formatCommandResolver) ResolveProjectRules(names []string) (map[string]ProjectRuleSetting, error) {
@@ -482,7 +530,7 @@ func resolverOptions(resolver RuleResolver) RuleOptionsMap {
   case InlineRuleResolver:
     return r.Options
   case *ConfigStore:
-    return r.options
+    return r.flattenOptions()
   default:
     return nil
   }

@@ -16,5 +16,5 @@ import "testing"
 // 2. Enable the rule severities declared by its // expect: comments.
 // 3. Assert the native Engine reports exactly the annotated diagnostics.
 func TestRuleCorpusValidTypeof(t *testing.T) {
-  assertRuleCorpusCase(t, "valid-typeof.ts", "function f(x: any) {\n  // expect: valid-typeof error\n  return typeof x === \"stirng\";\n}\nJSON.stringify(f);\n")
+  assertRuleCorpusCase(t, "valid-typeof.ts", "function f(x: any) {\n  // expect: valid-typeof error\n  const typo = typeof x === \"stirng\";\n  const known = typeof x === \"string\";\n  const ordered = typeof x < \"m\";\n  const orderedOrEqual = typeof x >= \"z\";\n  return [typo, known, ordered, orderedOrEqual];\n}\nJSON.stringify(f);\n")
 }

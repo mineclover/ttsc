@@ -756,17 +756,6 @@ func isFalseLiteral(node *shimast.Node) bool {
   return ok && !value
 }
 
-func isEqualityOperator(kind shimast.Kind) bool {
-  switch kind {
-  case shimast.KindEqualsEqualsToken,
-    shimast.KindEqualsEqualsEqualsToken,
-    shimast.KindExclamationEqualsToken,
-    shimast.KindExclamationEqualsEqualsToken:
-    return true
-  }
-  return false
-}
-
 func containsSecretIdentifier(node *shimast.Node) bool {
   found := false
   walkDescendants(node, func(child *shimast.Node) {

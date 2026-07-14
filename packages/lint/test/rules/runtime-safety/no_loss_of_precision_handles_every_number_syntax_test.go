@@ -1,6 +1,9 @@
 package linthost
 
-import "testing"
+import (
+  "strings"
+  "testing"
+)
 
 // TestNoLossOfPrecisionHandlesEveryNumberSyntax verifies full Number literal coverage.
 //
@@ -49,10 +52,12 @@ func TestNoLossOfPrecisionHandlesEveryNumberSyntax(t *testing.T) {
     {name: "legacy exact octal", literal: "0377777777777777777", loses: false},
     {name: "legacy rounded octal", literal: "0400000000000000001", loses: true},
     {name: "decimal with legacy-looking prefix", literal: "0195", loses: false},
+    {name: "zero hexadecimal", literal: "0x0", loses: false},
     {name: "exact hexadecimal", literal: "0x20000000000000", loses: false},
     {name: "separated exact hexadecimal", literal: "0x2_0000000000000", loses: false},
     {name: "rounded hexadecimal", literal: "0x20000000000001", loses: true},
     {name: "separated rounded hexadecimal", literal: "0X2_0000000000001", loses: true},
+    {name: "hexadecimal overflow", literal: "0x1" + strings.Repeat("0", 300), loses: true},
     {name: "largest finite number", literal: "1.7976931348623157e308", loses: false},
     {name: "overflow", literal: "1.7976931348623159e308", loses: true},
     {name: "enormous overflow exponent", literal: "1e999999999999999999999999", loses: true},

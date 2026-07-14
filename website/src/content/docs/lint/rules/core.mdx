@@ -1156,6 +1156,13 @@ Reject empty blocks and switches that have no interior comment. Empty catch
 clauses are reported by default; set `allowEmptyCatch` to `true` when silently
 ignoring caught errors is an established project convention.
 
+Options:
+
+- `allowEmptyCatch?: boolean`
+
+  Accept uncommented empty catch clauses while continuing to report every
+  other uncommented empty block. Default: `false`.
+
 Example:
 
 ```ts
@@ -1200,6 +1207,16 @@ Reject empty function bodies that have no interior comment. The `allow` option
 accepts the same function, arrow, generator, method, accessor, constructor,
 async, decorator, and override categories as ESLint. TypeScript parameter-property
 constructors are always accepted because their parameters initialize fields.
+
+Options:
+
+- `allow?: TtscLintCoreNoEmptyFunctionAllow[]`
+
+  Accept the selected categories: `functions`, `arrowFunctions`,
+  `generatorFunctions`, `methods`, `generatorMethods`, `getters`, `setters`,
+  `constructors`, `asyncFunctions`, `asyncMethods`, `privateConstructors`,
+  `protectedConstructors`, `decoratedFunctions`, and `overrideMethods`.
+  Default: `[]`.
 
 Example:
 

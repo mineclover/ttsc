@@ -79,6 +79,8 @@ class C19 implements /*19*/Contract {}
 class C20 implements /*20*/GenericContract < Allowed > {}
 interface I21 extends /*21*/ContractBase {}
 interface I22 extends /*22*/GenericBase < Allowed > {}
+type T23 = Allowed | /*23*/RestrictedUnion;
+type T24 = Allowed & /*24*/RestrictedIntersection;
 declare class RuntimeBase {}
 class CleanRuntimeHeritage extends RuntimeBase {}
 `
@@ -105,6 +107,8 @@ class CleanRuntimeHeritage extends RuntimeBase {}
       "GenericContract<Allowed>": true,
       "ContractBase": true,
       "GenericBase<Allowed>": true,
+      "RestrictedUnion": true,
+      "RestrictedIntersection": true,
       "RuntimeBase": true
     }
   }`)
@@ -136,6 +140,8 @@ class CleanRuntimeHeritage extends RuntimeBase {}
     {"/*20*/", "GenericContract < Allowed >", "GenericContract<Allowed>", ""},
     {"/*21*/", "ContractBase", "ContractBase", ""},
     {"/*22*/", "GenericBase < Allowed >", "GenericBase<Allowed>", ""},
+    {"/*23*/", "RestrictedUnion", "RestrictedUnion", ""},
+    {"/*24*/", "RestrictedIntersection", "RestrictedIntersection", ""},
   }
 
   findings := runNoRestrictedTypes(t, source, options)

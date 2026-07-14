@@ -29,6 +29,9 @@ const legacyLiteralOpen = /[[]/;
 const unicodeEscapedClose = /[\]]/u;
 const setsEscapedBrackets = /[\[\]]/v;
 const nestedSetsNonEmpty = /[[a-z]]/v;
+const invalidEscape = /\u{110000}[]/u;
+const unknownFlag = /[]/z;
+const duplicateFlag = /[]/uu;
 `)
   findings := NewEngine(RuleConfig{
     "no-empty-character-class":        SeverityError,

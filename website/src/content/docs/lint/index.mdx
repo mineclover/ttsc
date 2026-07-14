@@ -16,6 +16,8 @@ A lint rule. Reported as `error TS11966`. The same `error TSxxxxx` shape your ed
 
 Each built-in rule owns one positive numeric code in the reserved `TS9000` through `TS17999` band. The assignments use an append-only ledger, so a new built-in rule does not renumber existing rules and a removed rule's code is not reused. LSP diagnostics expose the stable rule ID, such as `no-var`, in their `code` field.
 
+The ledger introduction preserved every legacy code that was already unique. For each pre-existing collision group, the alphabetically first rule kept the shared legacy code and every other rule received an available code. Those resolved assignments are now frozen by the same append-only policy.
+
 Rules contributed by another Go package use the same collision-free band. Their codes are deterministic for an unchanged complete contributor set and do not depend on registration order. Changing that contributor set can change contributor assignments when preferred codes collide, but it cannot change a built-in assignment.
 
 ## The shape of the chapter

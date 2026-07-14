@@ -1,4 +1,5 @@
 import TtscWebsiteBenchmarkGraphCommon from "../../../components/benchmark/graph/TtscWebsiteBenchmarkGraphCommon";
+import TtscWebsiteBenchmarkPerformanceSummary from "../../../components/benchmark/TtscWebsiteBenchmarkPerformanceSummary";
 
 # Benchmark
 
@@ -17,3 +18,5 @@ The overview below uses the same shared onboarding prompt across every project w
 [The compiler-performance benchmark](/docs/benchmark/performance) measures wall-clock time when a real TypeScript project moves from the legacy `tsc` + `eslint` path to TypeScript-Go backed builds, checks, and linting. The dashboard covers build, type-check, lint, and format across real open-source repositories, single-threaded and multi-threaded.
 
 vscode, 6,093 TypeScript files across a large application monorepo, is the flagship example. At 8 checker workers, `ttsc` builds vscode in around 8 s versus roughly 94 s for legacy `tsc`, and type-checks it in around 6.5 s versus roughly 73 s. The full dashboard covers nestjs, vue, zod, typeorm, rxjs, and shopping-backend as well.
+
+<TtscWebsiteBenchmarkPerformanceSummary />

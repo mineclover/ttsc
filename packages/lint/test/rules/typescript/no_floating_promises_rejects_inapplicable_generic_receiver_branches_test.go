@@ -149,6 +149,12 @@ function checkUncertainArray<U>(
   if code != 2 || stdout != "" {
     t.Fatalf("generic applicability run mismatch: code=%d stdout=%q stderr=%q", code, stdout, stderr)
   }
+  compilerRejectedMarkers := []string{
+    "fixedMismatch.then",
+    "callbackMismatch.then",
+    "constrainedMismatch.catch",
+    "dependentConstraintMismatch.then",
+  }
   unsafeMarkers := []string{
     "explicitMismatch.catch",
     "partialDefaultMismatch.then",
@@ -167,10 +173,11 @@ function checkUncertainArray<U>(
     "uncertainResult.catch",
     "uncertainArrayResult.catch",
   }
-  if got := strings.Count(stderr, "[typescript/no-floating-promises]"); got != len(unsafeMarkers) {
-    t.Fatalf("expected %d generic applicability findings, got %d:\n%s", len(unsafeMarkers), got, stderr)
+  lintMarkers := append(append([]string{}, unsafeMarkers...), compilerRejectedMarkers...)
+  if got := strings.Count(stderr, "[typescript/no-floating-promises]"); got != len(lintMarkers) {
+    t.Fatalf("expected %d generic applicability findings, got %d:\n%s", len(lintMarkers), got, stderr)
   }
-  for _, marker := range unsafeMarkers {
+  for _, marker := range lintMarkers {
     offset := strings.Index(source, marker)
     if offset < 0 {
       t.Fatalf("missing source marker %q", marker)
@@ -180,20 +187,37 @@ function checkUncertainArray<U>(
       t.Fatalf("missing generic applicability finding at %s (%s)\n%s", location, marker, stderr)
     }
   }
-  compilerRejectedMarkers := []string{
-    "fixedMismatch.then",
-    "callbackMismatch.then",
-    "constrainedMismatch.catch",
-    "dependentConstraintMismatch.then",
+  root := seedLintProject(t, source)
+  program, diagnostics, err := loadProgram(root, "tsconfig.json", loadProgramOptions{forceNoEmit: true})
+  if err != nil {
+    t.Fatal(err)
   }
+  if len(diagnostics) != 0 {
+    t.Fatalf("load diagnostics = %+v", diagnostics)
+  }
+  defer program.close()
+  compilerDiagnostics := program.programDiagnostics()
   for _, marker := range compilerRejectedMarkers {
     offset := strings.Index(source, marker)
     if offset < 0 {
       t.Fatalf("missing compiler-rejected source marker %q", marker)
     }
-    location := "main.ts:" + strconv.Itoa(strings.Count(source[:offset], "\n")+1) + ":"
-    if !diagnosticOutputContains(stderr, location) {
-      t.Fatalf("missing compiler rejection at %s (%s)\n%s", location, marker, stderr)
+    found := false
+    for _, diagnostic := range compilerDiagnostics {
+      if diagnostic == nil || diagnostic.Code() != 2349 || diagnostic.File() == nil {
+        continue
+      }
+      fileName := strings.ReplaceAll(diagnostic.File().FileName(), "\\", "/")
+      if fileName != "main.ts" && !strings.HasSuffix(fileName, "/main.ts") {
+        continue
+      }
+      if diagnostic.Pos() >= offset && diagnostic.Pos() < offset+len(marker) {
+        found = true
+        break
+      }
+    }
+    if !found {
+      t.Fatalf("missing independent TS2349 rejection for %q at offset %d: %+v", marker, offset, compilerDiagnostics)
     }
   }
 }

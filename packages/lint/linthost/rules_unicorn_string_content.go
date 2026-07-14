@@ -410,6 +410,8 @@ func checkUnicornStringContentNode(
   // Template quasis match on their RAW text so escape spelling and
   // substitution boundaries stay untouched. Foreign-language tags are
   // exempt even when the quasi was reached through a configured selector.
+  // The raw text is LF-normalized like acorn's, so a reported quasi that
+  // contained CRLF comes back LF-only after the fix, exactly like upstream.
   if unicornStringContentHasIgnoredTag(node) {
     return
   }
@@ -417,7 +419,7 @@ func checkUnicornStringContentNode(
   if !ok {
     return
   }
-  raw := unicornStringContentNormalizeTemplateRaw(source[innerPos:innerEnd])
+  raw := normalizeTemplateRaw(source[innerPos:innerEnd])
   if raw == "" {
     return
   }
@@ -428,19 +430,6 @@ func checkUnicornStringContentNode(
   fixed := replacement.regex.ReplaceAllLiteralString(raw, replacement.suggest)
   edits := []TextEdit{{Pos: innerPos, End: innerEnd, Text: unicornStringContentEscapeTemplateRaw(fixed)}}
   reportUnicornStringContent(ctx, node, replacement, edits)
-}
-
-// unicornStringContentTemplateNewlinePattern is acorn's TemplateElement raw
-// normalization (`raw.replace(/\r\n?/g, "\n")` in parseTemplateElement).
-var unicornStringContentTemplateNewlinePattern = regexp.MustCompile(`\r\n?`)
-
-// unicornStringContentNormalizeTemplateRaw reproduces the raw value ESLint
-// sees for a template quasi: acorn materializes `TemplateElement.value.raw`
-// with CR / CRLF collapsed to LF, so upstream both matches patterns against
-// and rewrites from the LF-normalized text. A reported quasi that contained
-// CRLF therefore comes back LF-only after the fix, exactly like upstream.
-func unicornStringContentNormalizeTemplateRaw(raw string) string {
-  return unicornStringContentTemplateNewlinePattern.ReplaceAllString(raw, "\n")
 }
 
 // findUnicornStringContentReplacement returns the FIRST configured pattern

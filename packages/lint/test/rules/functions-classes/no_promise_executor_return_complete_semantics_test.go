@@ -17,7 +17,7 @@ import (
 //
 // 1. Run the rule against global Promise executors and collect every marked line.
 // 2. Exercise concise, block, function-expression, and nested control-flow returns.
-// 3. Assert local and script-level Promise bindings plus nested functions stay silent.
+// 3. Assert local and top-level Promise bindings plus nested functions stay silent.
 func TestNoPromiseExecutorReturnCompleteSemantics(t *testing.T) {
   cases := []struct {
     name   string

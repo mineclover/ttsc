@@ -1678,7 +1678,7 @@ func reportUnicornPreventAbbreviationsFilename(
   options unicornPreventAbbreviationsOptions,
 ) {
   filenameWithPath := ctx.File.FileName()
-  if filenameWithPath == "" || filenameWithPath == "<input>" || filenameWithPath == "<text>" {
+  if filenameWithPath == "" || unicornPreventAbbreviationsIsVirtualFilename(filenameWithPath) {
     return
   }
   filename := filepath.Base(filenameWithPath)
@@ -1692,6 +1692,10 @@ func reportUnicornPreventAbbreviationsFilename(
     replacements.samples[index] += extension
   }
   ctx.Report(node, unicornPreventAbbreviationsMessage(filename, replacements, "filename"))
+}
+
+func unicornPreventAbbreviationsIsVirtualFilename(filename string) bool {
+  return filename == "<input>" || filename == "<text>"
 }
 
 // Node's path.extname treats a leading-dot basename such as `.err` as having

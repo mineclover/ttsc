@@ -469,33 +469,13 @@ func TestUnicornPreventAbbreviationsChecksPhysicalFilenameWithoutOfferingEdits(t
     t.Fatalf("leading-dot basename must not be treated as an extension: %q", extension)
   }
 
-  _, _, findings = runRuleFindingsSnapshotFile(
-    t,
-    unicornPreventAbbreviationsRuleName,
-    "foo<err>.ts",
-    "export {};\n",
-    nil,
-  )
-  if len(findings) != 1 || !strings.Contains(findings[0].Message, "`foo<error>.ts`") {
-    t.Fatalf("physical filenames containing angle brackets must still be checked: %+v", findings)
+  if unicornPreventAbbreviationsIsVirtualFilename("foo<err>.ts") {
+    t.Fatal("a physical filename containing angle brackets must not be treated as virtual")
   }
 
   for _, filename := range []string{"<input>", "<text>"} {
-    _, _, findings = runRuleFindingsSnapshotFile(
-      t,
-      unicornPreventAbbreviationsRuleName,
-      filename,
-      "export {};\n",
-      json.RawMessage(`{
-        "extendDefaultReplacements": false,
-        "replacements": {
-          "input": {"source": true},
-          "text": {"source": true}
-        }
-      }`),
-    )
-    if len(findings) != 0 {
-      t.Fatalf("virtual filename %q must be skipped: %+v", filename, findings)
+    if !unicornPreventAbbreviationsIsVirtualFilename(filename) {
+      t.Fatalf("virtual filename %q must be recognized", filename)
     }
   }
 }

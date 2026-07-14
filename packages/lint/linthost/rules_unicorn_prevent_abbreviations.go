@@ -459,7 +459,12 @@ func decodeUnicornPreventAbbreviationsIgnore(raw json.RawMessage) ([]*regexp.Reg
     return nil, errors.New("option \"ignore\" must be an array of regular-expression strings")
   }
   compiled := make([]*regexp.Regexp, 0, len(patterns))
+  seen := make(map[string]struct{}, len(patterns))
   for index, pattern := range patterns {
+    if _, duplicate := seen[pattern]; duplicate {
+      return nil, fmt.Errorf("option \"ignore\"[%d] duplicates %q", index, pattern)
+    }
+    seen[pattern] = struct{}{}
     expression, err := regexp.Compile(pattern)
     if err != nil {
       return nil, fmt.Errorf("option \"ignore\"[%d] must be a valid regular expression: %w", index, err)

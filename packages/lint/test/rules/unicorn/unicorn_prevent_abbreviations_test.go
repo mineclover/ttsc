@@ -654,6 +654,7 @@ func TestUnicornPreventAbbreviationsRejectsMalformedOptions(t *testing.T) {
     `{"replacements":{"err":null}}`,
     `{"allowList":{"err":"yes"}}`,
     `{"ignore":["("]}`,
+    `{"ignore":["^skip","^skip"]}`,
   }
   rule := unicornPreventAbbreviations{}
   for _, options := range invalid {

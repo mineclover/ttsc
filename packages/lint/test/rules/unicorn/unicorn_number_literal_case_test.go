@@ -2,6 +2,8 @@ package linthost
 
 import "testing"
 
+const unicornNumberLiteralCaseRuleName = "unicorn/number-literal-case"
+
 // TestRuleCorpusUnicornNumberLiteralCase verifies unicorn/number-literal-case
 // reports a hex literal with lowercase digits.
 //

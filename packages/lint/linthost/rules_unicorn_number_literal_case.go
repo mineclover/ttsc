@@ -1,23 +1,34 @@
-// unicorn/number-literal-case: hex / binary / octal numeric literals
-// have a conventional canonical form — the radix prefix is lowercase
-// (`0x`, `0b`, `0o`) while hex digits are uppercase (`0xFF`). Mixed-case
-// alternatives (`0Xff`, `0xff`, `0xFf`, `0XFF`) read inconsistently and
-// the rule normalizes the codebase by reporting every literal that
-// isn't already canonical.
+// unicorn/number-literal-case: numeric and BigInt literals have a
+// conventional canonical spelling — every letter that carries no value is
+// lowercase (the radix prefix `0x` / `0b` / `0o`, the exponent `e`, the
+// BigInt suffix `n`) except the hex digits, which are uppercase (`0xFF`).
+// Mixed-case alternatives (`0Xff`, `0xfF`, `1E10`, `2E-5`) read
+// inconsistently, so the rule reports every literal whose raw source text
+// differs from that spelling and autofixes it in place.
 //
-// AST-only: visit `KindNumericLiteral` and `KindBigIntLiteral`, read
-// the raw source text via `nodeText` so the prefix and digit casing
-// survive the parser's normalization, and report when the prefix letter
-// is uppercase OR any hex digit is lowercase. Decimal literals lack a
-// prefix and never fire.
+// AST-only: visit `KindNumericLiteral` and `KindBigIntLiteral`, read the
+// raw source text (the parser's normalized `.Text` has already dropped the
+// casing), and compare it against the spelling upstream's fixer produces —
+// lowercase the whole literal, then uppercase whatever follows a `0x`
+// prefix. The BigInt `n` is held out of that pass, which is what stops
+// `0xFFn` from becoming `0xFFN`. Uppercasing the hex digits *after* the
+// lowercase pass is also what keeps `E` correct in both worlds: inside a
+// hex literal `E` is a digit and stays uppercase (`0xFFE10`), and a hex
+// literal has no exponent, while a decimal literal has no letter other
+// than its exponent `e`.
+//
+// Only letter case changes — digits, `.`, `_`, and the exponent sign are
+// copied through — so the fix never alters the literal's value.
 //
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/number-literal-case.md
 package linthost
 
 import (
+  "fmt"
   "strings"
 
   shimast "github.com/microsoft/typescript-go/shim/ast"
+  shimscanner "github.com/microsoft/typescript-go/shim/scanner"
 )
 
 type unicornNumberLiteralCase struct{}
@@ -27,41 +38,49 @@ func (unicornNumberLiteralCase) Visits() []shimast.Kind {
   return []shimast.Kind{shimast.KindNumericLiteral, shimast.KindBigIntLiteral}
 }
 func (unicornNumberLiteralCase) Check(ctx *Context, node *shimast.Node) {
-  source := strings.TrimSpace(nodeText(ctx.File, node))
-  if len(source) < 2 || source[0] != '0' {
+  if ctx == nil || ctx.File == nil || node == nil {
     return
   }
-  prefix := source[1]
-  switch prefix {
-  case 'x', 'X':
-    if unicornNumberLiteralCaseHexNeedsFix(source, prefix) {
-      ctx.Report(node, "Number literals should use a lowercase prefix and uppercase digits — e.g. `0xFF` instead of `0xff`.")
-    }
-  case 'b', 'B', 'o', 'O':
-    // Binary / octal digits are 0-1 / 0-7; only the prefix letter
-    // can be in the wrong case.
-    if prefix == 'B' || prefix == 'O' {
-      ctx.Report(node, "Number literals should use a lowercase prefix and uppercase digits — e.g. `0xFF` instead of `0xff`.")
-    }
+  source := ctx.File.Text()
+  start := shimscanner.SkipTrivia(source, node.Pos())
+  end := node.End()
+  if start < 0 || end > len(source) || start >= end {
+    return
   }
+  original := source[start:end]
+  canonical := unicornNumberLiteralCaseCanonical(original)
+  if canonical == original {
+    return
+  }
+  ctx.ReportFix(
+    node,
+    fmt.Sprintf("Number literal `%s` should be written as `%s`.", original, canonical),
+    TextEdit{Pos: start, End: end, Text: canonical},
+  )
 }
 
-// unicornNumberLiteralCaseHexNeedsFix reports whether the hex literal's
-// raw source text deviates from `0x` + uppercase digits. The trailing
-// `n` of a hex bigint literal (`0xFFn`) is allowed.
-func unicornNumberLiteralCaseHexNeedsFix(source string, prefix byte) bool {
-  if prefix != 'x' {
-    return true
+// unicornNumberLiteralCaseCanonical returns the canonical spelling of one
+// literal's raw source text. A BigInt literal is canonicalized by its
+// number part alone so the mandatory lowercase `n` suffix survives the hex
+// digits' uppercase pass.
+func unicornNumberLiteralCaseCanonical(source string) string {
+  if strings.HasSuffix(source, "n") {
+    return unicornNumberLiteralCaseCanonicalNumber(strings.TrimSuffix(source, "n")) + "n"
   }
-  digits := source[2:]
-  digits = strings.TrimSuffix(digits, "n")
-  for i := 0; i < len(digits); i++ {
-    ch := digits[i]
-    if ch >= 'a' && ch <= 'f' {
-      return true
-    }
+  return unicornNumberLiteralCaseCanonicalNumber(source)
+}
+
+// unicornNumberLiteralCaseCanonicalNumber canonicalizes a literal's number
+// part: everything lowercases (radix prefix, exponent), then a hex
+// literal's digits are uppercased. Decimal, binary, octal, and legacy octal
+// literals hold no case-bearing digit, so the lowercase pass is all they
+// need.
+func unicornNumberLiteralCaseCanonicalNumber(number string) string {
+  lowered := strings.ToLower(number)
+  if strings.HasPrefix(lowered, "0x") {
+    return "0x" + strings.ToUpper(lowered[2:])
   }
-  return false
+  return lowered
 }
 
 func init() {

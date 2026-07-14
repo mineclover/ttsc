@@ -20,6 +20,7 @@ import (
 //  3. Pin compatibility for noncolliding rules and every pair reported in #492.
 func TestRuleCodesAreUniqueAcrossCompleteRegistry(t *testing.T) {
 	ledgerCodes := make(map[int32]string, len(builtInRuleCodes))
+	legacyGroups := make(map[int32][]string, len(builtInRuleCodes))
 	for name, code := range builtInRuleCodes {
 		if code < rulecode.Minimum || code >= rulecode.MaximumExclusive {
 			t.Fatalf("built-in rule %q has out-of-range code %d", name, code)
@@ -28,14 +29,17 @@ func TestRuleCodesAreUniqueAcrossCompleteRegistry(t *testing.T) {
 			t.Fatalf("built-in rules %q and %q share code %d", previous, name, code)
 		}
 		ledgerCodes[code] = name
-	}
-	for name, code := range builtInRuleCodes {
 		legacy := rulecode.Legacy(name)
-		if code != legacy {
-			if occupant, exists := ledgerCodes[legacy]; !exists {
-				t.Fatalf("built-in rule %q moved from unused legacy code %d to %d", name, legacy, code)
-			} else if occupant == name {
-				t.Fatalf("built-in rule %q has inconsistent legacy assignment %d", name, legacy)
+		legacyGroups[legacy] = append(legacyGroups[legacy], name)
+	}
+	for legacy, names := range legacyGroups {
+		sort.Strings(names)
+		if code := builtInRuleCodes[names[0]]; code != legacy {
+			t.Fatalf("legacy incumbent %q moved from %d to %d", names[0], legacy, code)
+		}
+		for _, name := range names[1:] {
+			if code := builtInRuleCodes[name]; code == legacy {
+				t.Fatalf("collision loser %q retained incumbent code %d", name, legacy)
 			}
 		}
 	}

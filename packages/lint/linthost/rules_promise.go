@@ -780,9 +780,6 @@ func analyzeFloatingPromise(
   if node.Kind == shimast.KindCallExpression {
     return analyzeFloatingPromiseCall(ctx, node, options, callResultIsFloating)
   }
-  if !callResultIsFloating {
-    return floatingPromiseResult{}
-  }
 
   switch node.Kind {
   case shimast.KindConditionalExpression:
@@ -807,6 +804,9 @@ func analyzeFloatingPromise(
         return analyzeFloatingPromise(ctx, binary.Right, options)
       }
     }
+  }
+  if !callResultIsFloating {
+    return floatingPromiseResult{}
   }
   return floatingPromiseResult{unhandled: true}
 }

@@ -940,7 +940,7 @@ func floatingPromisePropertyAccessIsOptional(node *shimast.Node) bool {
 
 // floatingPromiseMethodReturnIsUnhandled determines what a non-Promise
 // receiver branch contributes to the union call. Method names alone are not a
-// Promise escape: the compiler-selected callable signature must return a value
+// Promise escape: a provably applicable callable signature must return a value
 // that is safe to discard under the same Promise and thenable options as the
 // outer expression.
 func floatingPromiseMethodReturnIsUnhandled(
@@ -979,17 +979,334 @@ func floatingPromiseMethodReturnIsUnhandled(
       return true
     }
     sawBranch = true
-    signature := shimchecker.Checker_resolveCallSignatures(ctx.Checker, node, signatures)
+    signature := floatingPromiseApplicableSignature(ctx, call, signatures)
     if signature == nil {
       return true
     }
-    returnType := ctx.Checker.GetReturnTypeOfSignature(signature)
-    if isFloatingPromiseType(ctx, node, returnType, options) ||
-      isFloatingPromiseArray(ctx, node, returnType, options) {
+    if floatingPromiseSignatureReturnIsUnhandled(ctx, node, call, signature, options) {
       return true
     }
   }
   return !sawBranch
+}
+
+// floatingPromiseApplicableSignature selects an overload only when public
+// Checker queries prove its arity and argument types accept this call. Multiple
+// candidates are accepted only when their parameter contracts are equivalent.
+// This is deliberately a lint-side proof, not a second call resolver: uncertain
+// generic or spread cases remain unhandled instead of entering the private,
+// stateful resolveCall path with a candidate subset.
+func floatingPromiseApplicableSignature(
+  ctx *Context,
+  call *shimast.CallExpression,
+  signatures []*shimchecker.Signature,
+) *shimchecker.Signature {
+  if ctx == nil || ctx.Checker == nil || call == nil || len(signatures) == 0 {
+    return nil
+  }
+  var applicable []*shimchecker.Signature
+  for _, signature := range signatures {
+    if floatingPromiseSignatureAcceptsCall(ctx.Checker, call, signature) {
+      applicable = append(applicable, signature)
+    }
+  }
+  if len(applicable) == 1 {
+    return applicable[0]
+  }
+  if len(applicable) == 0 || !floatingPromiseEquivalentOverloads(ctx.Checker, call, applicable) {
+    return nil
+  }
+  // TypeScript selects the first declaration when otherwise-identical
+  // overloads are repeated. Preserve that specified source-order behavior,
+  // but do not guess between merely overlapping parameter types.
+  return applicable[0]
+}
+
+func floatingPromiseEquivalentOverloads(
+  checker *shimchecker.Checker,
+  call *shimast.CallExpression,
+  signatures []*shimchecker.Signature,
+) bool {
+  if checker == nil || call == nil || len(signatures) < 2 {
+    return false
+  }
+  first := signatures[0]
+  firstParameters := first.Parameters()
+  if first.HasRestParameter() || len(first.TypeParameters()) != 0 {
+    return false
+  }
+  for _, signature := range signatures[1:] {
+    parameters := signature.Parameters()
+    if len(parameters) != len(firstParameters) ||
+      signature.HasRestParameter() != first.HasRestParameter() ||
+      shimchecker.Checker_getMinArgumentCount(checker, signature) != shimchecker.Checker_getMinArgumentCount(checker, first) ||
+      len(signature.TypeParameters()) != len(first.TypeParameters()) {
+      return false
+    }
+    for index := range firstParameters {
+      left := floatingPromiseParameterType(checker, call, first, index)
+      right := floatingPromiseParameterType(checker, call, signature, index)
+      if left == nil || right == nil ||
+        left.Flags()&(shimchecker.TypeFlagsAny|shimchecker.TypeFlagsUnknown) != 0 ||
+        right.Flags()&(shimchecker.TypeFlagsAny|shimchecker.TypeFlagsUnknown) != 0 ||
+        !checker.IsTypeAssignableTo(left, right) ||
+        !checker.IsTypeAssignableTo(right, left) {
+        return false
+      }
+    }
+  }
+  return true
+}
+
+func floatingPromiseSignatureAcceptsCall(
+  checker *shimchecker.Checker,
+  call *shimast.CallExpression,
+  signature *shimchecker.Signature,
+) bool {
+  if checker == nil || call == nil || signature == nil {
+    return false
+  }
+  arguments := []*shimast.Node(nil)
+  if call.Arguments != nil {
+    arguments = call.Arguments.Nodes
+  }
+  parameters := signature.Parameters()
+  if len(arguments) < shimchecker.Checker_getMinArgumentCount(checker, signature) {
+    return false
+  }
+  if len(arguments) > len(parameters) && !signature.HasRestParameter() {
+    return false
+  }
+  typeArguments := call.AsNode().TypeArguments()
+  typeParameters := signature.TypeParameters()
+  if len(typeArguments) > len(typeParameters) || (len(typeArguments) != 0 && len(typeParameters) == 0) {
+    return false
+  }
+  // A generic candidate remains possible after arity and explicit-type-
+  // argument checks. Its inferred return is handled separately and
+  // conservatively below; comparing an argument to an uninstantiated type
+  // parameter here could reject a candidate that inference would accept.
+  if len(typeParameters) != 0 {
+    return true
+  }
+  for index, argument := range arguments {
+    if argument == nil || argument.Kind == shimast.KindSpreadElement {
+      return false
+    }
+    parameterType := floatingPromiseParameterType(checker, call, signature, index)
+    argumentType := checker.GetTypeAtLocation(argument)
+    if parameterType == nil || argumentType == nil {
+      return false
+    }
+    if floatingPromiseArgumentNeedsCandidateContext(argument) {
+      if floatingPromiseFunctionArgument(argument) && !floatingPromiseTypeMayAcceptFunction(checker, parameterType) {
+        return false
+      }
+      // A context-sensitive function, object, array, or branch can acquire a
+      // different type for each overload. Keep every plausible candidate in
+      // play; excluding one from the canonical union-context type would turn
+      // uncertainty into a false safe result.
+      continue
+    }
+    if !checker.IsTypeAssignableTo(argumentType, parameterType) {
+      return false
+    }
+  }
+  return true
+}
+
+func floatingPromiseFunctionArgument(node *shimast.Node) bool {
+  node = unwrapFloatingPromiseExpression(node)
+  return node != nil && (node.Kind == shimast.KindArrowFunction || node.Kind == shimast.KindFunctionExpression)
+}
+
+func floatingPromiseArgumentNeedsCandidateContext(node *shimast.Node) bool {
+  node = unwrapFloatingPromiseExpression(node)
+  if node == nil {
+    return false
+  }
+  switch node.Kind {
+  case shimast.KindArrowFunction,
+    shimast.KindFunctionExpression,
+    shimast.KindObjectLiteralExpression,
+    shimast.KindArrayLiteralExpression,
+    shimast.KindConditionalExpression:
+    return true
+  case shimast.KindBinaryExpression:
+    binary := node.AsBinaryExpression()
+    return binary != nil && binary.OperatorToken != nil &&
+      (binary.OperatorToken.Kind == shimast.KindBarBarToken ||
+        binary.OperatorToken.Kind == shimast.KindQuestionQuestionToken)
+  }
+  return false
+}
+
+func floatingPromiseTypeMayAcceptFunction(checker *shimchecker.Checker, t *shimchecker.Type) bool {
+  if checker == nil || t == nil {
+    return false
+  }
+  if t.Flags()&(shimchecker.TypeFlagsAny|shimchecker.TypeFlagsUnknown) != 0 {
+    return true
+  }
+  for _, part := range promiseUnionParts(t) {
+    if part == nil {
+      continue
+    }
+    apparent := checker.GetApparentType(part)
+    if apparent != nil && len(checker.GetSignaturesOfType(apparent, shimchecker.SignatureKindCall)) != 0 {
+      return true
+    }
+  }
+  return false
+}
+
+func floatingPromiseParameterType(
+  checker *shimchecker.Checker,
+  call *shimast.CallExpression,
+  signature *shimchecker.Signature,
+  index int,
+) *shimchecker.Type {
+  if checker == nil || call == nil || signature == nil || index < 0 {
+    return nil
+  }
+  parameters := signature.Parameters()
+  if len(parameters) == 0 {
+    return nil
+  }
+  parameterIndex := index
+  if parameterIndex >= len(parameters) {
+    if !signature.HasRestParameter() {
+      return nil
+    }
+    parameterIndex = len(parameters) - 1
+  }
+  parameterType := checker.GetTypeOfSymbolAtLocation(parameters[parameterIndex], call.Expression)
+  if parameterType == nil {
+    return nil
+  }
+  if signature.HasRestParameter() && parameterIndex == len(parameters)-1 && index >= parameterIndex {
+    if elementType := checker.GetNumberIndexType(parameterType); elementType != nil {
+      return elementType
+    }
+  }
+  return parameterType
+}
+
+// floatingPromiseSignatureReturnIsUnhandled proves the selected declaration's
+// return is safe without instantiating a signature through private Checker
+// machinery. Concrete returns use the ordinary Promise classifiers. A naked
+// method type parameter is accepted only when an explicit type argument or a
+// directly corresponding value/callback return supplies every inferred type;
+// all other generic shapes are conservatively unhandled.
+func floatingPromiseSignatureReturnIsUnhandled(
+  ctx *Context,
+  node *shimast.Node,
+  call *shimast.CallExpression,
+  signature *shimchecker.Signature,
+  options noFloatingPromisesOptions,
+) bool {
+  returnType := ctx.Checker.GetReturnTypeOfSignature(signature)
+  if returnType == nil {
+    return true
+  }
+  typeParameters := signature.TypeParameters()
+  if len(typeParameters) == 0 {
+    return isFloatingPromiseType(ctx, node, returnType, options) ||
+      isFloatingPromiseArray(ctx, node, returnType, options)
+  }
+  for index, typeParameter := range typeParameters {
+    if returnType != typeParameter {
+      continue
+    }
+    inferred := floatingPromiseNakedReturnInferences(ctx.Checker, call, signature, typeParameter, index)
+    if len(inferred) == 0 {
+      return true
+    }
+    for _, inferredType := range inferred {
+      if isFloatingPromiseType(ctx, node, inferredType, options) ||
+        isFloatingPromiseArray(ctx, node, inferredType, options) {
+        return true
+      }
+    }
+    return false
+  }
+  // Resolving a nested generic return (for example Container<T>) correctly
+  // requires TypeScript's full inference mapper. With no public candidate-set
+  // API, treating that shape as safe would hide a possible Promise.
+  return true
+}
+
+func floatingPromiseNakedReturnInferences(
+  checker *shimchecker.Checker,
+  call *shimast.CallExpression,
+  signature *shimchecker.Signature,
+  typeParameter *shimchecker.Type,
+  typeParameterIndex int,
+) []*shimchecker.Type {
+  if checker == nil || call == nil || signature == nil || typeParameter == nil {
+    return nil
+  }
+  typeArguments := call.AsNode().TypeArguments()
+  if typeParameterIndex >= 0 && typeParameterIndex < len(typeArguments) {
+    if explicit := checker.GetTypeFromTypeNode(typeArguments[typeParameterIndex]); explicit != nil {
+      if !floatingPromiseTypeParameterAccepts(checker, typeParameter, explicit) {
+        return nil
+      }
+      return []*shimchecker.Type{explicit}
+    }
+    return nil
+  }
+  if call.Arguments == nil {
+    return nil
+  }
+  var inferred []*shimchecker.Type
+  for index, argument := range call.Arguments.Nodes {
+    if argument == nil || argument.Kind == shimast.KindSpreadElement {
+      return nil
+    }
+    parameterType := floatingPromiseParameterType(checker, call, signature, index)
+    argumentType := checker.GetTypeAtLocation(argument)
+    if parameterType == nil || argumentType == nil {
+      return nil
+    }
+    if parameterType == typeParameter {
+      if !floatingPromiseTypeParameterAccepts(checker, typeParameter, argumentType) {
+        return nil
+      }
+      inferred = append(inferred, argumentType)
+      continue
+    }
+    for _, parameterPart := range promiseUnionParts(parameterType) {
+      for _, parameterSignature := range checker.GetSignaturesOfType(parameterPart, shimchecker.SignatureKindCall) {
+        if checker.GetReturnTypeOfSignature(parameterSignature) != typeParameter {
+          continue
+        }
+        for _, argumentPart := range promiseUnionParts(argumentType) {
+          for _, argumentSignature := range checker.GetSignaturesOfType(argumentPart, shimchecker.SignatureKindCall) {
+            if actualReturn := checker.GetReturnTypeOfSignature(argumentSignature); actualReturn != nil {
+              if !floatingPromiseTypeParameterAccepts(checker, typeParameter, actualReturn) {
+                return nil
+              }
+              inferred = append(inferred, actualReturn)
+            }
+          }
+        }
+      }
+    }
+  }
+  return inferred
+}
+
+func floatingPromiseTypeParameterAccepts(
+  checker *shimchecker.Checker,
+  typeParameter *shimchecker.Type,
+  inferred *shimchecker.Type,
+) bool {
+  if checker == nil || typeParameter == nil || inferred == nil {
+    return false
+  }
+  constraint := checker.GetBaseConstraintOfType(typeParameter)
+  return constraint == nil || constraint == typeParameter || checker.IsTypeAssignableTo(inferred, constraint)
 }
 
 func floatingPromisePropertyAccessParts(node *shimast.Node) (*shimast.Node, string, bool) {

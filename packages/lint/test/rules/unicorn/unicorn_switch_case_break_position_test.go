@@ -440,44 +440,6 @@ func TestUnicornSwitchCaseBreakPositionDeclinesUnsafeOrSemanticMoves(t *testing.
     continue; /* keep with continue */
   }
 }
-
-// TestCommandFixUnicornSwitchCaseBreakPositionConvergesAndIsIdempotent drives
-// the rule through the public `fix` dispatch twice. The first invocation must
-// produce parse-valid canonical source; the second must leave that exact byte
-// sequence untouched, proving the complete command cascade reaches a fixed
-// point instead of merely validating the rule's in-memory edits.
-func TestCommandFixUnicornSwitchCaseBreakPositionConvergesAndIsIdempotent(t *testing.T) {
-  source := `declare const key: string;
-switch (key) {
-  case "first": {
-    void key;
-  }
-  break;
-}
-`
-  expected := `declare const key: string;
-switch (key) {
-  case "first": {
-    void key;
-    break;
-  }
-}
-`
-  root := seedLintProject(t, source)
-  seedLintRules(t, root, map[string]string{switchCaseBreakPositionRule: "error"})
-  args := []string{
-    "fix",
-    "--cwd", root,
-    "--plugins-json", lintManifest(t),
-  }
-  for pass := 1; pass <= 2; pass++ {
-    code, stdout, stderr := captureCommandOutput(t, func() int { return run(args) })
-    if code != 0 || stdout != "" || stderr != "" {
-      t.Fatalf("fix pass %d mismatch: code=%d stdout=%q stderr=%q", pass, code, stdout, stderr)
-    }
-    assertFileText(t, filepath.Join(root, "src", "main.ts"), expected)
-  }
-}
 `,
     },
     {
@@ -517,5 +479,43 @@ switch (key) {
       source := "declare const key: string;\ndeclare function use(value: string): void;\n" + test.source
       assertNoFixSnapshot(t, switchCaseBreakPositionRule, source)
     })
+  }
+}
+
+// TestCommandFixUnicornSwitchCaseBreakPositionConvergesAndIsIdempotent drives
+// the rule through the public `fix` dispatch twice. The first invocation must
+// produce parse-valid canonical source; the second must leave that exact byte
+// sequence untouched, proving the complete command cascade reaches a fixed
+// point instead of merely validating the rule's in-memory edits.
+func TestCommandFixUnicornSwitchCaseBreakPositionConvergesAndIsIdempotent(t *testing.T) {
+  source := `declare const key: string;
+switch (key) {
+  case "first": {
+    void key;
+  }
+  break;
+}
+`
+  expected := `declare const key: string;
+switch (key) {
+  case "first": {
+    void key;
+    break;
+  }
+}
+`
+  root := seedLintProject(t, source)
+  seedLintRules(t, root, map[string]string{switchCaseBreakPositionRule: "error"})
+  args := []string{
+    "fix",
+    "--cwd", root,
+    "--plugins-json", lintManifest(t),
+  }
+  for pass := 1; pass <= 2; pass++ {
+    code, stdout, stderr := captureCommandOutput(t, func() int { return run(args) })
+    if code != 0 || stdout != "" || stderr != "" {
+      t.Fatalf("fix pass %d mismatch: code=%d stdout=%q stderr=%q", pass, code, stdout, stderr)
+    }
+    assertFileText(t, filepath.Join(root, "src", "main.ts"), expected)
   }
 }

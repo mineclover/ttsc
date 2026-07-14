@@ -816,9 +816,10 @@ func unicornPreventAbbreviationsBindingScope(declaration *shimast.Node) *shimast
     }
     return nil
   }
-  if declaration.Kind == shimast.KindVariableDeclaration && declaration.Parent != nil &&
-    declaration.Parent.Kind == shimast.KindVariableDeclarationList && shimast.IsVar(declaration.Parent) {
-    for scope := declaration.Parent.Parent; scope != nil; scope = scope.Parent {
+  root := unicornPreventAbbreviationsRootDeclaration(declaration)
+  if root != nil && root.Kind == shimast.KindVariableDeclaration && root.Parent != nil &&
+    root.Parent.Kind == shimast.KindVariableDeclarationList && shimast.IsVar(root.Parent) {
+    for scope := root.Parent.Parent; scope != nil; scope = scope.Parent {
       if unicornPreventAbbreviationsIsFunctionLike(scope) {
         return scope
       }
@@ -849,6 +850,16 @@ func unicornPreventAbbreviationsBindingScope(declaration *shimast.Node) *shimast
     return nil
   }
   return preferConstLexicalScope(declaration)
+}
+
+// Destructuring BindingElements inherit declaration-kind semantics from the
+// root Parameter, catch VariableDeclaration, or variable declaration.
+func unicornPreventAbbreviationsRootDeclaration(declaration *shimast.Node) *shimast.Node {
+  for declaration != nil && declaration.Kind == shimast.KindBindingElement &&
+    declaration.Parent != nil && declaration.Parent.Parent != nil {
+    declaration = declaration.Parent.Parent
+  }
+  return declaration
 }
 
 func unicornPreventAbbreviationsEnclosingParameter(declaration *shimast.Node) *shimast.Node {

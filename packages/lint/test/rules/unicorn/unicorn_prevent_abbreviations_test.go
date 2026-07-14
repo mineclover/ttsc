@@ -81,6 +81,16 @@ func TestUnicornPreventAbbreviationsUsesFunctionScopeForVarCollisions(t *testing
   )
 }
 
+func TestUnicornPreventAbbreviationsUsesFunctionScopeForDestructuredVarCollisions(t *testing.T) {
+  source := "function read(source: Record<string, number>): void {\n  if (source.first) {\n    var { first: idx } = source;\n    console.log(idx);\n  }\n  if (source.second) {\n    var { second: i } = source;\n    console.log(i);\n  }\n}\nvoid read;\n"
+  assertFixSnapshot(
+    t,
+    unicornPreventAbbreviationsRuleName,
+    source,
+    "function read(source: Record<string, number>): void {\n  if (source.first) {\n    var { first: index } = source;\n    console.log(index);\n  }\n  if (source.second) {\n    var { second: index_ } = source;\n    console.log(index_);\n  }\n}\nvoid read;\n",
+  )
+}
+
 func TestUnicornPreventAbbreviationsSeparatesGeneratedNamesInOneScope(t *testing.T) {
   source := "const idx = 0;\nconst i = 1;\nconsole.log(idx, i);\n"
   assertFixSnapshot(

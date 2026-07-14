@@ -773,6 +773,30 @@ func analyzeFloatingPromise(
   if isFloatingPromiseArray(ctx, node, t, options) {
     return floatingPromiseResult{unhandled: true, promiseArray: true}
   }
+  if node.Kind == shimast.KindArrayLiteralExpression {
+    array := node.AsArrayLiteralExpression()
+    if array != nil && array.Elements != nil {
+      for _, element := range array.Elements.Nodes {
+        element = unwrapFloatingPromiseExpression(element)
+        if element != nil && element.Kind == shimast.KindSpreadElement {
+          if spread := element.AsSpreadElement(); spread != nil {
+            element = unwrapFloatingPromiseExpression(spread.Expression)
+          }
+        }
+        if element == nil {
+          continue
+        }
+        elementType := ctx.Checker.GetTypeAtLocation(element)
+        if elementType != nil && (isFloatingPromiseType(ctx, element, elementType, options) ||
+          isFloatingPromiseArray(ctx, element, elementType, options)) {
+          return floatingPromiseResult{unhandled: true, promiseArray: true}
+        }
+        if result := analyzeFloatingPromise(ctx, element, options); result.unhandled {
+          return floatingPromiseResult{unhandled: true, promiseArray: true}
+        }
+      }
+    }
+  }
   if node.Kind == shimast.KindAwaitExpression {
     return floatingPromiseResult{}
   }

@@ -133,6 +133,9 @@ interface interfaceMerged {
 export class exported {}
 /* report */exported = replacement;
 
+export default class defaultExported {}
+/* report */defaultExported = replacement;
+
 function leftScope() {
   class same {}
   /* report */same = replacement;

@@ -112,6 +112,12 @@ namespace merged {
 }
 /* report */merged = replacement;
 
+export function exportedFunction() {}
+/* report */exportedFunction = replacement;
+
+export default function defaultExportedFunction() {}
+/* report */defaultExportedFunction = replacement;
+
 function leftScope() {
   function same() {}
   /* report */same = replacement;

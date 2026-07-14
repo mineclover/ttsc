@@ -557,13 +557,20 @@ func valueSymbolAtIdentifier(ctx *Context, identifier *shimast.Node) *shimast.Sy
 }
 
 // canonicalValueSymbol resolves an identifier in value position and
-// normalizes declaration merges to one binding identity. Rules that protect
-// declarations from writes use this for both the declaration name and every
-// modifying reference, including shorthand destructuring targets.
+// normalizes exported local/export pairs and declaration merges to one binding
+// identity. TypeScript binds an exported declaration to both a local symbol
+// (used by references in the declaring module) and its ExportSymbol (returned
+// for the declaration name), so both sides must converge before comparison.
+// Rules that protect declarations from writes use this for both the
+// declaration name and every modifying reference, including shorthand
+// destructuring targets.
 func canonicalValueSymbol(ctx *Context, identifier *shimast.Node) *shimast.Symbol {
   symbol := valueSymbolAtIdentifier(ctx, identifier)
   if symbol == nil {
     return nil
+  }
+  if symbol.Flags&shimast.SymbolFlagsExportValue != 0 && symbol.ExportSymbol != nil {
+    symbol = symbol.ExportSymbol
   }
   return ctx.Checker.GetMergedSymbol(symbol)
 }

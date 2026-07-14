@@ -1,18 +1,35 @@
 import commonjs from "@rollup/plugin-commonjs";
 import nodeResolve from "@rollup/plugin-node-resolve";
-import autoExternal from "rollup-plugin-auto-external";
-import nodeExternals from "rollup-plugin-node-externals";
+import { builtinModules, createRequire } from "node:module";
 import { globSync } from "tinyglobby";
 // `@rollup/plugin-typescript` is re-exported from the build-config package so
 // its `typescript` peer resolves to the legacy v6 compiler pinned there; native
 // TypeScript 7 drops the classic JS API the plugin needs.
 import typescript from "../../config/typescript-plugin.mjs";
 
+const manifest = createRequire(import.meta.url)("./package.json");
 const inputs = globSync("./src/**/*.ts");
-const externalPackages = ["ttsc", "@ttsc/unplugin", "unplugin"];
+
+// Externalise Node builtins, the host `ttsc` (supplied by the consuming project,
+// never bundled), and every declared dependency — including the Metro/Expo peers
+// resolved at runtime — so the published package never inlines a runtime it
+// shares with its consumer. The names come straight from package.json instead of
+// `rollup-plugin-node-externals`: that plugin's v9 calls the ES2025
+// `RegExp.escape`, so it needs Node 24 and crashes the build on Node 22. Deriving
+// the set here covers the same specifiers with no Node-version floor, and folds
+// in the old `rollup-plugin-auto-external` too.
+const externalPackages = new Set([
+  "ttsc",
+  "@ttsc/unplugin",
+  "unplugin",
+  ...Object.keys(manifest.dependencies ?? {}),
+  ...Object.keys(manifest.peerDependencies ?? {}),
+  ...Object.keys(manifest.optionalDependencies ?? {}),
+]);
 const external = (id) =>
   id.startsWith("node:") ||
-  externalPackages.some((name) => id === name || id.startsWith(`${name}/`));
+  builtinModules.includes(id) ||
+  [...externalPackages].some((name) => id === name || id.startsWith(`${name}/`));
 
 const output = (format, extension) => ({
   dir: "./lib",
@@ -34,8 +51,6 @@ export default {
   input: inputs,
   output: [output("cjs", "js"), output("esm", "mjs")],
   plugins: [
-    nodeExternals(),
-    autoExternal(),
     nodeResolve({
       extensions: [".mjs", ".js", ".json", ".ts"],
     }),

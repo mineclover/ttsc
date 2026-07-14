@@ -100,9 +100,16 @@ function assertAdapterEntrypointsSupportCjsRequire() {
 
 /**
  * Asserts that `ttsc` and `unplugin` are externalised in the built output, that
- * no virtual-module shims or workspace-relative paths are inlined, and that
- * stale dev-time externals (`diff-match-patch-es`, `magic-string`) have been
- * removed from both `rollup.config.mjs` and the built artifacts.
+ * no virtual-module shims or workspace-relative paths are inlined, that stale
+ * dev-time externals (`diff-match-patch-es`, `magic-string`) have been removed
+ * from both `rollup.config.mjs` and the built artifacts, and that the build no
+ * longer depends on `rollup-plugin-node-externals` /
+ * `rollup-plugin-auto-external`.
+ *
+ * The externals plugin's v9 calls the ES2025 `RegExp.escape`, so it requires
+ * Node 24 and crashes the rollup build on Node 22; the config now derives its
+ * external set from package.json instead. Pinning the config free of those
+ * imports keeps the build working on Node 22 and blocks the plugin's return.
  */
 function assertPackageBuildKeepsRuntimeDependenciesExternal() {
   assert.equal(
@@ -164,6 +171,19 @@ function assertPackageBuildKeepsRuntimeDependenciesExternal() {
     for (const output of [cjs, esm, cjsCore, esmCore]) {
       assert.doesNotMatch(output, pattern);
     }
+  }
+
+  for (const removedPlugin of [
+    "rollup-plugin-node-externals",
+    "rollup-plugin-auto-external",
+  ]) {
+    // Match the import statement, not a bare mention: the config comment names
+    // these plugins to explain why externals come from package.json instead.
+    assert.doesNotMatch(
+      rollupConfig,
+      new RegExp(`from ["']${escapeRegExp(removedPlugin)}["']`),
+      removedPlugin,
+    );
   }
 
   for (const output of [cjs, esm, cjsCore, esmCore]) {

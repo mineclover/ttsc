@@ -4,6 +4,7 @@ import (
   "sort"
   "strconv"
   "strings"
+  "unicode"
 
   shimast "github.com/microsoft/typescript-go/shim/ast"
   shimscanner "github.com/microsoft/typescript-go/shim/scanner"
@@ -243,11 +244,32 @@ func regexpFlagOrder(flag byte) int {
   return len(order) + int(flag)
 }
 
+// regexpHasUselessFlag decides `regexp/no-useless-flag` for the two flags whose
+// effect is visible in the pattern alone: `i` (nothing it could re-case) and `m`
+// (no `^`/`$` for it to re-anchor).
+//
+// Both questions are answered on the regexp AST from regex_tree.go rather than
+// on a byte scan. `scanRegexpPattern` never enters a character class -- correct
+// for the rules that hunt `|`, `(`, `{` outside classes, and correct for `m`
+// (`^`/`$` are literals inside a class), but fatal for `i`, because `[a-z]` is
+// exactly where the flag earns its keep.
+//
+// A literal the parser rejects yields no finding at all: the rule tells people
+// to delete a flag, so it stays silent whenever it cannot see the whole pattern.
 func regexpHasUselessFlag(parts regexpLiteralParts) bool {
-  if strings.Contains(parts.flags, "i") && !regexpPatternHasAsciiLetter(parts.pattern) {
+  ignoreCase := strings.Contains(parts.flags, "i")
+  multiline := strings.Contains(parts.flags, "m")
+  if !ignoreCase && !multiline {
+    return false
+  }
+  parsed, err := regexParseLiteral(parts.raw)
+  if err != nil {
+    return false
+  }
+  if ignoreCase && !regexpNodeIsCaseVariant(parsed.Body, strings.ContainsAny(parts.flags, "uv")) {
     return true
   }
-  if strings.Contains(parts.flags, "m") && !regexpPatternHasLineAnchor(parts.pattern) {
+  if multiline && !regexpNodeHasLineAnchor(parsed.Body) {
     return true
   }
   return false
@@ -403,17 +425,163 @@ func classHasRange(content string) bool {
   return false
 }
 
-func regexpPatternHasAsciiLetter(pattern string) bool {
-  return scanRegexpPattern(pattern, func(pattern string, i int) bool {
-    ch := pattern[i]
-    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
-  })
+// regexpCaseFoldScanLimit bounds the fold scan of a single character range.
+// The scan exists to prove a range case-*invariant*, so refusing to walk an
+// unbounded one costs at most a missed report, never a wrong one. Every script
+// block that carries cased letters is orders of magnitude narrower than this.
+const regexpCaseFoldScanLimit = 0x20000
+
+// regexpNodeIsCaseVariant reports whether toggling the `i` flag can change what
+// the node matches.
+//
+// Mirrors eslint-plugin-regexp's `isCaseVariant(pattern, flags, false)`, which
+// judges a character class element by element rather than as a whole set: an
+// element that the flag widens keeps the flag alive even when the class already
+// spells both cases out, so `/[a-zA-Z]/i` is case-variant.
+//
+// The analysis is one-sided. Every construct it cannot settle from the AST --
+// a Unicode property escape, a `v`-mode set-notation class, a range too wide to
+// fold-scan, an unmodeled node -- counts as case-variant, so the rule stays
+// quiet rather than order a load-bearing flag deleted. Backreferences are
+// case-variant for a real reason and not merely out of caution: `i` makes the
+// backreference comparison itself case-insensitive, so `/(.)\1/i` matches "aA"
+// while `/(.)\1/` does not, without a single letter in the source.
+func regexpNodeIsCaseVariant(node regexNode, unicodeMode bool) bool {
+  switch n := node.(type) {
+  case nil:
+    return false
+  case *regexCharNode:
+    return regexpCharIsCaseVariant(n, unicodeMode)
+  case *regexClassRangeNode:
+    return regexpClassRangeIsCaseVariant(n, unicodeMode)
+  case *regexClassNode:
+    for _, expression := range n.Expressions {
+      if regexpNodeIsCaseVariant(expression, unicodeMode) {
+        return true
+      }
+    }
+    return false
+  case *regexAlternativeNode:
+    for _, expression := range n.Expressions {
+      if regexpNodeIsCaseVariant(expression, unicodeMode) {
+        return true
+      }
+    }
+    return false
+  case *regexDisjunctionNode:
+    return regexpNodeIsCaseVariant(n.Left, unicodeMode) ||
+      regexpNodeIsCaseVariant(n.Right, unicodeMode)
+  case *regexGroupNode:
+    // A group name is never matched against the input, so `/(?<year>\d{4})/i`
+    // stays case-invariant despite the letters in `year`.
+    return regexpNodeIsCaseVariant(n.Expression, unicodeMode)
+  case *regexRepetitionNode:
+    return regexpNodeIsCaseVariant(n.Expression, unicodeMode)
+  case *regexAssertionNode:
+    switch n.Kind {
+    case "^", "$":
+      return false
+    case "\\b", "\\B":
+      // Word boundaries are defined in terms of `\w`, which grows by U+017F and
+      // U+212A under `iu`/`iv`.
+      return unicodeMode
+    }
+    return regexpNodeIsCaseVariant(n.Assertion, unicodeMode)
+  }
+  return true
 }
 
-func regexpPatternHasLineAnchor(pattern string) bool {
-  return scanRegexpPattern(pattern, func(pattern string, i int) bool {
-    return pattern[i] == '^' || pattern[i] == '$'
-  })
+// regexpCharIsCaseVariant reports whether the `i` flag widens what a single
+// character node matches.
+func regexpCharIsCaseVariant(char *regexCharNode, unicodeMode bool) bool {
+  if !char.codePointIsNaN() {
+    return regexpRuneIsCaseVariant(rune(char.CodePoint))
+  }
+  switch char.Kind {
+  case "meta":
+    switch char.Value {
+    case "\\w", "\\W":
+      // `\w` is the one character set the flag moves: in Unicode mode
+      // Canonicalize folds U+017F and U+212A onto `s` and `k`, so they join the
+      // word characters (and leave `\W`).
+      return unicodeMode
+    case "\\d", "\\D", "\\s", "\\S", ".", "\\b":
+      return false
+    }
+  case "decimal":
+    // Annex B `\8` and `\9` match the bare digits.
+    return false
+  case "control":
+    // `\cX` is a control code point, but a dangling `\c` matches the two
+    // characters `\` and `c`, and that `c` re-cases.
+    return char.Value == "\\c"
+  }
+  return true
+}
+
+// regexpClassRangeIsCaseVariant reports whether the `i` flag widens a character
+// class range. A range is case-variant as soon as it contains one code point
+// with a case-folded counterpart, because that counterpart may sit outside the
+// range.
+func regexpClassRangeIsCaseVariant(node *regexClassRangeNode, unicodeMode bool) bool {
+  if node.From == nil || node.To == nil {
+    return true
+  }
+  if node.From.codePointIsNaN() || node.To.codePointIsNaN() {
+    // Annex B reads `[\d-z]` as three independent members while the AST still
+    // models it as a range, so judge the two ends on their own.
+    return regexpCharIsCaseVariant(node.From, unicodeMode) ||
+      regexpCharIsCaseVariant(node.To, unicodeMode)
+  }
+  low, high := rune(node.From.CodePoint), rune(node.To.CodePoint)
+  if low > high || high-low >= regexpCaseFoldScanLimit {
+    return true
+  }
+  for r := low; r <= high; r++ {
+    if regexpRuneIsCaseVariant(r) {
+      return true
+    }
+  }
+  return false
+}
+
+// regexpRuneIsCaseVariant reports whether a code point has any case-folded
+// counterpart.
+//
+// unicode.SimpleFold walks the simple case-folding orbit, which is exactly the
+// equivalence class ECMAScript's Canonicalize builds in `u`/`v` mode. Legacy
+// mode canonicalizes more narrowly -- it keeps U+017F, U+212A and U+00DF apart
+// from their ASCII or uppercase partners -- so there the orbit is a superset,
+// and the rule at worst keeps quiet about a flag it could have reported.
+func regexpRuneIsCaseVariant(r rune) bool {
+  return unicode.SimpleFold(r) != r
+}
+
+// regexpNodeHasLineAnchor reports whether the pattern contains a `^` or `$`
+// assertion, the only thing the `m` flag re-defines. Character classes are not
+// descended into: `^` and `$` are literal characters in there.
+func regexpNodeHasLineAnchor(node regexNode) bool {
+  switch n := node.(type) {
+  case *regexAssertionNode:
+    if n.Kind == "^" || n.Kind == "$" {
+      return true
+    }
+    return regexpNodeHasLineAnchor(n.Assertion)
+  case *regexAlternativeNode:
+    for _, expression := range n.Expressions {
+      if regexpNodeHasLineAnchor(expression) {
+        return true
+      }
+    }
+    return false
+  case *regexDisjunctionNode:
+    return regexpNodeHasLineAnchor(n.Left) || regexpNodeHasLineAnchor(n.Right)
+  case *regexGroupNode:
+    return regexpNodeHasLineAnchor(n.Expression)
+  case *regexRepetitionNode:
+    return regexpNodeHasLineAnchor(n.Expression)
+  }
+  return false
 }
 
 func init() {

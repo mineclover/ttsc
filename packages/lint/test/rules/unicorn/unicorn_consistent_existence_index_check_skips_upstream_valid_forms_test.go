@@ -28,6 +28,7 @@ func TestUnicornConsistentExistenceIndexCheckSkipsUpstreamValidForms(t *testing.
 declare const collection: { indexOf(value: number): number };
 declare const table: Record<string, (value: number) => number>;
 declare const holder: { indexOf: number };
+declare const nested: { list: { indexOf(value: number): number } };
 declare function indexOf(value: number): number;
 declare function compute(): number;
 declare function consume(value: number): void;
@@ -55,11 +56,14 @@ void (standalone < 0);
 const property = holder.indexOf;
 void (property >= 0);
 
-// Optional chains are ChainExpressions upstream, which never match.
+// Optional chains are ChainExpressions upstream, which never match — including
+// when the ` + "`?.`" + ` sits earlier in the chain than the index call itself.
 const optionalMember = collection?.indexOf(5);
 void (optionalMember < 0);
 const optionalCall = collection.indexOf?.(6);
 void (optionalCall >= 0);
+const optionalRoot = nested?.list.indexOf(19);
+void (optionalRoot < 0);
 
 // A private-name method is not an Identifier property.
 class PrivateIndex {

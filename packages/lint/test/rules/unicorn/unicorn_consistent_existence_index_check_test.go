@@ -44,6 +44,12 @@ func unicornConsistentExistenceIndexCheckMarkedRanges(t *testing.T, source strin
 // locks both the binding resolution and the operator/value table — a name-only
 // match or a missing operator arm would show up here immediately.
 //
+// The initializer arms matter as much: a non-null-asserted receiver and a
+// parenthesis-capped optional chain are both plain method calls upstream (the
+// `!` is transparent, and the parens end the ChainExpression before the call),
+// so they must still report — the negative twin, an uncapped `a?.b.indexOf(x)`,
+// lives in the skips case.
+//
 //  1. Enable unicorn/consistent-existence-index-check on one type-clean source
 //     that stacks every upstream-invalid form.
 //  2. Mark the expected `<operator> <right>` span of each with `/*<*/ … /*>*/`.
@@ -63,6 +69,7 @@ declare const collection: {
   findIndex(predicate: (value: number) => boolean): number;
   findLastIndex(predicate: (value: number) => boolean): number;
 };
+declare const nested: { list: { indexOf(value: number): number } };
 declare function predicate(value: number): boolean;
 
 const lessThanZero = array.indexOf(1);
@@ -97,7 +104,13 @@ void (compared /*<*/>= 0/*>*/);
 const parenthesized = array.indexOf(7);
 void ((parenthesized) /*<*/< 0/*>*/);
 
-export const exported = array.indexOf(8);
+const asserted = array!.indexOf(8);
+void (asserted /*<*/< 0/*>*/);
+
+const cappedChain = (nested?.list).indexOf(9);
+void (cappedChain /*<*/>= 0/*>*/);
+
+export const exported = array.indexOf(10);
 void (exported /*<*/>= 0/*>*/);
 `
 
@@ -119,6 +132,8 @@ void (exported /*<*/>= 0/*>*/);
     {originalOperator: "<", originalValue: "0", operator: "==="},
     {originalOperator: ">=", originalValue: "0", operator: "!=="},
     {originalOperator: "<", originalValue: "0", operator: "==="},
+    {originalOperator: "<", originalValue: "0", operator: "==="},
+    {originalOperator: ">=", originalValue: "0", operator: "!=="},
     {originalOperator: ">=", originalValue: "0", operator: "!=="},
   }
 

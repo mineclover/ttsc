@@ -45,6 +45,14 @@ Found 3 errors in the same file, starting at: src/index.ts:3
 
 Type errors (`TS2322`) and lint violations (`TS17397`, `TS11966`) come out together. No second tool, no second CI step.
 
+## Diagnostic code compatibility
+
+Every built-in rule has a unique positive numeric code in the reserved `TS9000` through `TS17999` band. These assignments are kept in an append-only ledger: adding a built-in rule does not renumber existing rules, and a removed rule's code is not reused. The LSP surface continues to expose the rule ID, such as `no-var`, in its diagnostic `code` field.
+
+The ledger introduction preserved every legacy code that was already unique. For each pre-existing collision group, the alphabetically first rule kept the shared legacy code and every other rule received an available code. Those resolved assignments are now frozen by the same append-only policy.
+
+Rules contributed by another Go package share the same collision-free band. Their codes are deterministic for an unchanged complete set of loaded contributors and do not depend on registration order. Adding or removing a contributor recomputes assignments for that complete contributor set and can change contributor codes, but never changes a built-in assignment.
+
 ## Setup
 
 ```bash

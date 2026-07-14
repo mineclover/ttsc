@@ -43,7 +43,7 @@ func TestLSPFormatPathsUseDefaultsWithoutFormatBlock(t *testing.T) {
 // the project-wide CLI must use only the top-level value. Every value is
 // deliberately non-default so neither path can pass by skipping settings.
 func TestLSPFormatPathsUseEditorLanguageOverrides(t *testing.T) {
-  source := "function outer() {\n    const value = 1\n}\n"
+  source := "function outer() {\n     const value = 1\n}\n"
   root := seedLintProject(t, source)
   writeFile(t, filepath.Join(root, ".vscode", "settings.json"), `{
   "editor.tabSize": 3,

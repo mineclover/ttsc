@@ -113,6 +113,38 @@ const value = 1;
   }
 }
 
+// TestContributorRangeFixBoundsDiagnosticIndependentlyFromEdit pins the
+// public fix-reporting adapter. A malformed diagnostic span must be bounded
+// without shifting or discarding an otherwise valid candidate edit; the two
+// ranges have separate contracts and consumers.
+func TestContributorRangeFixBoundsDiagnosticIndependentlyFromEdit(t *testing.T) {
+  file := parseTSFile(t, "/virtual/range-fix.ts", "const value = 1;\n")
+  contributor := &boundedDiagnosticRangeContributor{
+    spans:   map[string][2]int{file.FileName(): {999, -5}},
+    fixFile: file.FileName(),
+  }
+  metadata, err := inspectContributor(contributor)
+  if err != nil {
+    t.Fatal(err)
+  }
+  Register(newContributorAdapter(metadata))
+  t.Cleanup(func() { delete(registered.rules, contributor.Name()) })
+
+  findings := NewEngine(RuleConfig{contributor.Name(): SeverityError}).
+    Run([]*shimast.SourceFile{file}, nil)
+  if got, want := len(findings), 1; got != want {
+    t.Fatalf("findings = %d, want %d: %+v", got, want, findings)
+  }
+  finding := findings[0]
+  sourceLen := len(file.Text())
+  if got, want := [2]int{finding.Pos, finding.End}, [2]int{sourceLen, sourceLen}; got != want {
+    t.Fatalf("diagnostic range = %v, want EOF %v", got, want)
+  }
+  if got, want := finding.Fix, []TextEdit{{Pos: 0, End: 5, Text: "let"}}; len(got) != len(want) || got[0] != want[0] {
+    t.Fatalf("candidate edit = %+v, want %+v", got, want)
+  }
+}
+
 // TestRangeSuggestionFindingUsesCanonicalBounds covers the internal
 // suggestion-only reporting surface, which does not pass through the public
 // contributor ReportRange method but feeds the same LSP diagnostic pipeline.
@@ -171,7 +203,8 @@ func TestNodeReportBoundsBeforeSkippingTrivia(t *testing.T) {
 }
 
 type boundedDiagnosticRangeContributor struct {
-  spans map[string][2]int
+  spans   map[string][2]int
+  fixFile string
 }
 
 func (*boundedDiagnosticRangeContributor) Name() string {
@@ -182,6 +215,14 @@ func (*boundedDiagnosticRangeContributor) Visits() []shimast.Kind {
 }
 func (r *boundedDiagnosticRangeContributor) Check(ctx *publicrule.Context, _ *shimast.Node) {
   span := r.spans[ctx.File.FileName()]
+  if ctx.File.FileName() == r.fixFile {
+    ctx.ReportRangeFix(span[0], span[1], "explicit contributor range", publicrule.TextEdit{
+      Pos:  0,
+      End:  5,
+      Text: "let",
+    })
+    return
+  }
   ctx.ReportRange(span[0], span[1], "explicit contributor range")
 }
 

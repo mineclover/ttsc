@@ -1634,6 +1634,7 @@ func floatingPromiseTypeContainsAnyTypeParameter(
     }
     for _, indexInfo := range checker.GetIndexInfosOfType(t) {
       if indexInfo == nil ||
+        floatingPromiseTypeContainsAnyTypeParameter(checker, indexInfo.KeyType(), typeParameters, location, visited) ||
         floatingPromiseTypeContainsAnyTypeParameter(checker, indexInfo.ValueType(), typeParameters, location, visited) {
         return true
       }

@@ -29,10 +29,9 @@ type unicornConsistentFunctionScopingOptions struct {
 }
 
 type unicornConsistentFunctionScopingAnalysis struct {
-  ctx                    *Context
-  declarationIdentifiers map[*shimast.Node]struct{}
-  referencesBySymbol     map[*shimast.Symbol][]*shimast.Node
-  unresolvedPrivate      []*shimast.Node
+  ctx                *Context
+  referencesBySymbol map[*shimast.Symbol][]*shimast.Node
+  unresolvedPrivate  []*shimast.Node
 }
 
 type unicornConsistentFunctionScopingScopeSet struct {
@@ -126,18 +125,9 @@ func newUnicornConsistentFunctionScopingAnalysis(
   source *shimast.Node,
 ) *unicornConsistentFunctionScopingAnalysis {
   analysis := &unicornConsistentFunctionScopingAnalysis{
-    ctx:                    ctx,
-    declarationIdentifiers: make(map[*shimast.Node]struct{}),
-    referencesBySymbol:     make(map[*shimast.Symbol][]*shimast.Node),
+    ctx:                ctx,
+    referencesBySymbol: make(map[*shimast.Symbol][]*shimast.Node),
   }
-  walkDescendants(source, func(node *shimast.Node) {
-    if node.Kind == shimast.KindShorthandPropertyAssignment {
-      return
-    }
-    for _, identifier := range unicornConsistentFunctionScopingNamedIdentifiers(node.Name()) {
-      analysis.declarationIdentifiers[identifier] = struct{}{}
-    }
-  })
   walkDescendants(source, func(node *shimast.Node) {
     if !analysis.isReference(node) {
       return
@@ -149,22 +139,12 @@ func newUnicornConsistentFunctionScopingAnalysis(
       }
       return
     }
+    if unicornConsistentFunctionScopingIsDeclarationName(node, symbol) {
+      return
+    }
     analysis.referencesBySymbol[symbol] = append(analysis.referencesBySymbol[symbol], node)
   })
   return analysis
-}
-
-func unicornConsistentFunctionScopingNamedIdentifiers(name *shimast.Node) []*shimast.Node {
-  if name == nil {
-    return nil
-  }
-  switch name.Kind {
-  case shimast.KindIdentifier:
-    return []*shimast.Node{name}
-  case shimast.KindObjectBindingPattern, shimast.KindArrayBindingPattern:
-    return bindingIdentifierNodes(name)
-  }
-  return nil
 }
 
 func (analysis *unicornConsistentFunctionScopingAnalysis) isReference(node *shimast.Node) bool {
@@ -176,9 +156,6 @@ func (analysis *unicornConsistentFunctionScopingAnalysis) isReference(node *shim
     return !unicornConsistentFunctionScopingIsPrivateDeclaration(node)
   case shimast.KindIdentifier:
   default:
-    return false
-  }
-  if _, declaration := analysis.declarationIdentifiers[node]; declaration {
     return false
   }
   if !unicornConsistentFunctionScopingIsSemanticReferenceIdentifier(node) {
@@ -199,14 +176,59 @@ func (analysis *unicornConsistentFunctionScopingAnalysis) isReference(node *shim
 // already handles qualified-name property slots; only a simple TypeReference's
 // TypeName needs to be admitted explicitly.
 func unicornConsistentFunctionScopingIsSemanticReferenceIdentifier(node *shimast.Node) bool {
+  if node == nil || node.Parent == nil {
+    return node != nil
+  }
+  parent := node.Parent
+  switch parent.Kind {
+  case shimast.KindJsxOpeningElement,
+    shimast.KindJsxSelfClosingElement,
+    shimast.KindJsxClosingElement:
+    if parent.TagName() == node && shimscanner.IsIntrinsicJsxName(identifierText(node)) {
+      return false
+    }
+  case shimast.KindJsxAttribute,
+    shimast.KindNamedTupleMember,
+    shimast.KindImportAttribute,
+    shimast.KindNamespaceExport,
+    shimast.KindNamespaceExportDeclaration,
+    shimast.KindMetaProperty:
+    if parent.Name() == node {
+      return false
+    }
+  case shimast.KindJsxNamespacedName:
+    return false
+  }
   if isValueReferenceIdentifier(node) {
     return true
   }
-  if node == nil || node.Parent == nil || node.Parent.Kind != shimast.KindTypeReference {
+  if parent.Kind != shimast.KindTypeReference {
     return false
   }
-  reference := node.Parent.AsTypeReferenceNode()
+  reference := parent.AsTypeReferenceNode()
   return reference != nil && reference.TypeName == node
+}
+
+// Checker symbols are the complete declaration oracle. Comparing against
+// their declaration-name nodes avoids maintaining a brittle syntax-kind list
+// while keeping JSX component tag uses distinct from the declarations they
+// resolve to.
+func unicornConsistentFunctionScopingIsDeclarationName(
+  node *shimast.Node,
+  symbol *shimast.Symbol,
+) bool {
+  if node == nil || symbol == nil {
+    return false
+  }
+  if declaration := symbol.ValueDeclaration; declaration != nil && declaration.Name() == node {
+    return true
+  }
+  for _, declaration := range symbol.Declarations {
+    if declaration != nil && declaration.Name() == node {
+      return true
+    }
+  }
+  return false
 }
 
 func unicornConsistentFunctionScopingIsPrivateDeclaration(node *shimast.Node) bool {

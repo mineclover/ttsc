@@ -71,6 +71,33 @@ void outer;
   assertRuleSkipsSource(t, unicornConsistentFunctionScopingRuleName, source)
 }
 
+func TestUnicornConsistentFunctionScopingResolvesJSXComponentCaptures(t *testing.T) {
+  source := `declare namespace JSX {
+  interface Element {}
+  interface IntrinsicElements { section: {}; }
+}
+function capturesComponent(Component: () => JSX.Element): () => JSX.Element {
+  function render(): JSX.Element { return <Component />; }
+  return render;
+}
+function ignoresIntrinsicTag(): () => JSX.Element {
+  function movable(): JSX.Element { return <section />; }
+  return movable;
+}
+void [capturesComponent, ignoresIntrinsicTag];
+`
+  _, _, findings := runRuleFindingsSnapshotFile(
+    t,
+    unicornConsistentFunctionScopingRuleName,
+    "main.tsx",
+    source,
+    nil,
+  )
+  if len(findings) != 1 || findings[0].Message != "Move function 'movable' to the outer scope." {
+    t.Fatalf("JSX reference analysis mismatch: %+v", findings)
+  }
+}
+
 func TestUnicornConsistentFunctionScopingChecksArrowLexicalEnvironment(t *testing.T) {
   source := `function outer(value: number): void {
   const movable = (input: number): number => input + 1;

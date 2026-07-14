@@ -1195,7 +1195,7 @@ func floatingPromiseSignatureApplicability(
     if argument.Kind == shimast.KindSpreadElement {
       return floatingPromiseCallUncertain
     }
-    if floatingPromiseExpressionNeedsCandidateContext(argument) {
+    if floatingPromiseExpressionNeedsCandidateContext(checker, argument) {
       return floatingPromiseCallUncertain
     }
     parameterType := floatingPromiseParameterType(checker, call, signature, index)
@@ -1354,7 +1354,7 @@ func floatingPromiseGenericArgumentApplicability(
   explicit []*shimchecker.Type,
   inferred map[*shimchecker.Type][]*shimchecker.Type,
 ) floatingPromiseCallApplicability {
-  if floatingPromiseExpressionNeedsCandidateContext(argument) {
+  if floatingPromiseExpressionNeedsCandidateContext(checker, argument) {
     return floatingPromiseCallUncertain
   }
   argumentType := checker.GetTypeAtLocation(argument)
@@ -1538,7 +1538,7 @@ func floatingPromiseCallableArgumentApplicability(
     return floatingPromiseCallUncertain
   }
   implicitReturn := floatingPromiseFunctionHasImplicitReturnType(argument)
-  returnNeedsContext := floatingPromiseFunctionReturnNeedsCandidateContext(argument)
+  returnNeedsContext := floatingPromiseFunctionReturnNeedsCandidateContext(checker, argument)
   if typeParameterIndex := floatingPromiseTypeParameterIndex(typeParameters, expectedReturn); typeParameterIndex >= 0 {
     typeParameter := typeParameters[typeParameterIndex]
     if explicitType := explicit[typeParameterIndex]; explicitType != nil {
@@ -1761,10 +1761,14 @@ func floatingPromiseFunctionArgument(node *shimast.Node) bool {
 // whose type or validity can change when TypeScript rechecks them against an
 // overload parameter. Checker.IsContextSensitive has a narrower purpose: it
 // tracks nested untyped functions for inference and therefore returns false for
-// ordinary object and array literals. Treat those literals and the expression
-// forms that propagate an outer context as uncertain instead of comparing a
-// type cached under the canonical call's different overload.
-func floatingPromiseExpressionNeedsCandidateContext(node *shimast.Node) bool {
+// ordinary object and array literals. Candidate context also flows through
+// await/non-null wrappers, template expressions, and generic call return
+// inference. Treat those paths as uncertain instead of comparing a type cached
+// under the canonical call's different overload.
+func floatingPromiseExpressionNeedsCandidateContext(
+  checker *shimchecker.Checker,
+  node *shimast.Node,
+) bool {
   node = unwrapFloatingPromiseExpression(node)
   if node == nil {
     return true
@@ -1772,8 +1776,17 @@ func floatingPromiseExpressionNeedsCandidateContext(node *shimast.Node) bool {
   switch node.Kind {
   case shimast.KindObjectLiteralExpression,
     shimast.KindArrayLiteralExpression,
-    shimast.KindConditionalExpression:
+    shimast.KindConditionalExpression,
+    shimast.KindTemplateExpression:
     return true
+  case shimast.KindAwaitExpression,
+    shimast.KindNonNullExpression,
+    shimast.KindYieldExpression:
+    return floatingPromiseExpressionChildNeedsCandidateContext(checker, node.Expression())
+  case shimast.KindCallExpression,
+    shimast.KindNewExpression,
+    shimast.KindTaggedTemplateExpression:
+    return floatingPromiseCallNeedsCandidateContext(checker, node)
   case shimast.KindBinaryExpression:
     binary := node.AsBinaryExpression()
     if binary == nil || binary.OperatorToken == nil {
@@ -1790,12 +1803,72 @@ func floatingPromiseExpressionNeedsCandidateContext(node *shimast.Node) bool {
   return false
 }
 
+func floatingPromiseExpressionChildNeedsCandidateContext(
+  checker *shimchecker.Checker,
+  node *shimast.Node,
+) bool {
+  node = unwrapFloatingPromiseExpression(node)
+  return floatingPromiseFunctionArgument(node) ||
+    floatingPromiseExpressionNeedsCandidateContext(checker, node)
+}
+
+func floatingPromiseCallNeedsCandidateContext(
+  checker *shimchecker.Checker,
+  node *shimast.Node,
+) bool {
+  if checker == nil || node == nil {
+    return true
+  }
+  var callee *shimast.Node
+  if node.Kind == shimast.KindTaggedTemplateExpression {
+    tagged := node.AsTaggedTemplateExpression()
+    if tagged != nil {
+      callee = tagged.Tag
+    }
+  } else {
+    callee = node.Expression()
+  }
+  if callee == nil {
+    return true
+  }
+  calleeType := checker.GetTypeAtLocation(callee)
+  if calleeType == nil {
+    return true
+  }
+  signatureKind := shimchecker.SignatureKindCall
+  if node.Kind == shimast.KindNewExpression {
+    signatureKind = shimchecker.SignatureKindConstruct
+  }
+  sawSignature := false
+  for _, part := range promiseUnionParts(calleeType) {
+    apparent := checker.GetApparentType(part)
+    if apparent == nil {
+      return true
+    }
+    for _, signature := range checker.GetSignaturesOfType(apparent, signatureKind) {
+      if signature == nil {
+        return true
+      }
+      sawSignature = true
+      target := signature.Target()
+      if len(signature.TypeParameters()) != 0 ||
+        target != nil && len(target.TypeParameters()) != 0 {
+        return true
+      }
+    }
+  }
+  return !sawSignature
+}
+
 func floatingPromiseFunctionHasImplicitReturnType(node *shimast.Node) bool {
   node = unwrapFloatingPromiseExpression(node)
   return floatingPromiseFunctionArgument(node) && node.Type() == nil
 }
 
-func floatingPromiseFunctionReturnNeedsCandidateContext(node *shimast.Node) bool {
+func floatingPromiseFunctionReturnNeedsCandidateContext(
+  checker *shimchecker.Checker,
+  node *shimast.Node,
+) bool {
   node = unwrapFloatingPromiseExpression(node)
   if !floatingPromiseFunctionHasImplicitReturnType(node) {
     return false
@@ -1811,7 +1884,7 @@ func floatingPromiseFunctionReturnNeedsCandidateContext(node *shimast.Node) bool
     return true
   }
   if body.Kind != shimast.KindBlock {
-    return floatingPromiseExpressionNeedsCandidateContext(body)
+    return floatingPromiseExpressionNeedsCandidateContext(checker, body)
   }
   needsContext := false
   walkConsistentReturnBody(body, func(statement *shimast.Node) {
@@ -1819,7 +1892,7 @@ func floatingPromiseFunctionReturnNeedsCandidateContext(node *shimast.Node) bool
       return
     }
     if expression := statement.Expression(); expression != nil &&
-      floatingPromiseExpressionNeedsCandidateContext(expression) {
+      floatingPromiseExpressionNeedsCandidateContext(checker, expression) {
       needsContext = true
     }
   })

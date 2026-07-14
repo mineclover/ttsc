@@ -14,9 +14,9 @@ import (
 // contextually type the same literal differently.
 //
 // Checker.IsContextSensitive intentionally tracks nested untyped functions,
-// not every expression affected by contextual typing. Plain arrays, objects,
-// and annotated callbacks returning them must therefore remain uncertain in
-// both concrete and generic candidate proofs.
+// not every expression affected by contextual typing. Plain literals, wrapper
+// expressions, annotated callback returns, and generic calls with contextual
+// return inference must therefore remain uncertain in candidate proofs.
 func TestNoFloatingPromisesPreservesCandidateContextLiterals(t *testing.T) {
   root := t.TempDir()
   writeFile(t, filepath.Join(root, "tsconfig.json"), `{
@@ -28,7 +28,7 @@ func TestNoFloatingPromisesPreservesCandidateContextLiterals(t *testing.T) {
   "files": ["main.ts"]
 }
 `)
-  writeFile(t, filepath.Join(root, "main.ts"), `interface ArrayCandidate {
+  source := `interface ArrayCandidate {
   then(value: [1, 2], onRejected: () => void): Promise<void>;
   then(value: number[], onRejected: () => void): undefined;
 }
@@ -44,19 +44,40 @@ interface GenericCallbackCandidate {
   catch<T = undefined>(onRejected: (reason: unknown) => { kind: "narrow" }): Promise<void>;
   catch<T = undefined>(onRejected: (reason: unknown) => { kind: string }): undefined;
 }
+interface TemplateCandidate {
+  then(value: __BACKTICK__item-${number}__BACKTICK__, onRejected: () => void): Promise<void>;
+  then(value: string, onRejected: () => void): undefined;
+}
+interface GenericTemplateCandidate {
+  then<T = undefined>(value: __BACKTICK__item-${number}__BACKTICK__, onRejected: () => T): Promise<void>;
+  then<T = undefined>(value: string, onRejected: () => T): undefined;
+}
 declare const arrayCandidate: ArrayCandidate;
 declare const genericArrayCandidate: GenericArrayCandidate;
 declare const callbackCandidate: CallbackCandidate;
 declare const genericCallbackCandidate: GenericCallbackCandidate;
+declare const templateCandidate: TemplateCandidate;
+declare const genericTemplateCandidate: GenericTemplateCandidate;
 arrayCandidate.then([1, 2], () => undefined);
 genericArrayCandidate.then([1, 2], () => undefined);
 callbackCandidate.catch((reason: unknown): { kind: "narrow" } => ({ kind: "narrow" }));
 genericCallbackCandidate.catch((reason: unknown): { kind: "narrow" } => ({ kind: "narrow" }));
+templateCandidate.then(__BACKTICK__item-${1 as number}__BACKTICK__, () => undefined);
+genericTemplateCandidate.then(__BACKTICK__item-${1 as number}__BACKTICK__, () => undefined);
 declare function contextualArray(value: number[], onRejected: () => undefined): void;
 declare function contextualCallback(onRejected: (reason: unknown) => { kind: string }): void;
+declare function contextualString(value: string, onRejected: () => undefined): void;
+declare function contextualValue<T>(): T;
 contextualArray([1, 2], () => undefined);
 contextualCallback((reason: unknown) => ({ kind: "narrow" }));
-`)
+async function candidateContextWrappers(): Promise<void> {
+  contextualArray(await [1, 2], () => undefined);
+  contextualArray(([1, 2])!, () => undefined);
+  contextualArray(contextualValue(), () => undefined);
+  contextualString(__BACKTICK__item-${1 as number}__BACKTICK__, () => undefined);
+}
+`
+  writeFile(t, filepath.Join(root, "main.ts"), strings.ReplaceAll(source, "__BACKTICK__", "`"))
 
   prog, diags, err := loadProgram(root, "tsconfig.json", loadProgramOptions{
     needsRuleChecker: true,
@@ -125,6 +146,15 @@ contextualCallback((reason: unknown) => ({ kind: "narrow" }));
     t.Fatalf("canonical array type = %q, want number[]", got)
   }
 
+  genericCall := callAt("contextualArray(contextualValue()")
+  if genericCall.Arguments == nil || len(genericCall.Arguments.Nodes) != 2 {
+    t.Fatal("contextual generic-call fixture does not have two arguments")
+  }
+  genericCallType := prog.checker.GetTypeAtLocation(genericCall.Arguments.Nodes[0])
+  if genericCallType == nil || prog.checker.TypeToString(genericCallType) != "number[]" {
+    t.Fatal("canonical generic call did not infer the broad contextual return")
+  }
+
   contextualCallback := callAt("contextualCallback((reason: unknown)")
   if contextualCallback.Arguments == nil || len(contextualCallback.Arguments.Nodes) != 1 {
     t.Fatal("contextual callback fixture does not have one argument")
@@ -158,6 +188,31 @@ contextualCallback((reason: unknown) => ({ kind: "narrow" }));
       name:       "generic callback return",
       call:       contextualCallback,
       signatures: signaturesAt(callAt("genericCallbackCandidate.catch"), "catch"),
+    },
+    {
+      name:       "await wrapper",
+      call:       callAt("contextualArray(await"),
+      signatures: signaturesAt(callAt("arrayCandidate.then"), "then"),
+    },
+    {
+      name:       "non-null wrapper",
+      call:       callAt("contextualArray(([1, 2])!"),
+      signatures: signaturesAt(callAt("genericArrayCandidate.then"), "then"),
+    },
+    {
+      name:       "generic call return",
+      call:       genericCall,
+      signatures: signaturesAt(callAt("arrayCandidate.then"), "then"),
+    },
+    {
+      name:       "template expression",
+      call:       callAt("contextualString(`item-${1 as number}`"),
+      signatures: signaturesAt(callAt("templateCandidate.then"), "then"),
+    },
+    {
+      name:       "generic template expression",
+      call:       callAt("contextualString(`item-${1 as number}`"),
+      signatures: signaturesAt(callAt("genericTemplateCandidate.then"), "then"),
     },
   }
   ctx := &Context{File: file, Checker: prog.checker, CurrentDirectory: root}

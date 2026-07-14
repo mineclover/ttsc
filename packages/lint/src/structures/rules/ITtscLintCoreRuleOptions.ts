@@ -86,8 +86,8 @@ export interface ITtscLintCoreNoUnusedExpressionsRuleOptions {
 /** Object option for ESLint's canonical `no-inner-declarations` tuple. */
 export interface ITtscLintCoreNoInnerDeclarationsRuleOptions {
   /**
-   * Allow ES2015 block-scoped function declarations in strict scripts,
-   * modules, and class code, or report them as a style policy.
+   * Allow ES2015 block-scoped function declarations in strict scripts and
+   * function bodies, modules, and class code, or report them as a style policy.
    *
    * @default "allow"
    */

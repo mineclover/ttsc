@@ -1444,7 +1444,7 @@ x = 5;
 
 ### `no-inner-declarations`
 
-By default, reject function declarations in nested blocks when the surrounding script is sloppy and legacy function-hoisting semantics apply. Strict scripts, ECMAScript modules, and class code use ES2015 block-scoped functions and are allowed by default.
+By default, reject function declarations in nested blocks when the enclosing code is sloppy and legacy function-hoisting semantics apply. Strict scripts and function bodies, ECMAScript modules, and class code use ES2015 block-scoped functions and are allowed by default.
 
 Use the canonical `"both"` positional mode to check nested `var` declarations too. Set `blockScopedFunctions` to `"disallow"` when strict block functions should be rejected as a style policy:
 

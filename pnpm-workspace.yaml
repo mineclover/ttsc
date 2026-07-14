@@ -15,8 +15,6 @@ catalogs:
     '@rollup/plugin-commonjs': ^29.0.0
     '@rollup/plugin-node-resolve': ^16.0.3
     rollup: ^4.56.0
-    rollup-plugin-auto-external: ^2.0.0
-    rollup-plugin-node-externals: ^8.1.2
   samchon:
     '@typia/interface': ^13.1.0
     '@typia/mcp': ^13.1.0

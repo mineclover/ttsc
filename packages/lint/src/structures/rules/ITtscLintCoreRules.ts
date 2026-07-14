@@ -573,8 +573,9 @@ export interface ITtscLintCoreRules {
   "no-extend-native"?: TtscLintRuleSetting;
 
   /**
-   * Reject unnecessary `Function.prototype.bind()` calls — for example, binding
-   * without arguments or binding an arrow function (which ignores `this`).
+   * Reject `.bind(thisArg)` on an arrow function or on a regular function whose
+   * own scope never reads `this`. Calls that bind later arguments are preserved
+   * as partial applications.
    *
    * @reference https://eslint.org/docs/latest/rules/no-extra-bind
    */

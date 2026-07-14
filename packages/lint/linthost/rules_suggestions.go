@@ -166,68 +166,138 @@ func isNullLiteral(node *shimast.Node) bool {
   return node != nil && node.Kind == shimast.KindNullKeyword
 }
 
-// noExtraBind: `(function () {}).bind(this)` where `this` isn't used
-// — only flag the case where the bind target is empty/parameterless,
-// keeping false-positives down.
+// noExtraBind reports `.bind(thisArg)` on arrow functions and regular
+// functions whose own lexical/function scope never reads `this`. Calls that
+// also bind ordinary arguments are partial applications and remain untouched.
+// https://eslint.org/docs/latest/rules/no-extra-bind
 type noExtraBind struct{}
 
 func (noExtraBind) Name() string           { return "no-extra-bind" }
 func (noExtraBind) Visits() []shimast.Kind { return []shimast.Kind{shimast.KindCallExpression} }
 func (noExtraBind) Check(ctx *Context, node *shimast.Node) {
   call := node.AsCallExpression()
-  if call == nil || call.Expression == nil {
+  target, member, receiver, ok := noExtraBindCallParts(call)
+  if !ok {
     return
   }
-  if call.Expression.Kind != shimast.KindPropertyAccessExpression {
+  if target.Kind == shimast.KindFunctionExpression && functionScopeReferencesThis(target) {
     return
   }
-  access := call.Expression.AsPropertyAccessExpression()
-  if access == nil || identifierText(access.Name()) != "bind" {
-    return
-  }
-  target := stripParens(access.Expression)
-  if target == nil {
-    return
-  }
-  if target.Kind != shimast.KindArrowFunction && target.Kind != shimast.KindFunctionExpression {
-    return
-  }
-  // Arrow functions don't have their own `this`; `.bind` is always
-  // useless on them.
-  if target.Kind == shimast.KindArrowFunction {
+
+  edits := noExtraBindFixEdits(ctx, node, call, member, receiver)
+  if len(edits) == 0 {
     ctx.Report(node, "The function binding is unnecessary.")
-    return
-  }
-  body := target.Body()
-  if body != nil && !bodyReferencesThis(body) {
-    ctx.Report(node, "The function binding is unnecessary.")
+  } else {
+    ctx.ReportFix(node, "The function binding is unnecessary.", edits...)
   }
 }
 
-func bodyReferencesThis(node *shimast.Node) bool {
+// noExtraBindCallParts recognizes the complete syntactic bind call. Static
+// computed keys and optional member/call chains are accepted, but a dynamic
+// computed property is not assumed to be Function.prototype.bind. Exactly one
+// non-spread argument is required: zero arguments are not the canonical bind
+// shape, while later arguments perform meaningful partial application.
+func noExtraBindCallParts(call *shimast.CallExpression) (
+  target *shimast.Node,
+  member *shimast.Node,
+  receiver *shimast.Node,
+  ok bool,
+) {
+  if call == nil || call.Expression == nil || call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
+    return nil, nil, nil, false
+  }
+  receiver = call.Arguments.Nodes[0]
+  if receiver == nil || receiver.Kind == shimast.KindSpreadElement {
+    return nil, nil, nil, false
+  }
+
+  member = stripParens(call.Expression)
+  parts, matched := referenceMemberParts(member)
+  if !matched || parts.private || parts.staticKey == nil || *parts.staticKey != "bind" {
+    return nil, nil, nil, false
+  }
+  target = stripParens(parts.object)
+  if target == nil || (target.Kind != shimast.KindArrowFunction && target.Kind != shimast.KindFunctionExpression) {
+    return nil, nil, nil, false
+  }
+  return target, member, receiver, true
+}
+
+// functionScopeReferencesThis searches the bound regular function itself.
+// Nested arrows inherit that function's `this` and remain in the walk; nested
+// regular functions, methods, accessors, and constructors bind their own
+// `this`, so their subtrees are pruned.
+func functionScopeReferencesThis(root *shimast.Node) bool {
+  if root == nil {
+    return false
+  }
+  var visit func(*shimast.Node) bool
+  visit = func(node *shimast.Node) bool {
+    if node == nil {
+      return false
+    }
+    if node.Kind == shimast.KindThisKeyword {
+      return true
+    }
+    if node != root && isFunctionLikeKind(node) && node.Kind != shimast.KindArrowFunction {
+      return false
+    }
+    found := false
+    node.ForEachChild(func(child *shimast.Node) bool {
+      found = visit(child)
+      return found
+    })
+    return found
+  }
+  return visit(root)
+}
+
+// noExtraBindFixEdits removes the member access and its one-argument call as
+// separate ranges. Parentheses and comments before the member operator remain
+// byte-for-byte intact. The fix is withheld when evaluating the receiver may
+// have effects or when any comment lies inside discarded syntax.
+func noExtraBindFixEdits(
+  ctx *Context,
+  callNode *shimast.Node,
+  call *shimast.CallExpression,
+  member *shimast.Node,
+  receiver *shimast.Node,
+) []TextEdit {
+  if ctx == nil || ctx.File == nil || callNode == nil || call == nil || call.Expression == nil || member == nil ||
+    !noExtraBindReceiverIsSideEffectFree(receiver) {
+    return nil
+  }
+  parts, ok := referenceMemberParts(member)
+  if !ok || parts.object == nil {
+    return nil
+  }
+
+  src := ctx.File.Text()
+  memberStart := shimscanner.SkipTrivia(src, parts.object.End())
+  memberEnd := member.End()
+  callStart := shimscanner.SkipTrivia(src, call.Expression.End())
+  callEnd := callNode.End()
+  if memberStart < 0 || memberStart >= memberEnd || memberEnd > callStart || callStart >= callEnd || callEnd > len(src) {
+    return nil
+  }
+  if hasCommentBetween(src, memberStart, callEnd) {
+    return nil
+  }
+  return []TextEdit{
+    {Pos: memberStart, End: memberEnd, Text: ""},
+    {Pos: callStart, End: callEnd, Text: ""},
+  }
+}
+
+func noExtraBindReceiverIsSideEffectFree(node *shimast.Node) bool {
+  node = stripParens(node)
   if node == nil {
     return false
   }
-  if node.Kind == shimast.KindThisKeyword {
-    return true
-  }
-  // Don't descend into nested function-likes — their `this` is
-  // independent.
-  if isFunctionLikeKind(node) && node.Parent != nil {
-    return false
-  }
-  found := false
-  node.ForEachChild(func(child *shimast.Node) bool {
-    if found {
-      return true
-    }
-    if bodyReferencesThis(child) {
-      found = true
-      return true
-    }
-    return false
-  })
-  return found
+  return isLiteralExpression(node) ||
+    node.Kind == shimast.KindIdentifier ||
+    node.Kind == shimast.KindThisKeyword ||
+    node.Kind == shimast.KindFunctionExpression
 }
 
 // noLabels: labels (`outer: for (...) { break outer; }`) are

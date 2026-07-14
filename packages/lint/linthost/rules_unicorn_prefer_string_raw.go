@@ -39,10 +39,13 @@
 //
 // Not ported: upstream also suppresses the report by POSITION
 // (`isStringRawRestricted` — directive prologues, property keys, module
-// specifiers, JSX attribute values, TypeScript literal types and enum
-// members, …) and inside Jest inline snapshots. Untagged template
-// literals WITH substitutions are out of scope too; this rule only
-// addresses the "single literal of fixed text" case.
+// specifiers, TypeScript literal types and enum members, …) and inside
+// Jest inline snapshots. Of that list only JSX attribute values are
+// covered here, and by value rather than by position: a JSX attribute
+// string has no escape sequences, so its cooked text keeps the doubled
+// backslash that the unescape above drops. Untagged template literals
+// WITH substitutions are out of scope too; this rule only addresses the
+// "single literal of fixed text" case.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/prefer-string-raw.md
 package linthost
 

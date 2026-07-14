@@ -73,8 +73,8 @@ func (noUselessConstructor) Check(ctx *Context, node *shimast.Node) {
 }
 
 // hasParameterProperty reports whether any constructor parameter carries
-// a TypeScript parameter-property modifier (`public`, `private`,
-// `protected`, or `readonly`). Such a parameter declares an instance
+// TypeScript's canonical parameter-property modifier flag. Such a parameter
+// declares an instance
 // field, so the constructor is doing real work even if its body is
 // empty — removing it would drop the field.
 func hasParameterProperty(node *shimast.Node) bool {
@@ -82,33 +82,7 @@ func hasParameterProperty(node *shimast.Node) bool {
     if p == nil {
       continue
     }
-    if p.ModifierFlags()&(shimast.ModifierFlagsPrivate|shimast.ModifierFlagsProtected|shimast.ModifierFlagsReadonly) != 0 {
-      return true
-    }
-    // `public` is not represented by any of the above flags but does
-    // still create a parameter property. Inspect the raw modifier
-    // list for a PublicKeyword.
-    decl := p.AsParameterDeclaration()
-    if decl == nil {
-      continue
-    }
-    if hasPublicModifier(decl.Modifiers()) {
-      return true
-    }
-  }
-  return false
-}
-
-// hasPublicModifier reports whether `mods` includes a `public` keyword.
-// `public` is a parameter-property qualifier that does not set any of
-// the Private/Protected/Readonly modifier flags, so we walk the raw
-// modifier list to detect it.
-func hasPublicModifier(mods *shimast.ModifierList) bool {
-  if mods == nil {
-    return false
-  }
-  for _, m := range mods.Nodes {
-    if m != nil && m.Kind == shimast.KindPublicKeyword {
+    if p.ModifierFlags()&shimast.ModifierFlagsParameterPropertyModifier != 0 {
       return true
     }
   }
@@ -194,12 +168,9 @@ func plainParamIdentifier(param *shimast.Node) (string, bool, bool) {
   if decl.Initializer != nil || decl.QuestionToken != nil {
     return "", false, false
   }
-  // Accessibility modifier on the parameter would already have been
-  // caught by hasParameterProperty above, but guard locally too.
-  if param.ModifierFlags()&(shimast.ModifierFlagsPrivate|shimast.ModifierFlagsProtected|shimast.ModifierFlagsReadonly) != 0 {
-    return "", false, false
-  }
-  if hasPublicModifier(decl.Modifiers()) {
+  // A parameter-property modifier would already have been caught by
+  // hasParameterProperty above, but guard locally too.
+  if param.ModifierFlags()&shimast.ModifierFlagsParameterPropertyModifier != 0 {
     return "", false, false
   }
   name := identifierText(decl.Name())

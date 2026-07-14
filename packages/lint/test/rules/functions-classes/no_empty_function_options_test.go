@@ -92,8 +92,13 @@ func TestNoEmptyFunctionTypeScriptExceptionsAndCategoryBoundaries(t *testing.T) 
     want    int
   }{
     {
-      name:   "parameter property constructor always has work",
-      source: `class Example { constructor(public value: number) {} }`,
+      name: "every parameter property constructor always has work",
+      source: `class PublicExample { constructor(public value: number) {} }
+class PrivateExample { constructor(private value: number) {} }
+class ProtectedExample { constructor(protected value: number) {} }
+class ReadonlyExample { constructor(readonly value: number) {} }
+class Base { value = 0; }
+class OverrideExample extends Base { constructor(override value: number) {} }`,
     },
     {
       name: "private constructor option stays private",

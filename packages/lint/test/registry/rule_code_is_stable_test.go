@@ -17,7 +17,7 @@ import (
 //
 //  1. Require every active built-in to exist in the ledger.
 //  2. Assert ledger and complete loaded registry codes are unique and in range.
-//  3. Pin compatibility for noncolliding rules and all formerly colliding pairs.
+//  3. Pin compatibility for noncolliding rules and every pair reported in #492.
 func TestRuleCodesAreUniqueAcrossCompleteRegistry(t *testing.T) {
 	ledgerCodes := make(map[int32]string, len(builtInRuleCodes))
 	for name, code := range builtInRuleCodes {
@@ -67,7 +67,7 @@ func TestRuleCodesAreUniqueAcrossCompleteRegistry(t *testing.T) {
 		activeCodes[code] = name
 	}
 
-	formerlyColliding := [][2]string{
+	reportedCollisions := [][2]string{
 		{"complexity", "vars-on-top"},
 		{"format/declaration-header", "unicorn/prefer-array-some"},
 		{"no-var", "typescript/no-this-alias"},
@@ -80,7 +80,7 @@ func TestRuleCodesAreUniqueAcrossCompleteRegistry(t *testing.T) {
 		{"typescript/no-unnecessary-type-constraint", "unicorn/no-typeof-undefined"},
 		{"getter-return", "vitest/no-conditional-tests"},
 	}
-	for _, pair := range formerlyColliding {
+	for _, pair := range reportedCollisions {
 		if left, right := RuleCode(pair[0]), RuleCode(pair[1]); left == right {
 			t.Fatalf("formerly colliding rules %q and %q still share code %d", pair[0], pair[1], left)
 		}

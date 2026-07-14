@@ -56,6 +56,34 @@ func TestUnicornTemplateIndentSelectsEveryOfficialEntryPointAtExactRange(t *test
   }
 }
 
+func TestUnicornTemplateIndentPinsEveryDefaultMatcher(t *testing.T) {
+  source := "const taggedOutdent = outdent`\ntag-outdent\n`;\n" +
+    "const taggedDedent = dedent`\ntag-dedent\n`;\n" +
+    "const taggedGraphQL = gql`\ntag-gql\n`;\n" +
+    "const taggedSQL = sql`\ntag-sql\n`;\n" +
+    "const taggedHTML = html`\ntag-html\n`;\n" +
+    "const taggedStyled = styled`\ntag-styled\n`;\n" +
+    "const calledDedent = dedent(`\nfunction-dedent\n`);\n" +
+    "const calledStripIndent = stripIndent(`\nfunction-strip-indent\n`);\n" +
+    "const commentedHTML = /* HTML */ `\ncomment-html\n`;\n" +
+    "const commentedIndent = /* indent */ `\ncomment-indent\n`;\n"
+  markers := []string{
+    "`\ntag-outdent", "`\ntag-dedent", "`\ntag-gql", "`\ntag-sql", "`\ntag-html", "`\ntag-styled",
+    "`\nfunction-dedent", "`\nfunction-strip-indent", "`\ncomment-html", "`\ncomment-indent",
+  }
+
+  _, _, findings := runRuleFindingsSnapshot(t, unicornTemplateIndentRuleName, source, nil)
+  if len(findings) != len(markers) {
+    t.Fatalf("every default matcher must remain active: want %d findings, got %d (%+v)", len(markers), len(findings), findings)
+  }
+  for index, marker := range markers {
+    want := strings.Index(source, marker)
+    if want < 0 || findings[index].Pos != want {
+      t.Fatalf("default matcher %q start: want %d, got %+v", marker, want, findings[index])
+    }
+  }
+}
+
 func TestUnicornTemplateIndentHonorsConfiguredTagsFunctionsCommentsAndSelectors(t *testing.T) {
   t.Run("name and comment lists replace defaults", func(t *testing.T) {
     source := "const tagged = utils.dedent`\none\n`;\n" +

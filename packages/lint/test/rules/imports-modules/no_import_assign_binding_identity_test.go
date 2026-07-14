@@ -293,6 +293,9 @@ export const member = { deep: 0 };
   writeFile(t, filepath.Join(root, "src", "dep-default.ts"), "export default interface DefaultModel { member: number }\n")
 
   engine := NewEngine(RuleConfig{"no-import-assign": SeverityError})
+  if !engine.NeedsTypeChecker() {
+    t.Fatal("no-import-assign did not request the checker required for binding identity")
+  }
   engine.SetCurrentDirectory(root)
   program, diagnostics, err := loadProgram(root, "tsconfig.json", loadProgramOptions{
     forceNoEmit:      true,
@@ -365,6 +368,9 @@ func assertNoImportAssignFindings(
       t.Fatalf("finding %d mismatch: want no-import-assign/error [%d,%d) %q, got %s/%s [%d,%d) %q",
         index, want.pos, want.end, want.message,
         finding.Rule, finding.Severity.String(), finding.Pos, finding.End, finding.Message)
+    }
+    if len(finding.Fix) != 0 || len(finding.Suggestions) != 0 {
+      t.Fatalf("finding %d unexpectedly offered edits: %+v", index, finding)
     }
   }
 }

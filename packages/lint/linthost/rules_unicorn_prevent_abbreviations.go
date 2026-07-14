@@ -30,6 +30,8 @@ import (
 
   shimast "github.com/microsoft/typescript-go/shim/ast"
   shimscanner "github.com/microsoft/typescript-go/shim/scanner"
+  "golang.org/x/text/cases"
+  "golang.org/x/text/language"
 )
 
 type unicornPreventAbbreviations struct{}
@@ -1714,7 +1716,7 @@ func getUnicornPreventAbbreviationsNameReplacements(
   options unicornPreventAbbreviationsOptions,
   limit int,
 ) unicornPreventAbbreviationsNameReplacements {
-  if name == "" || strings.ToUpper(name) == name || options.allowList[name] {
+  if name == "" || unicornPreventAbbreviationsUppercase(name) == name || options.allowList[name] {
     return unicornPreventAbbreviationsNameReplacements{}
   }
   for _, pattern := range options.ignore {
@@ -1773,7 +1775,7 @@ func getUnicornPreventAbbreviationsWordReplacements(
   word string,
   options unicornPreventAbbreviationsOptions,
 ) []string {
-  if word == "" || strings.ToUpper(word) == word || options.allowList[word] {
+  if word == "" || unicornPreventAbbreviationsUppercase(word) == word || options.allowList[word] {
     return nil
   }
   keys := []string{
@@ -1918,11 +1920,11 @@ func unicornPreventAbbreviationsASCIIWord(value string) bool {
 }
 
 func unicornPreventAbbreviationsStartsUpper(value string) bool {
-  first, _ := utf8.DecodeRuneInString(value)
+  first, size := utf8.DecodeRuneInString(value)
   // Upstream compares the first UTF-16 code unit with its upper-case form.
   // Consequently uncased ASCII characters (`$`, `_`, digits) and either half
   // of an astral rune count as upper-first too.
-  return first > 0xFFFF || unicode.ToUpper(first) == first
+  return first > 0xFFFF || unicornPreventAbbreviationsUppercase(value[:size]) == value[:size]
 }
 
 func lowerUnicornPreventAbbreviationsFirst(value string) string {
@@ -1935,7 +1937,10 @@ func lowerUnicornPreventAbbreviationsFirst(value string) string {
   if first > 0xFFFF {
     return value
   }
-  return string(unicode.ToLower(first)) + value[size:]
+  if first <= unicode.MaxASCII {
+    return string(unicode.ToLower(first)) + value[size:]
+  }
+  return cases.Lower(language.Und).String(value[:size]) + value[size:]
 }
 
 func upperUnicornPreventAbbreviationsFirst(value string) string {
@@ -1946,7 +1951,19 @@ func upperUnicornPreventAbbreviationsFirst(value string) string {
   if first > 0xFFFF {
     return value
   }
-  return string(unicode.ToUpper(first)) + value[size:]
+  if first <= unicode.MaxASCII {
+    return string(unicode.ToUpper(first)) + value[size:]
+  }
+  return unicornPreventAbbreviationsUppercase(value[:size]) + value[size:]
+}
+
+func unicornPreventAbbreviationsUppercase(value string) string {
+  for index := 0; index < len(value); index++ {
+    if value[index] >= utf8.RuneSelf {
+      return cases.Upper(language.Und).String(value)
+    }
+  }
+  return strings.ToUpper(value)
 }
 
 func init() {

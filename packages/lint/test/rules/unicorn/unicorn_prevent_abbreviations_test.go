@@ -284,6 +284,22 @@ func TestUnicornPreventAbbreviationsPreservesAstralFirstRuneCasing(t *testing.T)
   }
 }
 
+func TestUnicornPreventAbbreviationsUsesJavaScriptFullUnicodeCasing(t *testing.T) {
+  assertFixSnapshotWithOptions(
+    t,
+    unicornPreventAbbreviationsRuleName,
+    "const ß = 1;\nvoid ß;\n",
+    `{"extendDefaultReplacements":false,"replacements":{"ß":{"name":true}}}`,
+    "const name = 1;\nvoid name;\n",
+  )
+  if actual := upperUnicornPreventAbbreviationsFirst("ßeta"); actual != "SSeta" {
+    t.Fatalf("upper-first must use full Unicode casing: %q", actual)
+  }
+  if actual := lowerUnicornPreventAbbreviationsFirst("İtem"); actual != "i\u0307tem" {
+    t.Fatalf("lower-first must use full Unicode casing: %q", actual)
+  }
+}
+
 func TestUnicornPreventAbbreviationsAppliesInternalImportDefaultsAndPreservesImportedNames(t *testing.T) {
   source := "import err from \"./local-default\";\nimport * as ctx from \"external-ns\";\nimport doc from \"./node_modules/external-default\";\nimport { prop } from \"./local-named\";\nimport { ref } from \"external-named\";\nvoid [err, ctx, doc, prop, ref];\n"
   assertFixSnapshot(

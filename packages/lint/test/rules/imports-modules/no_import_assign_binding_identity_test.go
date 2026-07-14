@@ -48,12 +48,14 @@ declare const record: Record<string, any>;
 /* no-import-assign:start */namespaceValue.member = 1/* no-import-assign:end */;
 /* no-import-assign:start */namespaceValue["member"]++/* no-import-assign:end */;
 /* no-import-assign:start */delete namespaceValue.member/* no-import-assign:end */;
+/* no-import-assign:start */delete namespaceValue?.member/* no-import-assign:end */;
 (/* no-import-assign:start */[namespaceValue.member] = values/* no-import-assign:end */);
 /* no-import-assign:start */for (namespaceValue["member"] of values) {}/* no-import-assign:end */
 /* no-import-assign:start */namespaceValue = replacement/* no-import-assign:end */;
 
 /* no-import-assign:start */Object["assign"](namespaceValue, {})/* no-import-assign:end */;
 /* no-import-assign:start */Object.defineProperty(namespaceValue, "x", {})/* no-import-assign:end */;
+/* no-import-assign:start */(Object?.defineProperty)(namespaceValue, "y", {})/* no-import-assign:end */;
 /* no-import-assign:start */Object.defineProperties(namespaceValue, {})/* no-import-assign:end */;
 /* no-import-assign:start */Object.freeze(namespaceValue)/* no-import-assign:end */;
 /* no-import-assign:start */Object.setPrototypeOf(namespaceValue, null)/* no-import-assign:end */;
@@ -90,11 +92,13 @@ declare const record: Record<string, any>;
     member("namespaceValue.member = 1", "namespaceValue"),
     member("namespaceValue[\"member\"]++", "namespaceValue"),
     member("delete namespaceValue.member", "namespaceValue"),
+    member("delete namespaceValue?.member", "namespaceValue"),
     member("[namespaceValue.member] = values", "namespaceValue"),
     member("for (namespaceValue[\"member\"] of values) {}", "namespaceValue"),
     binding("namespaceValue = replacement", "namespaceValue"),
     member("Object[\"assign\"](namespaceValue, {})", "namespaceValue"),
     member("Object.defineProperty(namespaceValue, \"x\", {})", "namespaceValue"),
+    member("(Object?.defineProperty)(namespaceValue, \"y\", {})", "namespaceValue"),
     member("Object.defineProperties(namespaceValue, {})", "namespaceValue"),
     member("Object.freeze(namespaceValue)", "namespaceValue"),
     member("Object.setPrototypeOf(namespaceValue, null)", "namespaceValue"),

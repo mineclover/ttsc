@@ -54,7 +54,7 @@ Examples come from the checked [lint corpus](https://github.com/samchon/ttsc/tre
 - [`no-eval`](#rule-no-eval): Reject `eval(...)` and indirect `eval` calls, almost always a security or correctness bug.
 - [`no-ex-assign`](#rule-no-ex-assign): Reject reassigning the parameter of a `catch` clause.
 - [`no-extend-native`](#rule-no-extend-native): Reject assignments to a built-in prototype such as `Array.prototype.foo = bar`.
-- [`no-extra-bind`](#rule-no-extra-bind): Reject unnecessary `Function.prototype.bind()` calls.
+- [`no-extra-bind`](#rule-no-extra-bind): Reject `.bind(thisArg)` when the function cannot use the bound receiver.
 - [`no-extra-boolean-cast`](#rule-no-extra-boolean-cast): Reject redundant boolean casts such as `!!Boolean(x)`, `if (Boolean(x))`, or `Boolean(!!x)`.
 - [`no-fallthrough`](#rule-no-fallthrough): Reject `switch` cases that can reach the next label without an intentional `// falls through` comment.
 - [`no-func-assign`](#rule-no-func-assign): Reject reassignment of function declarations.
@@ -1358,13 +1358,17 @@ Object.debugLabel = 1;
 
 ### `no-extra-bind`
 
-Reject unnecessary `Function.prototype.bind()` calls, for example, binding without arguments or binding an arrow function (which ignores `this`).
+Reject `.bind(thisArg)` on an arrow function or on a regular function whose own scope never reads `this`. A nested arrow inherits the enclosing regular function's receiver and therefore counts as a use, while a nested regular function owns a separate receiver. Calls with arguments after `thisArg` and calls that spread their arguments remain unchanged because they can perform partial application.
+
+Dot, static computed, and optional member/call forms are recognized. The autofix removes the bind syntax only when evaluating `thisArg` is side-effect-free and no comment lies inside the discarded ranges; other findings remain diagnostic-only.
 
 Example:
 
 ```ts
 // reports: no-extra-bind (error)
 const f = (() => 1).bind({});
+
+const partial = ((value: number) => value).bind(null, 1);
 ```
 
 <a id="rule-no-extra-boolean-cast"></a>

@@ -254,7 +254,7 @@ Source: [ESLint core rules](https://eslint.org/docs/latest/rules/).
 - [`no-eval`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-eval.ts): rejects `eval`.
 - [`no-ex-assign`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-ex-assign.ts): rejects reassignment of caught exceptions.
 - [`no-extend-native`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-extend-native.ts): reject assignments to a built-in prototype such as `Array.prototype.foo = bar`.
-- [`no-extra-bind`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-extra-bind.ts): rejects unnecessary `.bind()` calls.
+- [`no-extra-bind`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-extra-bind.ts): rejects `.bind(thisArg)` on arrows and regular functions that never read their own `this`, while preserving partial application.
 - [`no-extra-boolean-cast`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-extra-boolean-cast.ts): rejects redundant boolean casts.
 - [`no-fallthrough`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-fallthrough.ts): rejects `switch` cases whose end is reachable and that lack an intentional `// falls through` comment before the next label.
 - [`no-func-assign`](https://github.com/samchon/ttsc/blob/master/tests/test-lint/src/cases/no-func-assign.ts): rejects reassignment of function declarations.

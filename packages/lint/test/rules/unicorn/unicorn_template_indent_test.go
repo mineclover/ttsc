@@ -358,6 +358,7 @@ func TestUnicornTemplateIndentRejectsMalformedOptionsBeforeLinting(t *testing.T)
     {name: "unknown key", options: `{"tagz":[]}`, want: "contain only indent"},
     {name: "empty indent", options: `{"indent":""}`, want: "must not be empty"},
     {name: "non whitespace indent", options: `{"indent":" x"}`, want: "only whitespace"},
+    {name: "non ECMAScript whitespace indent", options: `{"indent":"\u0085"}`, want: "only whitespace"},
     {name: "zero indent", options: `{"indent":0}`, want: "positive integer"},
     {name: "fraction indent", options: `{"indent":1.5}`, want: "positive integer"},
     {name: "null tags", options: `{"tags":null}`, want: "array of unique strings"},

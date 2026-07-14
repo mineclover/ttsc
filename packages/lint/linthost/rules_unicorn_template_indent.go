@@ -196,8 +196,7 @@ func decodeUnicornTemplateIndentIndent(raw json.RawMessage) (string, error) {
       return "", fmt.Errorf("unicorn/template-indent indent string must not be empty")
     }
     for _, character := range indent {
-      // ECMAScript's `\s` also includes the byte-order-mark code point.
-      if !unicode.IsSpace(character) && character != '\uFEFF' {
+      if !unicornTemplateIndentIsECMAScriptWhitespace(character) {
         return "", fmt.Errorf("unicorn/template-indent indent string must contain only whitespace")
       }
     }
@@ -596,7 +595,7 @@ func unicornTemplateIndentParentMargin(source string, pos int) string {
   index := 0
   for index < len(line) {
     character, size := utf8.DecodeRuneInString(line[index:])
-    if !unicode.IsSpace(character) && character != '\uFEFF' {
+    if !unicornTemplateIndentIsECMAScriptWhitespace(character) {
       break
     }
     index += size
@@ -751,7 +750,7 @@ func unicornTemplateIndentLinesForDetection(text string, ignored map[int]struct{
 
 func unicornTemplateIndentWhitespaceOnly(text string) bool {
   for _, character := range text {
-    if !unicode.IsSpace(character) && character != '\uFEFF' {
+    if !unicornTemplateIndentIsECMAScriptWhitespace(character) {
       return false
     }
   }
@@ -759,9 +758,19 @@ func unicornTemplateIndentWhitespaceOnly(text string) bool {
 }
 
 func unicornTemplateIndentTrim(text string) string {
-  return strings.TrimFunc(text, func(character rune) bool {
-    return unicode.IsSpace(character) || character == '\uFEFF'
-  })
+  return strings.TrimFunc(text, unicornTemplateIndentIsECMAScriptWhitespace)
+}
+
+func unicornTemplateIndentIsECMAScriptWhitespace(character rune) bool {
+  if unicode.In(character, unicode.Zs) {
+    return true
+  }
+  switch character {
+  case '\t', '\v', '\f', '\n', '\r', '\u2028', '\u2029', '\uFEFF':
+    return true
+  default:
+    return false
+  }
 }
 
 func unicornTemplateIndentDetect(text string) string {

@@ -51,7 +51,7 @@ Every built-in rule has a unique positive numeric code in the reserved `TS9000` 
 
 The ledger introduction preserved every legacy code that was already unique. For each pre-existing collision group, the alphabetically first rule kept the shared legacy code and every other rule received an available code. Those resolved assignments are now frozen by the same append-only policy.
 
-Rules contributed by another Go package share the same collision-free band. Their codes are deterministic for an unchanged complete set of loaded contributors and do not depend on registration order. Adding or removing a contributor can change contributor assignments when their preferred codes collide, but never changes a built-in assignment.
+Rules contributed by another Go package share the same collision-free band. Their codes are deterministic for an unchanged complete set of loaded contributors and do not depend on registration order. Adding or removing a contributor recomputes assignments for that complete contributor set and can change contributor codes, but never changes a built-in assignment.
 
 ## Setup
 

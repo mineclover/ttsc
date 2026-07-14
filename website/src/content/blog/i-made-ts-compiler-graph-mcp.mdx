@@ -87,13 +87,13 @@ export interface ITtscGraphApplication {
    */
   inspect_typescript_graph(
     props: ITtscGraphApplication.IProps,
-  ): ITtscGraphApplication.IOutput;
+  ): Promise<ITtscGraphApplication.IOutput>;
 }
 
 export namespace ITtscGraphApplication {
   // The forced chain-of-thought, then exactly one graph request.
   export interface IProps {
-    question: string; // restate the code question being asked
+    question: string; // the code question, in the user's own words
     draft: IDraft;    // the request type it plans, and why it is the smallest
     review: string;   // self-correct a wrong/broad draft; pick `escape` if off-graph
     request:          // the final operation, chosen after review
@@ -148,6 +148,12 @@ What actually happened was a lot less exciting than the pitch.
 - Claude Code and Codex answered less accurately, not more. They kept missing what I was actually asking for.
 - Extra MCP calls fired on their own and delayed the work I wanted done.
 - I couldn't just ask in plain language either. Every query had to be shaped by hand. `codebase-memory-mcp`'s sharpest tools want a Cypher query or an exact `qualified_name`, `codegraph` wants you to name the symbols in a flow, and `serena` wants you to activate the project and then hand it an exact `name_path` you don't have yet. The hand-shaping alone cost more time than the tools gave back.
+
+And none of that counts the wait before the first question. A code-graph MCP has to index the repository before it can answer anything, and you sit through that build on a cold checkout whether the answer that follows is cheap or not.
+
+![Cold time to a first answer, per repository](/benchmark/svg/graph-time-to-answer.svg)
+
+> The faded head of each bar is the index build, the solid tail is the answer, and each bar is labelled `index / answer` in the order you wait for them. On VS Code, `@ttsc/graph` builds in 29 seconds; `codegraph` takes 732. A tool that cuts the token bill and then spends twelve minutes indexing has moved the cost, not removed it.
 
 So for my kind of question, all three left me worse off than before I installed them. Two things are true at once: they're the strongest tools of their kind, built by people who saw the problem before I did; and on an open question, every one made the agent spend more than nothing would have. That's when I went digging.
 
@@ -233,13 +239,13 @@ export interface ITtscGraphApplication {
    */
   inspect_typescript_graph(
     props: ITtscGraphApplication.IProps,
-  ): ITtscGraphApplication.IOutput;
+  ): Promise<ITtscGraphApplication.IOutput>;
 }
 
 export namespace ITtscGraphApplication {
   // The forced chain-of-thought, then exactly one graph request.
   export interface IProps {
-    question: string; // restate the code question being asked
+    question: string; // the code question, in the user's own words
     draft: IDraft;    // the request type it plans, and why it is the smallest
     review: string;   // self-correct a wrong/broad draft; pick `escape` if off-graph
     request:          // the final operation, chosen after review
@@ -274,9 +280,13 @@ export namespace ITtscGraphApplication {
 }
 ```
 
-Read those fields top to bottom, because that's the order the model fills them in. It restates and sharpens the question in `question`, sketches the smallest plan in `draft`, second-guesses that plan in `review`, and only then commits the final `request`. The property order is the chain-of-thought: one refining step per field, each building on the last, ending in the request it reasoned its way to. typia compiles this type into the tool's JSON schema and validator, so a submission that skipped a step is rejected right at the call boundary.
+Read those fields top to bottom, because that's the order the model fills them in. It writes the question in `question`, in the user's own words rather than its own, sketches the smallest plan in `draft`, second-guesses that plan in `review`, and only then commits the final `request`. The property order is the chain-of-thought: one refining step per field, each building on the last, ending in the request it reasoned its way to. typia compiles this type into the tool's JSON schema and validator, so a submission that skipped a step is rejected right at the call boundary.
 
 As typia puts it, "free prose can hide a skipped step; a typed submission cannot." Why that matters more than any instruction is the thread I pick back up in §5.
+
+One branch asks for a step of its own. A `tour` carries `reinterpretations` — a list of symbol names, never a sentence, naming the machinery the caller expects the answer to be made of. A tour ranks its seeds on words, and a codebase names many things alike: on the question's words alone, "dependency tracking" matches Vue's devtools hook `onRenderTracked` as readily as `track`, the function that actually records the dependency. Landing on the wrong machinery isn't a wrong answer, it's a tour the model then spends calls correcting. So the caller says which it means, and the graph adjudicates: each name is resolved like a handle, the ones it holds take half the entrypoints, the other half stays with what the graph finds central, and a name it doesn't know — or knows several of — is dropped. A wrong guess is free. That took Sonnet's Vue tour from seven calls to one.
+
+The field also taught me the limits of a typed contract, twice. Added silently, it wasn't sent at all: GPT-5.6 submits the smallest object that could be a request, so its tours failed validation and were re-sent, and on a client that re-transmits its whole context every turn, that round trip is most of what the call costs. Naming it in the instruction fixed that. Then it kept sending _one sentence_ to a `string[]` — until the field's own description opened with "a list of symbol names, not a sentence". A model reads the description, not the type.
 
 Those one-line comments are condensed. In the source, the fuller JSDoc on each member is what typia compiles into the MCP instruction and the schema descriptions the model actually reads. If you want the details, they're in [`ITtscGraphApplication.ts`](https://github.com/samchon/ttsc/blob/master/packages/graph/src/structures/ITtscGraphApplication.ts).
 

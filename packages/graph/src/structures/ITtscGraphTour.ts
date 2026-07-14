@@ -5,7 +5,7 @@ export interface ITtscGraphTour {
   /** Discriminator for code-tour indexing. */
   type: "tour";
 
-  /** Natural code question this tour was built for. */
+  /** The question this tour was built for, as the caller wrote it. */
   query: string;
 
   /** Central entrypoints selected for the tour. */
@@ -31,19 +31,56 @@ export namespace ITtscGraphTour {
   /**
    * The whole answer surface for a broad code tour: entrypoints, primary flow,
    * nearby paths, tests, and answer anchors.
+   *
+   * It asks for no question of its own. It used to carry a `query`, described
+   * in its own schema as "the same ask as `question`" — the field the caller
+   * has already filled two lines above — and a schema that asks for one string
+   * twice gets it once: GPT-5.6 sent `{ "type": "tour" }` with no query in **31
+   * of 32 cells**, the validator rejected it, and the model re-sent the whole
+   * call. Every Codex tour cost a wasted round trip, and a Codex turn re-sends
+   * its whole context, so the duplicate field was most of what the tool spent.
+   *
+   * The words that rank the tour are the question's, and the question is where
+   * the caller writes them. Asking for them twice also lost them: told to keep
+   * the user's words in `question`, Opus wrote `how does Zod carry
+   * `schema.parse` from the public API`, and then paraphrased them into `query`
+   * as "how does Zod carry schema.parse" — dropping the backticks the mention
+   * resolver reads to find the symbol the user named.
    */
   export interface IRequest {
     /** Discriminator for code-tour indexing. */
     type: "tour";
 
     /**
-     * The tour question, in the user's own words — the same ask as `question`.
+     * A list of symbol names. Not a sentence — names, one per entry, the way
+     * you would type them into a search: `["track", "trigger",
+     * "ReactiveEffect", "setupRenderEffect", "queueJob", "patch"]`.
      *
-     * Its terms rank the tour: a name sharing one is promoted, a name sharing
-     * none demoted. Trim what the user wrote, but neither reword it nor add
-     * terms of your own.
+     * They are the machinery you expect the answer to be made of. The question
+     * is above, in the user's words, and the tour ranks against them — but a
+     * codebase names many things alike, and the question's words cannot tell
+     * them apart. "Dependency tracking" matches Vue's devtools hook
+     * `onRenderTracked` as well as `track`, the function that actually records
+     * the dependency; "request" matches a message listener as well as the HTTP
+     * router. The names are how you say which one you mean.
+     *
+     * Names, not prose. Each is looked up in the graph the way a handle is — a
+     * symbol name, a `Class.member`, a `file.symbol`. The ones the graph holds
+     * take half the tour's entrypoints; the other half stays with what the
+     * graph finds central, so a name you get wrong cannot cost you the tour. A
+     * name it does not know, or one it knows several of, is simply dropped: a
+     * wrong guess is free, and a phrase like "the public API and its runtime
+     * path" buys nothing. Write the names you would grep for, before you have
+     * seen a line.
+     *
+     * Send `[]` when the question names no machinery — an orientation tour of a
+     * repository you have not seen, "show me the central flow". Then there is
+     * nothing to reinterpret: the tour ranks on structure, which is what that
+     * question is asking for, and `[]` is the whole and correct answer. Do not
+     * go looking for names to put here first. A lookup before the tour is a
+     * call spent to fill a field that the tour would have ignored anyway.
      */
-    query: string;
+    reinterpretations: string[];
 
     /**
      * Central entrypoints to seed the tour. Raise only when the question names

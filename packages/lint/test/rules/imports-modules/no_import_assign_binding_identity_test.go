@@ -28,6 +28,8 @@ func TestNoImportAssignBindingIdentityAndCompleteWrites(t *testing.T) {
 import { same as sameB } from "./dep2";
 import * as namespaceValue from "./dep";
 import type * as typeNamespace from "./dep";
+import type DefaultModel from "./dep-default";
+import type { Model as TypeAlias } from "./dep";
 import legacy = require("./dep");
 
 declare const replacement: typeof defaultValue;
@@ -68,6 +70,9 @@ declare const record: Record<string, any>;
 /* no-import-assign:start */sameB = 2/* no-import-assign:end */;
 /* no-import-assign:start */legacy = null as never/* no-import-assign:end */;
 /* no-import-assign:start */Model = null as never/* no-import-assign:end */;
+/* no-import-assign:start */DefaultModel = null as never/* no-import-assign:end */;
+/* no-import-assign:start */TypeAlias = null as never/* no-import-assign:end */;
+(/* no-import-assign:start */{ Model } = record/* no-import-assign:end */);
 /* no-import-assign:start */typeNamespace = null as never/* no-import-assign:end */;
 /* no-import-assign:start */typeNamespace.member = 1/* no-import-assign:end */;
 `
@@ -110,6 +115,9 @@ declare const record: Record<string, any>;
     binding("sameB = 2", "sameB"),
     binding("legacy = null as never", "legacy"),
     binding("Model = null as never", "Model"),
+    binding("DefaultModel = null as never", "DefaultModel"),
+    binding("TypeAlias = null as never", "TypeAlias"),
+    binding("{ Model } = record", "Model"),
     binding("typeNamespace = null as never", "typeNamespace"),
     member("typeNamespace.member = 1", "typeNamespace"),
   }
@@ -150,6 +158,7 @@ func TestNoImportAssignRecognizesEveryAssignmentOperator(t *testing.T) {
 func TestNoImportAssignIgnoresResolvedShadowsAndDeeperValues(t *testing.T) {
   source := `import defaultValue, { value, value as aliased } from "./dep";
 import * as namespaceValue from "./dep";
+import type { Model as ImportedModel } from "./dep";
 import legacy = require("./dep");
 
 declare const record: Record<string, any>;
@@ -189,6 +198,11 @@ function declarationShadows() {
   namespaceValue.member++;
 }
 
+function typeDeclarationShadow() {
+  type ImportedModel = { local: true };
+  ImportedModel = null as never;
+}
+
 {
   let value = 0;
   let namespaceValue = { member: 0 };
@@ -217,6 +231,7 @@ class ShadowContainer {
 
 consume(functionShadow);
 consume(declarationShadows);
+consume(typeDeclarationShadow);
 consume(ShadowContainer);
 `
 
@@ -238,6 +253,7 @@ export interface Model { member: number }
 export const member = { deep: 0 };
 `)
   writeFile(t, filepath.Join(root, "src", "dep2.ts"), "export let same = 0;\n")
+  writeFile(t, filepath.Join(root, "src", "dep-default.ts"), "export default interface DefaultModel { member: number }\n")
 
   engine := NewEngine(RuleConfig{"no-import-assign": SeverityError})
   engine.SetCurrentDirectory(root)
@@ -290,6 +306,14 @@ func assertNoImportAssignFindings(
     return findings[i].Message < findings[j].Message
   })
   if len(findings) != len(wants) {
+    for _, finding := range findings {
+      snippet := ""
+      if finding.Pos >= 0 && finding.End >= finding.Pos && finding.End <= len(source) {
+        snippet = source[finding.Pos:finding.End]
+      }
+      t.Logf("actual %s/%s [%d,%d) %q: %q",
+        finding.Rule, finding.Severity.String(), finding.Pos, finding.End, finding.Message, snippet)
+    }
     t.Fatalf("want %d findings, got %d (%+v)", len(wants), len(findings), findings)
   }
   for index, finding := range findings {

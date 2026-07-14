@@ -9,7 +9,10 @@
 // https://eslint.org/docs/latest/rules/no-import-assign
 package linthost
 
-import shimast "github.com/microsoft/typescript-go/shim/ast"
+import (
+  shimast "github.com/microsoft/typescript-go/shim/ast"
+  shimchecker "github.com/microsoft/typescript-go/shim/checker"
+)
 
 type noImportAssign struct{}
 
@@ -290,18 +293,33 @@ func noImportAssignDirectNamespaceName(
 
 // noImportAssignValueSymbol resolves shorthand destructuring targets through
 // their value slot, then normalizes merged declarations to a stable map key.
+// A type-only import used illegally as a value has no value-position symbol;
+// in that case the checker's all-meanings entity lookup still returns the
+// lexical import alias without falling back to textual name matching.
 func noImportAssignValueSymbol(ctx *Context, identifier *shimast.Node) *shimast.Symbol {
   if ctx == nil || ctx.Checker == nil || identifier == nil {
     return nil
   }
   var symbol *shimast.Symbol
+  shorthandTarget := false
   if parent := identifier.Parent; parent != nil && parent.Kind == shimast.KindShorthandPropertyAssignment {
     if shorthand := parent.AsShorthandPropertyAssignment(); shorthand != nil && shorthand.Name() == identifier {
+      shorthandTarget = true
       symbol = ctx.Checker.GetShorthandAssignmentValueSymbol(parent)
     }
   }
-  if symbol == nil {
+  if symbol == nil && !shorthandTarget {
     symbol = ctx.Checker.GetSymbolAtLocation(identifier)
+  }
+  if symbol == nil {
+    symbol = shimchecker.Checker_resolveEntityName(
+      ctx.Checker,
+      identifier,
+      shimast.SymbolFlagsValue|shimast.SymbolFlagsType|shimast.SymbolFlagsNamespace,
+      true,
+      true,
+      nil,
+    )
   }
   if symbol == nil {
     return nil

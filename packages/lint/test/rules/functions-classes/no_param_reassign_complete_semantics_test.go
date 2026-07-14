@@ -11,6 +11,7 @@ import (
 
 type noParamReassignFinding struct {
   line    int
+  target  string
   message string
 }
 
@@ -29,8 +30,12 @@ func runNoParamReassign(
     if len(finding.Fix) != 0 || len(finding.Suggestions) != 0 {
       t.Fatalf("no-param-reassign must not offer edits: %+v", finding)
     }
+    if finding.Pos < 0 || finding.End < finding.Pos || finding.End > len(source) {
+      t.Fatalf("no-param-reassign returned an invalid source range: %+v", finding)
+    }
     normalized = append(normalized, noParamReassignFinding{
       line:    shimscanner.GetECMALineOfPosition(finding.File, finding.Pos) + 1,
+      target:  source[finding.Pos:finding.End],
       message: finding.Message,
     })
   }
@@ -85,7 +90,11 @@ func TestNoParamReassignResolvesEveryParameterBindingAndWriteForm(t *testing.T) 
 `
   got := runNoParamReassign(t, source, nil)
   direct := func(line int, name string) noParamReassignFinding {
-    return noParamReassignFinding{line: line, message: "Assignment to function parameter '" + name + "'."}
+    return noParamReassignFinding{
+      line:    line,
+      target:  name,
+      message: "Assignment to function parameter '" + name + "'.",
+    }
   }
   assertNoParamReassignFindings(
     t,
@@ -148,16 +157,16 @@ JSON.stringify([FunctionKinds, arrowKind, expressionKind]);
   assertNoParamReassignFindings(
     t,
     got,
-    noParamReassignFinding{line: 10, message: "Assignment to function parameter 'value'."},
-    noParamReassignFinding{line: 12, message: "Assignment to function parameter 'value'."},
-    noParamReassignFinding{line: 13, message: "Assignment to function parameter 'value'."},
-    noParamReassignFinding{line: 20, message: "Assignment to function parameter 'value'."},
-    noParamReassignFinding{line: 25, message: "Assignment to function parameter 'value'."},
-    noParamReassignFinding{line: 28, message: "Assignment to function parameter 'value'."},
-    noParamReassignFinding{line: 29, message: "Assignment to function parameter 'value'."},
-    noParamReassignFinding{line: 30, message: "Assignment to function parameter 'value'."},
-    noParamReassignFinding{line: 32, message: "Assignment to function parameter 'value'."},
-    noParamReassignFinding{line: 33, message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 10, target: "value", message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 12, target: "value", message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 13, target: "value", message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 20, target: "value", message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 25, target: "value", message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 28, target: "value", message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 29, target: "value", message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 30, target: "value", message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 32, target: "value", message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 33, target: "value", message: "Assignment to function parameter 'value'."},
   )
 }
 
@@ -197,7 +206,11 @@ function mutate(target: any, ignored: any, regexName: any, condition: boolean): 
     json.RawMessage(`{"props":true,"ignorePropertyModificationsFor":["ignored"],"ignorePropertyModificationsForRegex":["^regex(?:Name)?$"]}`),
   )
   property := func(line int) noParamReassignFinding {
-    return noParamReassignFinding{line: line, message: "Assignment to property of function parameter 'target'."}
+    return noParamReassignFinding{
+      line:    line,
+      target:  "target",
+      message: "Assignment to property of function parameter 'target'.",
+    }
   }
   assertNoParamReassignFindings(
     t,
@@ -215,8 +228,8 @@ function mutate(target: any, ignored: any, regexName: any, condition: boolean): 
     property(15),
     property(16),
     property(17),
-    noParamReassignFinding{line: 26, message: "Assignment to function parameter 'ignored'."},
-    noParamReassignFinding{line: 27, message: "Assignment to function parameter 'regexName'."},
+    noParamReassignFinding{line: 26, target: "ignored", message: "Assignment to function parameter 'ignored'."},
+    noParamReassignFinding{line: 27, target: "regexName", message: "Assignment to function parameter 'regexName'."},
   )
 }
 
@@ -234,7 +247,7 @@ func TestNoParamReassignDefaultPropsLeavesPropertyWritesAlone(t *testing.T) {
   assertNoParamReassignFindings(
     t,
     got,
-    noParamReassignFinding{line: 7, message: "Assignment to function parameter 'target'."},
+    noParamReassignFinding{line: 7, target: "target", message: "Assignment to function parameter 'target'."},
   )
 }
 

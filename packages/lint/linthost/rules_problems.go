@@ -178,10 +178,9 @@ func regexHasSurrogatePair(src string) bool {
   return false
 }
 
-// noLossOfPrecision: `9007199254740993` — decimal numeric literal whose
-// source text changes when parsed as a JavaScript Number. We read the source
-// form instead of the parser's normalized .Text, which has already lost
-// precision.
+// noLossOfPrecision: a Number literal whose requested significant digits
+// change during IEEE-754 conversion. We read the source form instead of the
+// parser's normalized .Text, which has already lost spelling and precision.
 type noLossOfPrecision struct{}
 
 func (noLossOfPrecision) Name() string           { return "no-loss-of-precision" }

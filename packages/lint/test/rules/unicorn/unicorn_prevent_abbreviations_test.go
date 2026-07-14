@@ -11,7 +11,21 @@ import (
 const unicornPreventAbbreviationsRuleName = "unicorn/prevent-abbreviations"
 
 func TestRuleCorpusUnicornPreventAbbreviations(t *testing.T) {
-  assertRuleCorpusCase(t, "unicorn/prevent-abbreviations.ts", "// expect: unicorn/prevent-abbreviations error\nconst errCb = (error: Error): void => {\n  console.error(error);\n};\n\nerrCb(new Error(\"fixture\"));\n")
+  source := "// expect: unicorn/prevent-abbreviations error\nconst errCb = (error: Error): void => {\n  console.error(error);\n};\n\nerrCb(new Error(\"fixture\"));\n"
+  expected := parseRuleExpectations(t, source)
+  _, _, findings := runRuleFindingsSnapshot(t, unicornPreventAbbreviationsRuleName, source, nil)
+  if len(findings) == 0 {
+    t.Fatalf("unicorn/prevent-abbreviations.ts: want %v, got no findings", expected)
+  }
+  actual := normalizeRuleFindings(findings[0].File, findings)
+  if len(actual) != len(expected) {
+    t.Fatalf("unicorn/prevent-abbreviations.ts: want %v, got %v", expected, actual)
+  }
+  for index := range expected {
+    if actual[index] != expected[index] {
+      t.Fatalf("unicorn/prevent-abbreviations.ts[%d]: want %+v, got %+v", index, expected[index], actual[index])
+    }
+  }
 }
 
 func TestUnicornPreventAbbreviationsReportsBindingOnceAndFixesEveryReference(t *testing.T) {
@@ -457,6 +471,12 @@ func TestUnicornPreventAbbreviationsPreservesExportedAliasNames(t *testing.T) {
     unicornPreventAbbreviationsRuleName,
     "const err = new Error();\nexport { err as err };\n",
     "const error = new Error();\nexport { error as err };\n",
+  )
+  assertFixSnapshot(
+    t,
+    unicornPreventAbbreviationsRuleName,
+    "const err = new Error();\nexport { err as publicError };\n",
+    "const error = new Error();\nexport { error as publicError };\n",
   )
 }
 

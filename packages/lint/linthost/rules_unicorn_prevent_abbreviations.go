@@ -911,7 +911,7 @@ func collectUnicornPreventAbbreviationsReferences(
     if node.Kind != shimast.KindIdentifier {
       return
     }
-    symbol := unicornPreventAbbreviationsCanonicalSymbol(ctx, node)
+    symbol := unicornPreventAbbreviationsReferenceSymbol(ctx, node)
     if symbol == nil {
       return
     }
@@ -933,6 +933,26 @@ func collectUnicornPreventAbbreviationsReferences(
     binding.seen[node] = struct{}{}
     binding.references = append(binding.references, node)
   })
+}
+
+// The checker binds an export specifier's written name to the exported alias,
+// not to the local declaration that supplies it. Resolve the local side through
+// TypeScript's dedicated API so a local rename can preserve the public spelling
+// (`export { err }` becomes `export { error as err }`). Re-exports have no local
+// binding and stay on the ordinary symbol-at-location path.
+func unicornPreventAbbreviationsReferenceSymbol(ctx *Context, node *shimast.Node) *shimast.Symbol {
+  if node != nil && node.Parent != nil && node.Parent.Kind == shimast.KindExportSpecifier &&
+    !unicornPreventAbbreviationsExportSpecifierHasModuleSource(node.Parent) {
+    specifier := node.Parent.AsExportSpecifier()
+    if specifier != nil && (specifier.PropertyName == node ||
+      specifier.PropertyName == nil && specifier.Name() == node) {
+      symbol := ctx.Checker.GetExportSpecifierLocalTargetSymbol(node.Parent)
+      if symbol != nil {
+        return ctx.Checker.GetExportSymbolOfSymbol(symbol)
+      }
+    }
+  }
+  return unicornPreventAbbreviationsCanonicalSymbol(ctx, node)
 }
 
 func reportUnicornPreventAbbreviationsBinding(

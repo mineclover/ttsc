@@ -102,10 +102,15 @@ export interface ITtscLintRegexpRules {
 
   /**
    * Reject regex flags that the literal does not exercise — `i` on a pattern
-   * without case-variable characters, `m` without `^`/`$`, `s` without `.`, and
-   * similar dead flags on `g`/`y`.
+   * with no case-variable character, `m` on a pattern with no `^`/`$`
+   * assertion.
    *
    * Cleans up flag combos that suggest behavior the pattern can never trigger.
+   * A character is case-variable wherever it sits, so `/[a-z]/i` keeps its flag
+   * (the flag is what extends the class to `A-Z`), and a `^` or `$` inside a
+   * character class is a plain character that does not save `m`. Patterns the
+   * rule cannot settle from the source — a Unicode property escape, a
+   * backreference, a `v`-mode set-notation class — count as using the flag.
    *
    * @reference https://ota-meshi.github.io/eslint-plugin-regexp/rules/no-useless-flag.html
    */

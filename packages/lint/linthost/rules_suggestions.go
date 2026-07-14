@@ -224,9 +224,10 @@ func noExtraBindCallParts(call *shimast.CallExpression) (
 }
 
 // functionScopeReferencesThis searches the bound regular function itself.
-// Nested arrows inherit that function's `this` and remain in the walk; nested
-// regular functions, methods, accessors, and constructors bind their own
-// `this`, so their subtrees are pruned.
+// Nested arrows inherit that function's `this`; nested regular functions and
+// class-owned initializers do not. Computed class/object keys and decorators
+// are evaluated outside their owning method or field, so their `this` still
+// belongs to the enclosing function.
 func functionScopeReferencesThis(root *shimast.Node) bool {
   if root == nil {
     return false
@@ -237,10 +238,7 @@ func functionScopeReferencesThis(root *shimast.Node) bool {
       return false
     }
     if node.Kind == shimast.KindThisKeyword {
-      return true
-    }
-    if node != root && isFunctionLikeKind(node) && node.Kind != shimast.KindArrowFunction {
-      return false
+      return noExtraBindThisBelongsToFunction(node, root)
     }
     found := false
     node.ForEachChild(func(child *shimast.Node) bool {
@@ -250,6 +248,44 @@ func functionScopeReferencesThis(root *shimast.Node) bool {
     return found
   }
   return visit(root)
+}
+
+func noExtraBindThisBelongsToFunction(node, root *shimast.Node) bool {
+  outerEvaluation := false
+  for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
+    if ancestor == root {
+      return true
+    }
+    switch ancestor.Kind {
+    case shimast.KindComputedPropertyName, shimast.KindDecorator:
+      outerEvaluation = true
+    case shimast.KindClassStaticBlockDeclaration:
+      return false
+    case shimast.KindPropertyDeclaration:
+      if outerEvaluation {
+        outerEvaluation = false
+        continue
+      }
+      return false
+    case shimast.KindArrowFunction:
+      continue
+    }
+    if !isFunctionLikeKind(ancestor) {
+      continue
+    }
+    switch ancestor.Kind {
+    case shimast.KindMethodDeclaration,
+      shimast.KindGetAccessor,
+      shimast.KindSetAccessor,
+      shimast.KindConstructor:
+      if outerEvaluation {
+        outerEvaluation = false
+        continue
+      }
+    }
+    return false
+  }
+  return false
 }
 
 // noExtraBindFixEdits removes the member access and its one-argument call as

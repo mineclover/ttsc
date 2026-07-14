@@ -1461,7 +1461,10 @@ func floatingPromiseCallableArgumentApplicability(
   actualParameters := actual.Parameters()
   if shimchecker.Checker_getMinArgumentCount(checker, actual) >
     shimchecker.Checker_getMinArgumentCount(checker, expected) {
-    return floatingPromiseCallIncompatible
+    // Function compatibility uses effective target parameter counts and then
+    // applies optional-parameter and callback-variance rules. Comparing the
+    // two minima alone cannot conclusively exclude this candidate.
+    return floatingPromiseCallUncertain
   }
   comparableParameters := len(actualParameters)
   if comparableParameters > len(expectedParameters) {

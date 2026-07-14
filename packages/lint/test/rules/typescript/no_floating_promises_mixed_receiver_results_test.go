@@ -190,6 +190,12 @@ interface ConstrainedGenericCatch {
 interface ExplicitGenericCatch {
   catch<T>(onRejected: () => T): T;
 }
+interface PartialDefaultGenericThen {
+  then<T, U = number>(value: U, factory: () => T): T;
+}
+interface DependentDefaultGenericThen {
+  then<T, U = T>(value: U, factory: () => T): T;
+}
 interface NonGenericCallbackCatch {
   catch(onRejected: (reason: unknown) => void): undefined;
 }
@@ -228,6 +234,10 @@ declare const constrainedValid: Promise<void> | ConstrainedGenericCatch;
 declare const constrainedMismatch: Promise<void> | ConstrainedGenericCatch;
 declare const explicitValid: Promise<void> | ExplicitGenericCatch;
 declare const explicitMismatch: Promise<void> | ExplicitGenericCatch;
+declare const partialDefaultValid: Promise<void> | PartialDefaultGenericThen;
+declare const partialDefaultMismatch: Promise<void> | PartialDefaultGenericThen;
+declare const dependentDefaultValid: Promise<void> | DependentDefaultGenericThen;
+declare const dependentDefaultMismatch: Promise<void> | DependentDefaultGenericThen;
 declare const nonGenericCallbackValid: Promise<void> | NonGenericCallbackCatch;
 declare const nonGenericCallbackMismatch: Promise<void> | NonGenericCallbackCatch;
 declare const taggedValid: Promise<void> | TaggedGenericCatch;
@@ -251,6 +261,10 @@ constrainedValid.catch<number>(() => 1);
 constrainedMismatch.catch<string>(() => "not a number");
 explicitValid.catch<undefined>(() => undefined);
 explicitMismatch.catch<undefined>(() => Promise.resolve());
+partialDefaultValid.then<undefined>(1, () => undefined);
+partialDefaultMismatch.then<undefined>("not a number", () => undefined);
+dependentDefaultValid.then<undefined>(undefined, () => undefined);
+dependentDefaultMismatch.then<undefined>(Promise.resolve(), () => undefined);
 nonGenericCallbackValid.catch((reason: unknown) => undefined);
 nonGenericCallbackMismatch.catch((reason: string) => undefined);
 taggedValid.catch(taggedFactory);
@@ -285,6 +299,8 @@ function checkUncertainArray<U>(
     "callbackMismatch.then",
     "constrainedMismatch.catch",
     "explicitMismatch.catch",
+    "partialDefaultMismatch.then",
+    "dependentDefaultMismatch.then",
     "nonGenericCallbackMismatch.catch",
     "taggedMismatch.catch",
     "uncertainOverload.catch",

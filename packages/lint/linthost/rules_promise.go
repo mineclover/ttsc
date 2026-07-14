@@ -1128,7 +1128,7 @@ func floatingPromiseSignatureApplicability(
     if parameterType == nil || argumentType == nil {
       return floatingPromiseCallUncertain
     }
-    if floatingPromiseArgumentNeedsCandidateContext(argument) {
+    if checker.IsContextSensitive(argument) {
       if !floatingPromiseFunctionArgument(argument) {
         return floatingPromiseCallUncertain
       }
@@ -1203,6 +1203,20 @@ func floatingPromiseGenericSignatureApplicability(
     }
     explicit[index] = typeArgument
   }
+  if len(typeArgumentNodes) != 0 {
+    // TypeScript does not infer omitted type arguments after the caller has
+    // supplied an explicit prefix. Its public FillMissingTypeArguments query
+    // applies and instantiates every remaining default with the same mapper.
+    explicit = checker.FillMissingTypeArguments(
+      explicit[:len(typeArgumentNodes)],
+      typeParameters,
+      checker.GetMinTypeArgumentCount(typeParameters),
+      false,
+    )
+    if len(explicit) != len(typeParameters) {
+      return floatingPromiseCallUncertain
+    }
+  }
 
   inferred := make(map[*shimchecker.Type][]*shimchecker.Type, len(typeParameters))
   for index, argument := range arguments {
@@ -1270,7 +1284,7 @@ func floatingPromiseGenericArgumentApplicability(
     return floatingPromiseCallUncertain
   }
   if typeParameterIndex := floatingPromiseTypeParameterIndex(typeParameters, parameterType); typeParameterIndex >= 0 {
-    if floatingPromiseArgumentNeedsCandidateContext(argument) {
+    if checker.IsContextSensitive(argument) {
       return floatingPromiseCallUncertain
     }
     typeParameter := typeParameters[typeParameterIndex]
@@ -1315,7 +1329,7 @@ func floatingPromiseGenericArgumentApplicability(
   if floatingPromiseTypeContainsAnyTypeParameter(checker, parameterType, typeParameters, call.Expression, nil) {
     return floatingPromiseCallUncertain
   }
-  if floatingPromiseArgumentNeedsCandidateContext(argument) {
+  if checker.IsContextSensitive(argument) {
     // Object, array, and branching literals require the candidate-specific
     // contextual mapper that is intentionally unavailable here.
     return floatingPromiseCallUncertain
@@ -1574,6 +1588,7 @@ func floatingPromiseTypeContainsAnyTypeParameter(
     }
   }
   if t.Flags()&(shimchecker.TypeFlagsConditional|
+    shimchecker.TypeFlagsIndex|
     shimchecker.TypeFlagsIndexedAccess|
     shimchecker.TypeFlagsSubstitution|
     shimchecker.TypeFlagsStringMapping|
@@ -1622,27 +1637,6 @@ func floatingPromiseTypeContainsAnyTypeParameter(
 func floatingPromiseFunctionArgument(node *shimast.Node) bool {
   node = unwrapFloatingPromiseExpression(node)
   return node != nil && (node.Kind == shimast.KindArrowFunction || node.Kind == shimast.KindFunctionExpression)
-}
-
-func floatingPromiseArgumentNeedsCandidateContext(node *shimast.Node) bool {
-  node = unwrapFloatingPromiseExpression(node)
-  if node == nil {
-    return false
-  }
-  switch node.Kind {
-  case shimast.KindArrowFunction,
-    shimast.KindFunctionExpression,
-    shimast.KindObjectLiteralExpression,
-    shimast.KindArrayLiteralExpression,
-    shimast.KindConditionalExpression:
-    return true
-  case shimast.KindBinaryExpression:
-    binary := node.AsBinaryExpression()
-    return binary != nil && binary.OperatorToken != nil &&
-      (binary.OperatorToken.Kind == shimast.KindBarBarToken ||
-        binary.OperatorToken.Kind == shimast.KindQuestionQuestionToken)
-  }
-  return false
 }
 
 func floatingPromiseTypeMayAcceptFunction(checker *shimchecker.Checker, t *shimchecker.Type) bool {
@@ -1798,14 +1792,27 @@ func floatingPromiseNakedReturnInferences(
     return nil
   }
   typeArguments := call.AsNode().TypeArguments()
-  if typeParameterIndex >= 0 && typeParameterIndex < len(typeArguments) {
-    if explicit := checker.GetTypeFromTypeNode(typeArguments[typeParameterIndex]); explicit != nil {
-      if !floatingPromiseTypeParameterAccepts(checker, typeParameter, explicit) {
+  if len(typeArguments) != 0 {
+    provided := make([]*shimchecker.Type, len(typeArguments))
+    for index, typeArgument := range typeArguments {
+      if typeArgument == nil {
         return nil
       }
-      return []*shimchecker.Type{explicit}
+      provided[index] = checker.GetTypeFromTypeNode(typeArgument)
+      if provided[index] == nil {
+        return nil
+      }
     }
-    return nil
+    filled := checker.FillMissingTypeArguments(
+      provided,
+      signature.TypeParameters(),
+      checker.GetMinTypeArgumentCount(signature.TypeParameters()),
+      false,
+    )
+    if typeParameterIndex < 0 || typeParameterIndex >= len(filled) {
+      return nil
+    }
+    return []*shimchecker.Type{filled[typeParameterIndex]}
   }
   if call.Arguments == nil {
     return nil
@@ -1843,6 +1850,18 @@ func floatingPromiseNakedReturnInferences(
           }
         }
       }
+    }
+  }
+  if len(inferred) == 0 {
+    defaultType := checker.GetDefaultFromTypeParameter(typeParameter)
+    if defaultType != nil && !floatingPromiseTypeContainsAnyTypeParameter(
+      checker,
+      defaultType,
+      signature.TypeParameters(),
+      call.Expression,
+      nil,
+    ) && floatingPromiseTypeParameterAccepts(checker, typeParameter, defaultType) {
+      return []*shimchecker.Type{defaultType}
     }
   }
   return inferred

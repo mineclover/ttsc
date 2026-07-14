@@ -861,6 +861,7 @@ func analyzeFloatingPromiseCall(
 
   var nonPromiseReceivers []*shimchecker.Type
   sawPromiseReceiver := false
+  sawUnsafePromiseReceiver := false
   receiverIsOptional := floatingPromisePropertyAccessIsOptional(call.Expression)
   for _, part := range promiseUnionParts(apparent) {
     if part == nil {
@@ -870,11 +871,14 @@ func analyzeFloatingPromiseCall(
       continue
     }
 
-    safePromise := typeMatchesSomePromiseSpecifier(ctx, part, options.AllowForKnownSafePromises)
-    if safePromise ||
-      isNativePromiseInstanceLike(ctx.Checker, part) ||
+    if typeMatchesSomePromiseSpecifier(ctx, part, options.AllowForKnownSafePromises) {
+      sawPromiseReceiver = true
+      continue
+    }
+    if isNativePromiseInstanceLike(ctx.Checker, part) ||
       (options.CheckThenables && isCatchableThenableAtLocation(ctx.Checker, receiver, part)) {
       sawPromiseReceiver = true
+      sawUnsafePromiseReceiver = true
       continue
     }
     nonPromiseReceivers = append(nonPromiseReceivers, part)
@@ -883,24 +887,30 @@ func analyzeFloatingPromiseCall(
     return floatingPromiseResult{unhandled: callResultIsFloating}
   }
 
-  switch method {
-  case "catch":
-    if result := rejectionHandlerResult(ctx, call, 0); result.unhandled {
-      return result
-    }
-  case "then":
-    if call.Arguments != nil && len(call.Arguments.Nodes) != 0 && call.Arguments.Nodes[0].Kind == shimast.KindSpreadElement {
+  // A Promise type covered by allowForKnownSafePromises may be discarded
+  // without proving a rejection handler. Preserve that contract when every
+  // Promise receiver branch and the call result are safe, while still checking
+  // unsafe Promise branches and unsafe results returned from a safe subtype.
+  if sawUnsafePromiseReceiver || callResultIsFloating {
+    switch method {
+    case "catch":
+      if result := rejectionHandlerResult(ctx, call, 0); result.unhandled {
+        return result
+      }
+    case "then":
+      if call.Arguments != nil && len(call.Arguments.Nodes) != 0 && call.Arguments.Nodes[0].Kind == shimast.KindSpreadElement {
+        return floatingPromiseResult{unhandled: true}
+      }
+      if result := rejectionHandlerResult(ctx, call, 1); result.unhandled {
+        return result
+      }
+    case "finally":
+      if result := analyzeFloatingPromise(ctx, receiver, options); result.unhandled {
+        return result
+      }
+    default:
       return floatingPromiseResult{unhandled: true}
     }
-    if result := rejectionHandlerResult(ctx, call, 1); result.unhandled {
-      return result
-    }
-  case "finally":
-    if result := analyzeFloatingPromise(ctx, receiver, options); result.unhandled {
-      return result
-    }
-  default:
-    return floatingPromiseResult{unhandled: true}
   }
 
   for _, part := range nonPromiseReceivers {

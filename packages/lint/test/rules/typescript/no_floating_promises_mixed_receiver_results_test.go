@@ -174,10 +174,17 @@ handledThenableReceiver.catch(() => undefined);
 unsafeThenableReturn.catch(() => undefined);
 allowedCall();
 Promise.resolve();
+interface IgnoredPromise<T> extends Promise<T> {
+  catch<TResult = never>(
+    onRejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
+  ): IgnoredPromise<T | TResult>;
+}
+declare const ignoredPromise: IgnoredPromise<void>;
+ignoredPromise.catch();
 `
   options := map[string]any{
     "allowForKnownSafeCalls":    []any{"allowedCall"},
-    "allowForKnownSafePromises": []any{"SafePromise"},
+    "allowForKnownSafePromises": []any{"SafePromise", "IgnoredPromise"},
     "checkThenables":            true,
   }
   code, stdout, stderr = runNoFloatingPromisesCase(t, optionSource, options)

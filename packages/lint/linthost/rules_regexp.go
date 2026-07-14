@@ -487,7 +487,19 @@ func regexpNodeIsCaseVariant(node regexNode, unicodeMode bool) bool {
       return unicodeMode
     }
     return regexpNodeIsCaseVariant(n.Assertion, unicodeMode)
+  case *regexBackreferenceNode:
+    // `i` canonicalizes the backreference comparison itself.
+    return true
+  case *regexUnicodePropertyNode:
+    // Whether `\p{...}` is closed under case folding needs the Unicode property
+    // tables, not the source text: `\p{Lu}` moves under `i`, `\p{Nd}` does not.
+    return true
+  case *regexClassSetNode:
+    // A `v`-mode set-notation class is kept verbatim by the parser, so its
+    // members are not available to judge.
+    return true
   }
+  // An unmodeled node keeps the flag: silence beats a wrong deletion.
   return true
 }
 

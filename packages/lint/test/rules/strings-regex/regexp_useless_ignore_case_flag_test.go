@@ -39,11 +39,14 @@ func TestRegexpUselessIgnoreCaseFlag(t *testing.T) {
     {`/[\u4e00-\u9fa5]/i`, true, "no CJK ideograph has a case-folded counterpart"},
     {`/[\b]/i`, true, "inside a class \\b is the backspace character"},
     {`/\cA/i`, true, "\\cA is a control code point"},
+    {`/\60/i`, true, "the legacy octal escape \\60 decodes to the digit 0"},
+    {`/\8/i`, true, "Annex B \\8 matches the bare digit"},
     {`/\w+/i`, true, "without u, \\w is [A-Za-z0-9_] with or without the flag"},
     {`/\b\d/i`, true, "without u, \\b is defined over that same \\w"},
     {`/(?<year>\d{4})/i`, true, "a group name is never matched against the input"},
     {`/(?:\d{2,4})?/i`, true, "groups and quantifiers contribute no characters"},
     {`/[\d\s]|[.,]/i`, true, "both alternatives are case-invariant"},
+    {`/(?:)/i`, true, "an empty pattern matches no character at all"},
 
     // Live `i`: the flag widens what the pattern matches.
     {`/[a-z]/i`, false, "the reported regression: i extends [a-z] to A-Z"},
@@ -53,6 +56,7 @@ func TestRegexpUselessIgnoreCaseFlag(t *testing.T) {
     {`/[^a-z]/i`, false, "negation does not make the letters go away"},
     {`/[a-zA-Z]/i`, false, "upstream judges a class element by element"},
     {`/[\x41]/i`, false, "an escape inside a class still decodes to A"},
+    {`/\101/i`, false, "and the legacy octal escape \\101 decodes to A"},
     {`/\u0061/i`, false, "and \\u0061 decodes to a"},
     {`/[\u0061-\u007a]/i`, false, "an escaped range is still a-z"},
     {`/[\d-z]/i`, false, "Annex B reads [\\d-z] as \\d, -, z"},
@@ -68,6 +72,8 @@ func TestRegexpUselessIgnoreCaseFlag(t *testing.T) {
     {`/(.)\1/i`, false, "i canonicalizes the backreference: /(.)\\1/i matches aA"},
     {`/(\d)\1/i`, false, "conservative: every backreference counts"},
     {`/[\q{ab}]/vi`, false, "the v-mode string ab re-cases to AB"},
+    {`/[\u{20000}-\u{10FFFF}]/iu`, false, "conservative: a range this wide is not fold-scanned"},
+    {`/\c/i`, false, "a dangling \\c matches the two characters \\ and c"},
   }
   for _, tc := range cases {
     source := "const value = " + tc.literal + ";\n"

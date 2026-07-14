@@ -75,6 +75,14 @@ class StrictClass {
   }
 }
 
+const StrictClassExpression = class {
+  method() {
+    if (classExpressionCondition) {
+      function classExpressionNested() {}
+    }
+  }
+};
+
 function rootFunction() {}
 `, "")
 }

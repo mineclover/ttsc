@@ -432,12 +432,18 @@ func TestUnicornPreventAbbreviationsChecksShorthandDestructuringOnlyWhenEnabled(
   )
 }
 
-func TestUnicornPreventAbbreviationsPreservesShorthandExportNames(t *testing.T) {
+func TestUnicornPreventAbbreviationsPreservesExportedAliasNames(t *testing.T) {
   source := "const err = new Error();\nexport { err };\n"
   assertFixSnapshot(
     t,
     unicornPreventAbbreviationsRuleName,
     source,
+    "const error = new Error();\nexport { error as err };\n",
+  )
+  assertFixSnapshot(
+    t,
+    unicornPreventAbbreviationsRuleName,
+    "const err = new Error();\nexport { err as err };\n",
     "const error = new Error();\nexport { error as err };\n",
   )
 }

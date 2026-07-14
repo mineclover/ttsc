@@ -95,6 +95,14 @@ genericResult.catch(() => undefined);
 genericResult.catch(() => Promise.resolve());
 genericResult.catch<undefined>(() => undefined);
 genericResult.catch<Promise<void>>(() => Promise.resolve());
+interface ReorderedCatchResult {
+  catch(onRejected: (reason: unknown) => void): undefined;
+}
+interface ReorderedCatchResult {
+  catch(onRejected: (reason: unknown) => void): Promise<void>;
+}
+declare const reordered: Promise<void> | ReorderedCatchResult;
+reordered.catch(() => undefined);
 `, nil)
   if code != 2 || stdout != "" {
     t.Fatalf("mixed receiver run mismatch: code=%d stdout=%q stderr=%q", code, stdout, stderr)
@@ -112,6 +120,7 @@ genericResult.catch<Promise<void>>(() => Promise.resolve());
     "main.ts:74:",
     "main.ts:76:",
     "main.ts:78:",
+    "main.ts:86:",
   }
   if got := strings.Count(stderr, "[typescript/no-floating-promises]"); got != len(expectedLines) {
     t.Fatalf("expected %d mixed receiver findings, got %d:\n%s", len(expectedLines), got, stderr)

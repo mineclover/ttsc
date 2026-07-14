@@ -1047,6 +1047,8 @@ func floatingPromiseEquivalentOverloads(
   }
   first := signatures[0]
   firstParameters := first.Parameters()
+  firstDeclaration := first.Declaration()
+  stableSourceOrder := firstDeclaration != nil
   if first.HasRestParameter() || len(first.TypeParameters()) != 0 {
     return false
   }
@@ -1068,6 +1070,27 @@ func floatingPromiseEquivalentOverloads(
         !checker.IsTypeAssignableTo(right, left) {
         return false
       }
+    }
+    declaration := signature.Declaration()
+    if declaration == nil || firstDeclaration == nil ||
+      declaration.Parent != firstDeclaration.Parent {
+      stableSourceOrder = false
+    }
+  }
+  if stableSourceOrder {
+    return true
+  }
+  // TypeScript's reorderCandidates reverses declaration-block groups for one
+  // merged symbol. When public data cannot prove stable source order, selecting
+  // an arbitrary declaration is safe only if every possible selection has the
+  // exact same return type.
+  firstReturn := checker.GetReturnTypeOfSignature(first)
+  if firstReturn == nil {
+    return false
+  }
+  for _, signature := range signatures[1:] {
+    if checker.GetReturnTypeOfSignature(signature) != firstReturn {
+      return false
     }
   }
   return true

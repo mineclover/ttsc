@@ -73,9 +73,8 @@ func (noUselessConstructor) Check(ctx *Context, node *shimast.Node) {
 }
 
 // hasParameterProperty reports whether any constructor parameter carries
-// TypeScript's canonical parameter-property modifier flag. Such a parameter
-// declares an instance
-// field, so the constructor is doing real work even if its body is
+// TypeScript's canonical parameter-property modifier flag. Such parameters
+// declare instance fields, so the constructor is doing real work even if its body is
 // empty — removing it would drop the field.
 func hasParameterProperty(node *shimast.Node) bool {
   for _, p := range node.Parameters() {

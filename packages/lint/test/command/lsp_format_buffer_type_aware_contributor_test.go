@@ -12,6 +12,13 @@ import (
 
 const dirtyBufferFormatContributorName = "test/dirty-buffer-format"
 
+// Register through the public contributor surface before TestMain performs the
+// package's one-time bootstrap. This mirrors a real blank-imported contributor
+// and avoids any test-only mutation of the internal rule registry.
+func init() {
+  publicrule.Register(dirtyBufferFormatContributor{})
+}
+
 // TestLSPFormatBufferTypeAwareContributorUsesDirtyContent guards the public
 // contributor path that requires a real Program and Checker.
 //
@@ -21,8 +28,6 @@ const dirtyBufferFormatContributorName = "test/dirty-buffer-format"
 // a range measured against the wrong document. A syntactically invalid dirty
 // buffer must also fail closed instead of formatting the valid disk twin.
 func TestLSPFormatBufferTypeAwareContributorUsesDirtyContent(t *testing.T) {
-  registerDirtyBufferFormatContributor(t)
-
   disk := `import { imported } from "./dep";
 const value = imported;
 const diskOnly = "FIRST";
@@ -62,20 +67,6 @@ const bufferOnly = "FIRST";
       t.Fatalf("syntax-error dirty buffer edit = %#v, want no changes", edit)
     }
     assertFileText(t, target, disk)
-  })
-}
-
-func registerDirtyBufferFormatContributor(t *testing.T) {
-  t.Helper()
-  if existing := LookupRule(dirtyBufferFormatContributorName); existing != nil {
-    t.Fatalf("unexpected pre-registered %q rule", dirtyBufferFormatContributorName)
-  }
-  metadata, err := inspectContributor(dirtyBufferFormatContributor{})
-  if err != nil {
-    t.Fatalf("inspect contributor: %v", err)
-  }
-  Register(formatContributorAdapter{
-    contributorAdapter: newContributorAdapter(metadata),
   })
 }
 

@@ -101,9 +101,14 @@ keyed.catch({});
     if indexInfo == nil {
       t.Fatal("mapped-key parameter exposes a nil index info")
     }
+    keyType := indexInfo.KeyType()
+    valueType := indexInfo.ValueType()
+    if keyType == nil || valueType == nil {
+      t.Fatal("mapped-key index info has a nil key or value type")
+    }
     if floatingPromiseTypeContainsAnyTypeParameter(
       prog.checker,
-      indexInfo.ValueType(),
+      valueType,
       signatures[0].TypeParameters(),
       call.Expression,
       nil,
@@ -112,7 +117,7 @@ keyed.catch({});
     }
     if floatingPromiseTypeContainsAnyTypeParameter(
       prog.checker,
-      indexInfo.KeyType(),
+      keyType,
       signatures[0].TypeParameters(),
       call.Expression,
       nil,

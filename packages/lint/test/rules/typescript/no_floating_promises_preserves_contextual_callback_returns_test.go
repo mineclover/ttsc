@@ -145,6 +145,10 @@ genericContextual<"narrow">(() => "narrow");
     got != floatingPromiseCallUncertain {
     t.Fatalf("literal-return candidate applicability = %d, want uncertain", got)
   }
+  if got := floatingPromiseSignatureApplicability(prog.checker, contextualExpression, signatures[1]);
+    got != floatingPromiseCallApplicable {
+    t.Fatalf("safe concrete candidate applicability = %d, want applicable", got)
+  }
   ctx := &Context{File: file, Checker: prog.checker, CurrentDirectory: root}
   if got := floatingPromiseApplicableSignature(ctx, contextualExpression, signatures); got != nil {
     t.Fatal("safe overload selected after discarding a context-sensitive candidate")
@@ -166,6 +170,13 @@ genericContextual<"narrow">(() => "narrow");
   ); got != floatingPromiseCallUncertain {
     t.Fatalf("generic literal-return candidate applicability = %d, want uncertain", got)
   }
+  if got := floatingPromiseSignatureApplicability(
+    prog.checker,
+    genericContextualExpression,
+    genericSignatures[1],
+  ); got != floatingPromiseCallApplicable {
+    t.Fatalf("safe generic candidate applicability = %d, want applicable", got)
+  }
   if got := floatingPromiseApplicableSignature(ctx, genericContextualExpression, genericSignatures); got != nil {
     t.Fatal("safe generic overload selected after discarding a context-sensitive candidate")
   }
@@ -180,6 +191,13 @@ genericContextual<"narrow">(() => "narrow");
     constrainedSignatures[0],
   ); got != floatingPromiseCallUncertain {
     t.Fatalf("constrained literal-return candidate applicability = %d, want uncertain", got)
+  }
+  if got := floatingPromiseSignatureApplicability(
+    prog.checker,
+    contextualExpression,
+    constrainedSignatures[1],
+  ); got != floatingPromiseCallApplicable {
+    t.Fatalf("safe constrained twin applicability = %d, want applicable", got)
   }
   if got := floatingPromiseApplicableSignature(ctx, contextualExpression, constrainedSignatures); got != nil {
     t.Fatal("safe overload selected after discarding a constrained context-sensitive candidate")

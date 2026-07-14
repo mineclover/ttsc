@@ -804,7 +804,7 @@ Source: [`eslint-plugin-promise`](https://github.com/eslint-community/eslint-plu
 
 ### Unicorn
 
-Modernization and style rules spanning array iteration, string and regex idioms, Node.js APIs, error handling, module syntax, DOM APIs, and code shape. Rewrite legacy patterns into their modern counterparts (`for...of` over `forEach`, `Array#flatMap` over `map().flat()`, `String#replaceAll` over a global-regex `replace`, `Math.trunc` over `| 0`), forbid known anti-patterns (`null` literals, abusive `eslint-disable`, `new Buffer`, `process.exit`, `instanceof Array`), and pin a consistent style for things [ESLint core](#eslint-core) and [TypeScript](#typescript) leave underspecified (filename case, numeric separators, catch-binding names, expiring TODOs, escape-sequence case, switch-case braces). Pure-AST; no checker dependencies.
+Modernization and style rules spanning array iteration, string and regex idioms, Node.js APIs, error handling, module syntax, DOM APIs, and code shape. Rewrite legacy patterns into their modern counterparts (`for...of` over `forEach`, `Array#flatMap` over `map().flat()`, `String#replaceAll` over a global-regex `replace`, `Math.trunc` over `| 0`), forbid known anti-patterns (`null` literals, abusive `eslint-disable`, `new Buffer`, `process.exit`, `instanceof Array`), and pin a consistent style for things [ESLint core](#eslint-core) and [TypeScript](#typescript) leave underspecified (filename case, numeric separators, catch-binding names, expiring TODOs, escape-sequence case, switch-case braces). Most rules are pure AST checks; binding-aware rules use the TypeScript checker when lexical identity is part of the contract.
 
 Source: [`eslint-plugin-unicorn`](https://github.com/sindresorhus/eslint-plugin-unicorn).
 

@@ -101,6 +101,27 @@ func TestUnicornPreventAbbreviationsAllowsGeneratedNamesToShadowWithoutCapture(t
   )
 }
 
+func TestUnicornPreventAbbreviationsKeepsIndependentLoopAndSwitchScopesIndependent(t *testing.T) {
+  source := "function log(errors: string[], first: number, second: number): void {\n  for (const err of errors) console.log(err);\n  for (const err of errors) console.log(err);\n  switch (first) {\n    case 0:\n      const err = \"first\";\n      console.log(err);\n      break;\n  }\n  switch (second) {\n    case 0:\n      const err = \"second\";\n      console.log(err);\n      break;\n  }\n}\nvoid log;\n"
+  assertFixSnapshot(
+    t,
+    unicornPreventAbbreviationsRuleName,
+    source,
+    "function log(errors: string[], first: number, second: number): void {\n  for (const error of errors) console.log(error);\n  for (const error of errors) console.log(error);\n  switch (first) {\n    case 0:\n      const error = \"first\";\n      console.log(error);\n      break;\n  }\n  switch (second) {\n    case 0:\n      const error = \"second\";\n      console.log(error);\n      break;\n  }\n}\nvoid log;\n",
+  )
+}
+
+func TestUnicornPreventAbbreviationsIgnoresNonLexicalJSXAndTupleNamesForCollisions(t *testing.T) {
+  source := "type Pair = [error: string];\nconst btn = document.createElement(\"button\");\nconst err = new Error();\nconst view = <button />;\nconsole.log(btn, err, view);\n"
+  assertFixSnapshotFile(
+    t,
+    unicornPreventAbbreviationsRuleName,
+    "main.tsx",
+    source,
+    "type Pair = [error: string];\nconst button = document.createElement(\"button\");\nconst error = new Error();\nconst view = <button />;\nconsole.log(button, error, view);\n",
+  )
+}
+
 func TestUnicornPreventAbbreviationsSeparatesGeneratedNamesAtCrossScopeReads(t *testing.T) {
   source := "const errCb = \"outer\";\n{\n  console.log(errCb);\n  const errorCb = \"inner\";\n  console.log(errorCb);\n}\n"
   assertFixSnapshot(
@@ -294,6 +315,16 @@ func TestUnicornPreventAbbreviationsPreservesShorthandExportNames(t *testing.T) 
   )
 }
 
+func TestUnicornPreventAbbreviationsRenamesDefaultExportLocalNames(t *testing.T) {
+  source := "export default function err(depth: number): void {\n  if (depth > 0) err(depth - 1);\n}\n"
+  assertFixSnapshot(
+    t,
+    unicornPreventAbbreviationsRuleName,
+    source,
+    "export default function error(depth: number): void {\n  if (depth > 0) error(depth - 1);\n}\n",
+  )
+}
+
 func TestUnicornPreventAbbreviationsPropertyChecksAreOptInAndSuggestionOnly(t *testing.T) {
   source := "class Store {\n  e = 0;\n  update(): void {\n    this.e = 1;\n  }\n}\nvoid Store;\n"
   assertRuleSkipsSource(t, unicornPreventAbbreviationsRuleName, source)
@@ -311,6 +342,16 @@ func TestUnicornPreventAbbreviationsPropertyChecksAreOptInAndSuggestionOnly(t *t
       t.Fatalf("properties must be suggestion-only for ambiguous names: %+v", finding)
     }
   }
+}
+
+func TestUnicornPreventAbbreviationsDoesNotReportDestructuringAssignmentKeysAsProperties(t *testing.T) {
+  source := "const source = {} as Record<string, number>;\nlet local = 0;\n({ err: local } = source);\nvoid local;\n"
+  assertRuleSkipsSourceWithOptions(
+    t,
+    unicornPreventAbbreviationsRuleName,
+    source,
+    `{"checkVariables":false,"checkProperties":true}`,
+  )
 }
 
 func TestUnicornPreventAbbreviationsAllowsReservedWordsInPropertySuggestions(t *testing.T) {
@@ -353,6 +394,9 @@ func TestUnicornPreventAbbreviationsChecksPhysicalFilenameWithoutOfferingEdits(t
   )
   if len(findings) != 0 {
     t.Fatalf("checkFilenames false should suppress filename findings: %+v", findings)
+  }
+  if extension := unicornPreventAbbreviationsFilenameExtension(".err"); extension != "" {
+    t.Fatalf("leading-dot basename must not be treated as an extension: %q", extension)
   }
 }
 
@@ -506,6 +550,7 @@ func TestUnicornPreventAbbreviationsRejectsMalformedOptions(t *testing.T) {
     `{"checkVariables":null}`,
     `{"checkShorthandImports":"external"}`,
     `{"replacements":{"err":true}}`,
+    `{"replacements":{"err":null}}`,
     `{"allowList":{"err":"yes"}}`,
     `{"ignore":["("]}`,
   }

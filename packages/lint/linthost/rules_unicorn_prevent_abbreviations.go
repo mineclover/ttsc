@@ -1919,7 +1919,10 @@ func unicornPreventAbbreviationsASCIIWord(value string) bool {
 
 func unicornPreventAbbreviationsStartsUpper(value string) bool {
   first, _ := utf8.DecodeRuneInString(value)
-  return unicode.IsUpper(first)
+  // Upstream compares the first UTF-16 code unit with its upper-case form.
+  // Consequently uncased ASCII characters (`$`, `_`, digits) and either half
+  // of an astral rune count as upper-first too.
+  return first > 0xFFFF || unicode.ToUpper(first) == first
 }
 
 func lowerUnicornPreventAbbreviationsFirst(value string) string {

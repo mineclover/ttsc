@@ -38,8 +38,11 @@ func runUnicornImportStyleFindings(t *testing.T, source, optionsJSON string) []u
     options = json.RawMessage(optionsJSON)
   }
   _, _, findings := runRuleFindingsSnapshot(t, unicornImportStyleRuleName, source, options)
-  normalized := make([]unicornImportStyleFinding, 0, len(findings))
-  positions := make([]int, 0, len(findings))
+  type positionedFinding struct {
+    pos     int
+    finding unicornImportStyleFinding
+  }
+  entries := make([]positionedFinding, 0, len(findings))
   for _, finding := range findings {
     if finding.Rule != unicornImportStyleRuleName {
       t.Fatalf("unexpected rule in findings: %+v", finding)
@@ -50,15 +53,21 @@ func runUnicornImportStyleFindings(t *testing.T, source, optionsJSON string) []u
     if finding.Pos < 0 || finding.End <= finding.Pos || finding.End > len(source) {
       t.Fatalf("unicorn/import-style returned an invalid source range: %+v", finding)
     }
-    normalized = append(normalized, unicornImportStyleFinding{
-      target:  source[finding.Pos:finding.End],
-      message: finding.Message,
+    entries = append(entries, positionedFinding{
+      pos: finding.Pos,
+      finding: unicornImportStyleFinding{
+        target:  source[finding.Pos:finding.End],
+        message: finding.Message,
+      },
     })
-    positions = append(positions, finding.Pos)
   }
-  sort.SliceStable(normalized, func(i, j int) bool {
-    return positions[i] < positions[j]
+  sort.SliceStable(entries, func(i, j int) bool {
+    return entries[i].pos < entries[j].pos
   })
+  normalized := make([]unicornImportStyleFinding, len(entries))
+  for index, entry := range entries {
+    normalized[index] = entry.finding
+  }
   return normalized
 }
 
@@ -717,7 +726,10 @@ void [foo, bar, baz, qux];
 // `import … = require(…)` equals-declarations, and local exports.
 //
 // Each shape is one property away from a reported form, so any
-// over-broad matcher in the call or declarator path fails here.
+// over-broad matcher in the call or declarator path fails here. One
+// deliberate deviation hides in `const y = require()`: upstream throws
+// (`sourceCode.getScope(undefined)`) on the argument-less declarator,
+// so graceful silence is this port's canonical replacement for a crash.
 //
 //  1. Configure the four policy modules plus default table.
 //  2. Write every near-miss shape.

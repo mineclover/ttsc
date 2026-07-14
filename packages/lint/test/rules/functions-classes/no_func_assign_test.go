@@ -92,10 +92,10 @@ const writeCaptured = (): void => {
   /* report */captured = replacement;
 };
 
-const expression = function namedExpression() {
+let expression = function namedExpression() {
   /* report */namedExpression = replacement;
 };
-void expression;
+expression = replacement;
 
 function overloaded(value: string): string;
 function overloaded(value: number): number;

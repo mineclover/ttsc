@@ -72,7 +72,9 @@ func (noSelfCompare) Check(ctx *Context, node *shimast.Node) {
 }
 
 // isComparisonOperator reports whether kind is one of the eight standard
-// comparison operators: ==, ===, !=, !==, <, >, <=, >=.
+// comparison operators: ==, ===, !=, !==, <, >, <=, >=. Rules whose upstream
+// operator set spans both equality and ordering (no-self-compare, use-isnan,
+// no-compare-neg-zero, yoda) gate on this one.
 func isComparisonOperator(kind shimast.Kind) bool {
   switch kind {
   case
@@ -84,6 +86,24 @@ func isComparisonOperator(kind shimast.Kind) bool {
     shimast.KindGreaterThanToken,
     shimast.KindLessThanEqualsToken,
     shimast.KindGreaterThanEqualsToken:
+    return true
+  }
+  return false
+}
+
+// isEqualityOperator reports whether kind is one of the four equality
+// operators: ==, ===, !=, !==. It is the sameness-testing half of
+// isComparisonOperator, for the rules whose upstream operator set stops at
+// equality (valid-typeof, security/detect-possible-timing-attacks): the four
+// relational operators order their operands instead of testing them for
+// identity.
+func isEqualityOperator(kind shimast.Kind) bool {
+  switch kind {
+  case
+    shimast.KindEqualsEqualsToken,
+    shimast.KindEqualsEqualsEqualsToken,
+    shimast.KindExclamationEqualsToken,
+    shimast.KindExclamationEqualsEqualsToken:
     return true
   }
   return false

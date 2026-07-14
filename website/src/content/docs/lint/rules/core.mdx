@@ -3034,6 +3034,8 @@ function f(x: number) {
 
 Restrict the right-hand operand of `typeof` to the documented strings (`"number"`, `"object"`, ...) so `typeof x === "undefiend"` typos are caught.
 
+Only equality comparisons (`==`, `===`, `!=`, `!==`) are checked. A relational comparison such as `typeof x < "m"` orders two strings instead of naming a type, so it is left alone.
+
 Example:
 
 ```ts

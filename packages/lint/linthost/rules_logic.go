@@ -311,7 +311,9 @@ func (useIsNaN) Check(ctx *Context, node *shimast.Node) {
 }
 
 // validTypeof: typeof expressions can only be compared to known type
-// strings. Catches `typeof x === "stirng"`.
+// strings. Catches `typeof x === "stirng"`. Scoped to the four equality
+// operators, like ESLint's own OPERATORS set — a relational comparison such as
+// `typeof x < "m"` orders two strings rather than naming a type.
 // https://eslint.org/docs/latest/rules/valid-typeof
 type validTypeof struct{}
 
@@ -322,7 +324,7 @@ func (validTypeof) Check(ctx *Context, node *shimast.Node) {
   if expr == nil || expr.OperatorToken == nil {
     return
   }
-  if !isComparisonOperator(expr.OperatorToken.Kind) {
+  if !isEqualityOperator(expr.OperatorToken.Kind) {
     return
   }
   left := stripParens(expr.Left)

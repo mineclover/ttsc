@@ -125,9 +125,13 @@ contextual(function () { return nestedFunctionUncached.catch(() => undefined); }
     if signature == nil {
       t.Fatalf("canonical signature is nil at %q", node.Text())
     }
+    returnType := prog.checker.GetReturnTypeOfSignature(signature)
+    if returnType == nil {
+      t.Fatalf("canonical return type is nil at %q", node.Text())
+    }
     return canonical{
       signature:  signature,
-      returnType: prog.checker.GetReturnTypeOfSignature(signature),
+      returnType: returnType,
     }
   }
   assertCanonical := func(node *shimast.Node, want canonical) {

@@ -53,6 +53,9 @@ keyed.catch({});
   }
   file := files[0]
   offset := strings.Index(file.Text(), "keyed.catch")
+  if offset < 0 {
+    t.Fatal("mapped-key fixture marker not found")
+  }
   node := shimast.GetNodeAtPosition(file, offset, false)
   for node != nil && node.Kind != shimast.KindCallExpression {
     node = node.Parent
@@ -61,15 +64,65 @@ keyed.catch({});
     t.Fatal("mapped-key fixture call not found")
   }
   call := node.AsCallExpression()
-  receiver := call.Expression.AsPropertyAccessExpression().Expression
+  if call == nil {
+    t.Fatal("mapped-key fixture node is not a call")
+  }
+  access := call.Expression.AsPropertyAccessExpression()
+  if access == nil {
+    t.Fatal("mapped-key fixture call is not a property access")
+  }
+  receiver := access.Expression
   receiverType := prog.checker.GetTypeAtLocation(receiver)
+  if receiverType == nil {
+    t.Fatal("mapped-key receiver has no type")
+  }
   property := prog.checker.GetPropertyOfType(receiverType, "catch")
+  if property == nil {
+    t.Fatal("mapped-key catch property not found")
+  }
   propertyType := prog.checker.GetTypeOfSymbolAtLocation(property, call.Expression)
+  if propertyType == nil {
+    t.Fatal("mapped-key catch property has no type")
+  }
   signatures := prog.checker.GetSignaturesOfType(propertyType, shimchecker.SignatureKindCall)
   if len(signatures) != 1 || len(signatures[0].TypeParameters()) != 1 {
     t.Fatalf("mapped-key signature mismatch: signatures=%d", len(signatures))
   }
   parameterType := floatingPromiseParameterType(prog.checker, call, signatures[0], 0)
+  if parameterType == nil {
+    t.Fatal("mapped-key parameter has no type")
+  }
+  indexInfos := prog.checker.GetIndexInfosOfType(parameterType)
+  if len(indexInfos) == 0 {
+    t.Fatal("mapped-key parameter exposes no index info")
+  }
+  sawLatentKey := false
+  for _, indexInfo := range indexInfos {
+    if indexInfo == nil {
+      t.Fatal("mapped-key parameter exposes a nil index info")
+    }
+    if floatingPromiseTypeContainsAnyTypeParameter(
+      prog.checker,
+      indexInfo.ValueType(),
+      signatures[0].TypeParameters(),
+      call.Expression,
+      nil,
+    ) {
+      t.Fatal("mapped index value unexpectedly retains a type parameter")
+    }
+    if floatingPromiseTypeContainsAnyTypeParameter(
+      prog.checker,
+      indexInfo.KeyType(),
+      signatures[0].TypeParameters(),
+      call.Expression,
+      nil,
+    ) {
+      sawLatentKey = true
+    }
+  }
+  if !sawLatentKey {
+    t.Fatal("mapped index key does not retain the method type parameter")
+  }
   if !floatingPromiseTypeContainsAnyTypeParameter(
     prog.checker,
     parameterType,

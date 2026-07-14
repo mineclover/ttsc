@@ -232,7 +232,7 @@ func (unicornPreventAbbreviations) Check(ctx *Context, node *shimast.Node) {
   bindings, bySymbol, byDeclaration, occupied := collectUnicornPreventAbbreviationsBindings(ctx, node)
   collectUnicornPreventAbbreviationsReferences(ctx, node, bySymbol, byDeclaration)
 
-  generated := make(map[string][]*shimast.Node)
+  generated := make(map[string][]*unicornPreventAbbreviationsBinding)
   if options.checkVariables {
     comments := collectUnicornPreventAbbreviationsComments(ctx.File)
     for _, binding := range bindings {
@@ -921,7 +921,7 @@ func reportUnicornPreventAbbreviationsBinding(
   binding *unicornPreventAbbreviationsBinding,
   options unicornPreventAbbreviationsOptions,
   occupied map[string][]unicornPreventAbbreviationsOccupiedName,
-  generated map[string][]*shimast.Node,
+  generated map[string][]*unicornPreventAbbreviationsBinding,
   comments map[int]commentToken,
 ) {
   if binding == nil || !unicornPreventAbbreviationsShouldCheckBinding(binding, options) {
@@ -955,7 +955,7 @@ func reportUnicornPreventAbbreviationsBinding(
     replacement := replacements.samples[0]
     edits := unicornPreventAbbreviationsRenameEdits(ctx, binding, replacement)
     if len(edits) > 0 {
-      generated[replacement] = append(generated[replacement], scopes...)
+      generated[replacement] = append(generated[replacement], binding)
       ctx.ReportFix(binding.nameNode, message, edits...)
       return
     }
@@ -1360,7 +1360,7 @@ func unicornPreventAbbreviationsAvailableName(
   desired string,
   scopes []*shimast.Node,
   occupied map[string][]unicornPreventAbbreviationsOccupiedName,
-  generated map[string][]*shimast.Node,
+  generated map[string][]*unicornPreventAbbreviationsBinding,
 ) string {
   candidate := desired
   if !unicornPreventAbbreviationsValidIdentifier(candidate) {
@@ -1371,7 +1371,7 @@ func unicornPreventAbbreviationsAvailableName(
   }
   for unicornPreventAbbreviationsCheckerNameCollides(ctx, candidate, binding) ||
     unicornPreventAbbreviationsOccupiedNameCollides(candidate, binding.scope, occupied) ||
-    unicornPreventAbbreviationsGeneratedNameCollides(candidate, scopes, generated) {
+    unicornPreventAbbreviationsGeneratedNameCollides(candidate, binding, scopes, generated) {
     candidate += "_"
   }
   return candidate
@@ -1410,10 +1410,10 @@ func unicornPreventAbbreviationsCheckerNameCollides(
   return false
 }
 
-// Each generated name is reserved only in the precise scopes where its
-// binding is declared or referenced. This allows legal shadowing in an inner
-// scope while still preventing a second rename from capturing an outer
-// binding's read inside that scope.
+// Each generated name retains its binding plus the precise scopes where it is
+// declared or referenced. This allows legal shadowing while still detecting
+// a newly renamed inner declaration that would capture an outer binding's read
+// in a deeper descendant scope.
 func unicornPreventAbbreviationsBindingReferenceScopes(
   binding *unicornPreventAbbreviationsBinding,
 ) []*shimast.Node {
@@ -1493,14 +1493,47 @@ func unicornPreventAbbreviationsOccupiedNameCollides(
 
 func unicornPreventAbbreviationsGeneratedNameCollides(
   name string,
+  binding *unicornPreventAbbreviationsBinding,
   scopes []*shimast.Node,
-  names map[string][]*shimast.Node,
+  names map[string][]*unicornPreventAbbreviationsBinding,
 ) bool {
-  for _, scope := range scopes {
-    for _, existingScope := range names[name] {
-      if scope == existingScope {
+  for _, existing := range names[name] {
+    existingScopes := unicornPreventAbbreviationsBindingReferenceScopes(existing)
+    for _, scope := range scopes {
+      for _, existingScope := range existingScopes {
+        if scope == existingScope {
+          return true
+        }
+      }
+    }
+    if binding == nil || existing == nil || binding.scope == nil || existing.scope == nil {
+      return true
+    }
+    if unicornPreventAbbreviationsIsAncestor(binding.scope, existing.scope) {
+      if unicornPreventAbbreviationsBindingHasReferenceInScope(binding, existing.scope) {
         return true
       }
+    } else if unicornPreventAbbreviationsIsAncestor(existing.scope, binding.scope) {
+      if unicornPreventAbbreviationsBindingHasReferenceInScope(existing, binding.scope) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+func unicornPreventAbbreviationsBindingHasReferenceInScope(
+  binding *unicornPreventAbbreviationsBinding,
+  scope *shimast.Node,
+) bool {
+  if binding == nil || scope == nil {
+    return true
+  }
+  for _, reference := range binding.references {
+    referenceScope := unicornPreventAbbreviationsReferenceScope(reference)
+    if referenceScope == nil || referenceScope == scope ||
+      unicornPreventAbbreviationsIsAncestor(scope, referenceScope) {
+      return true
     }
   }
   return false

@@ -162,6 +162,16 @@ func TestUnicornPreventAbbreviationsSeparatesGeneratedNamesAtCrossScopeReads(t *
   )
 }
 
+func TestUnicornPreventAbbreviationsDoesNotCaptureOuterReadsWithUnusedInnerBindings(t *testing.T) {
+  source := "const cur = 1;\n{\n  const curr = 2;\n  {\n    console.log(cur);\n  }\n}\n"
+  assertFixSnapshot(
+    t,
+    unicornPreventAbbreviationsRuleName,
+    source,
+    "const current = 1;\n{\n  const current_ = 2;\n  {\n    console.log(current);\n  }\n}\n",
+  )
+}
+
 func TestUnicornPreventAbbreviationsExpandsCompoundAndCasedNamesButSkipsConstants(t *testing.T) {
   source := "class BtnFactory {}\nconst errCb = (): void => {};\nconst err文 = 1;\nconst errʰ = 2;\nconst ENV = \"test\";\nvoid [BtnFactory, errCb, err文, errʰ, ENV];\n"
   assertFixSnapshot(

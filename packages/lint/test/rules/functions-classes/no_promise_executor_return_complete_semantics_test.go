@@ -98,6 +98,12 @@ new Promise(() => 1);
 export {};
 `,
     },
+    {
+      name: "script global value declaration",
+      source: `declare var Promise: PromiseConstructor;
+new Promise(() => 1);
+`,
+    },
   }
 
   for _, testCase := range cases {

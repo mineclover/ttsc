@@ -2124,18 +2124,22 @@ The selector grammar follows esquery and supports:
 Native names are case-insensitive. Common ESTree names including `Program`,
 `ArrowFunctionExpression`, `ObjectExpression`, `ArrayExpression`,
 `VariableDeclarator`, `MemberExpression`, `AssignmentExpression`,
-`UpdateExpression`, `UnaryExpression`, `Literal`, `Property`, and the
+`LogicalExpression`, `UpdateExpression`, `UnaryExpression`, `Literal`,
+`Property`, `ThisExpression`, `Super`, `TemplateLiteral`, and the
 `TSAsExpression`/`TSTypeAssertion`/`TSSatisfiesExpression`/
 `TSNonNullExpression` family are aliases for their TypeScript-Go equivalents.
 
 Attribute paths expose `type`, `name`, `value`/`raw`, `operator`, variable
 `kind`, `async`, `generator`, `static`, `readonly`, `declare`, `optional`,
-`computed`, and the usual structural fields (`id`, `params`, `body`, `callee`,
+`computed`, `prefix`, and the usual structural fields (`id`, `params`, `body`, `callee`,
 `arguments`, `object`, `property`, `left`, `right`, `argument`, `expression`,
 `test`, `consequent`, `alternate`, `init`, `update`, `declarations`, `elements`,
 `properties`, `key`, `source`, and `statements`). Regular expressions use Go's
 linear-time RE2 syntax; `i`, `m`, and `s` change matching and `u` is accepted as
-an explicit no-op because Go strings are already UTF-8.
+an explicit no-op because Go strings are already UTF-8. Numeric segments index
+node-list paths, so selectors such as `[params.0.name='value']` are supported.
+Boolean properties are absent on node kinds that do not define them, rather
+than appearing as a synthetic `false` on every node.
 
 Tree relationships intentionally use TypeScript-Go's `Parent` and
 `ForEachChild` order. That makes TypeScript type, modifier, and token nodes

@@ -285,11 +285,6 @@ func (p *astSelectorParser) parseAttributeValue(operator string) (astSelectorVal
       return astSelectorValue{}, p.errorf("invalid type() value")
     }
     p.offset++
-    switch name {
-    case "string", "number", "boolean", "object", "undefined":
-    default:
-      return astSelectorValue{}, p.errorf("unknown type() value %q", name)
-    }
     return astSelectorValue{kind: astSelectorValueType, literal: name}, nil
   }
   start := p.offset
@@ -300,7 +295,8 @@ func (p *astSelectorParser) parseAttributeValue(operator string) (astSelectorVal
   if raw == "" {
     return astSelectorValue{}, p.errorf("expected attribute value")
   }
-  if number, err := strconv.ParseFloat(raw, 64); err == nil {
+  if astSelectorNumberPattern.MatchString(raw) {
+    number, _ := strconv.ParseFloat(raw, 64)
     return astSelectorValue{kind: astSelectorValueLiteral, literal: raw, number: &number}, nil
   }
   return astSelectorValue{kind: astSelectorValueLiteral, literal: raw}, nil
@@ -377,6 +373,9 @@ func (p *astSelectorParser) parseRegexp() (*regexp.Regexp, error) {
   }
   if end < 0 {
     return nil, p.errorf("unterminated regular expression")
+  }
+  if end == start {
+    return nil, p.errorf("regular expression must not be empty")
   }
   seenFlags := map[byte]struct{}{}
   var goFlags strings.Builder
@@ -483,7 +482,7 @@ func (p *astSelectorParser) parsePseudo() (*astSelector, error) {
     }
     return &astSelector{kind: kind, selectors: selectors}, nil
   default:
-    switch name {
+    switch strings.ToLower(name) {
     case "statement", "expression", "declaration", "function", "pattern":
       return &astSelector{kind: astSelectorClass, name: name}, nil
     default:
@@ -593,3 +592,5 @@ func (p *astSelectorParser) errorf(format string, args ...any) error {
 func isASTSelectorSpace(ch byte) bool {
   return ch < unicode.MaxASCII && unicode.IsSpace(rune(ch))
 }
+
+var astSelectorNumberPattern = regexp.MustCompile(`^(?:[0-9]*\.)?[0-9]+$`)

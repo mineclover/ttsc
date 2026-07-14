@@ -1,12 +1,12 @@
 package linthost
 
 import (
-  "fmt"
   "math"
   "strconv"
   "strings"
 
   shimast "github.com/microsoft/typescript-go/shim/ast"
+  shimscanner "github.com/microsoft/typescript-go/shim/scanner"
 )
 
 // matchASTSelector returns every node selected below root. A configured
@@ -275,6 +275,19 @@ func astSelectorMatchesNodeType(node *shimast.Node, requested string) bool {
     }
     expression := node.AsBinaryExpression()
     return expression != nil && expression.OperatorToken != nil && isAssignmentOperator(expression.OperatorToken.Kind)
+  case "logicalexpression":
+    if node.Kind != shimast.KindBinaryExpression {
+      return false
+    }
+    expression := node.AsBinaryExpression()
+    if expression == nil || expression.OperatorToken == nil {
+      return false
+    }
+    switch expression.OperatorToken.Kind {
+    case shimast.KindAmpersandAmpersandToken, shimast.KindBarBarToken, shimast.KindQuestionQuestionToken:
+      return true
+    }
+    return false
   case "updateexpression":
     if node.Kind == shimast.KindPrefixUnaryExpression {
       expression := node.AsPrefixUnaryExpression()
@@ -286,21 +299,31 @@ func astSelectorMatchesNodeType(node *shimast.Node, requested string) bool {
     }
     return false
   case "unaryexpression":
-    return node.Kind == shimast.KindPrefixUnaryExpression ||
-      node.Kind == shimast.KindDeleteExpression ||
+    if node.Kind == shimast.KindPrefixUnaryExpression {
+      expression := node.AsPrefixUnaryExpression()
+      return expression != nil && expression.Operator != shimast.KindPlusPlusToken && expression.Operator != shimast.KindMinusMinusToken
+    }
+    return node.Kind == shimast.KindDeleteExpression ||
       node.Kind == shimast.KindTypeOfExpression ||
       node.Kind == shimast.KindVoidExpression
   case "literal":
     return astSelectorIsLiteral(node)
+  case "thisexpression":
+    return node.Kind == shimast.KindThisKeyword
+  case "super":
+    return node.Kind == shimast.KindSuperKeyword
+  case "templateliteral":
+    return node.Kind == shimast.KindTemplateExpression || node.Kind == shimast.KindNoSubstitutionTemplateLiteral
   case "property":
     switch node.Kind {
     case shimast.KindPropertyAssignment,
       shimast.KindShorthandPropertyAssignment,
-      shimast.KindSpreadAssignment,
-      shimast.KindMethodDeclaration,
+      shimast.KindSpreadAssignment:
+      return true
+    case shimast.KindMethodDeclaration,
       shimast.KindGetAccessor,
       shimast.KindSetAccessor:
-      return true
+      return node.Parent != nil && node.Parent.Kind == shimast.KindObjectLiteralExpression
     }
   case "restelement":
     return node.Kind == shimast.KindSpreadElement || node.Kind == shimast.KindSpreadAssignment ||
@@ -338,7 +361,8 @@ func astSelectorIsLiteral(node *shimast.Node) bool {
 func astSelectorMatchesClass(node *shimast.Node, class string) bool {
   switch strings.ToLower(class) {
   case "statement":
-    return node.Kind >= shimast.KindFirstStatement && node.Kind <= shimast.KindLastStatement
+    native := strings.TrimPrefix(node.Kind.String(), "Kind")
+    return strings.HasSuffix(native, "Statement") || strings.HasSuffix(native, "Declaration")
   case "expression":
     return astSelectorIsExpression(node)
   case "declaration":
@@ -346,7 +370,7 @@ func astSelectorMatchesClass(node *shimast.Node, class string) bool {
   case "function":
     return isFunctionLikeKind(node)
   case "pattern":
-    return astSelectorIsPattern(node)
+    return astSelectorIsPattern(node) || astSelectorIsExpression(node)
   default:
     return false
   }
@@ -356,67 +380,35 @@ func astSelectorIsExpression(node *shimast.Node) bool {
   if node == nil {
     return false
   }
-  if astSelectorIsLiteral(node) {
+  native := strings.TrimPrefix(node.Kind.String(), "Kind")
+  if strings.HasSuffix(native, "Expression") || strings.HasSuffix(native, "Literal") {
     return true
   }
-  if node.Kind == shimast.KindIdentifier || node.Kind == shimast.KindPrivateIdentifier ||
-    node.Kind == shimast.KindThisKeyword || node.Kind == shimast.KindSuperKeyword {
+  switch node.Kind {
+  case shimast.KindIdentifier:
+    return node.Parent == nil || node.Parent.Kind != shimast.KindMetaProperty
+  case shimast.KindPrivateIdentifier,
+    shimast.KindMetaProperty,
+    shimast.KindThisKeyword,
+    shimast.KindSuperKeyword,
+    shimast.KindArrowFunction:
     return true
   }
-  return node.Kind >= shimast.KindArrayLiteralExpression && node.Kind <= shimast.KindSatisfiesExpression
+  return false
 }
 
 func astSelectorIsDeclaration(node *shimast.Node) bool {
   if node == nil {
     return false
   }
-  switch node.Kind {
-  case shimast.KindTypeParameter,
-    shimast.KindParameter,
-    shimast.KindPropertySignature,
-    shimast.KindPropertyDeclaration,
-    shimast.KindMethodSignature,
-    shimast.KindMethodDeclaration,
-    shimast.KindConstructor,
-    shimast.KindGetAccessor,
-    shimast.KindSetAccessor,
-    shimast.KindCallSignature,
-    shimast.KindConstructSignature,
-    shimast.KindIndexSignature,
-    shimast.KindVariableDeclaration,
-    shimast.KindFunctionDeclaration,
-    shimast.KindClassDeclaration,
-    shimast.KindInterfaceDeclaration,
-    shimast.KindTypeAliasDeclaration,
-    shimast.KindEnumDeclaration,
-    shimast.KindModuleDeclaration,
-    shimast.KindImportEqualsDeclaration,
-    shimast.KindImportDeclaration,
-    shimast.KindImportClause,
-    shimast.KindNamespaceImport,
-    shimast.KindImportSpecifier,
-    shimast.KindExportDeclaration,
-    shimast.KindExportSpecifier,
-    shimast.KindEnumMember,
-    shimast.KindBindingElement:
-    return true
-  }
-  return false
+  return strings.HasSuffix(strings.TrimPrefix(node.Kind.String(), "Kind"), "Declaration")
 }
 
 func astSelectorIsPattern(node *shimast.Node) bool {
   if node == nil {
     return false
   }
-  switch node.Kind {
-  case shimast.KindObjectBindingPattern, shimast.KindArrayBindingPattern, shimast.KindBindingElement:
-    return true
-  case shimast.KindIdentifier:
-    parent := node.Parent
-    return parent != nil && (parent.Kind == shimast.KindObjectBindingPattern ||
-      parent.Kind == shimast.KindArrayBindingPattern || parent.Kind == shimast.KindBindingElement)
-  }
-  return false
+  return strings.HasSuffix(strings.TrimPrefix(node.Kind.String(), "Kind"), "Pattern")
 }
 
 type astSelectorRuntimeValueKind uint8
@@ -426,7 +418,9 @@ const (
   astSelectorRuntimeNull
   astSelectorRuntimeString
   astSelectorRuntimeNumber
+  astSelectorRuntimeBigInt
   astSelectorRuntimeBoolean
+  astSelectorRuntimeObject
   astSelectorRuntimeNode
   astSelectorRuntimeNodes
 )
@@ -448,6 +442,9 @@ func astSelectorMatchesAttribute(node *shimast.Node, selector *astSelector) bool
   matched := false
   switch selector.value.kind {
   case astSelectorValueRegexp:
+    if selector.operator == "!=" {
+      return selector.value.regexp == nil || !selector.value.regexp.MatchString(astSelectorRuntimeStringValue(value))
+    }
     matched = value.kind == astSelectorRuntimeString && selector.value.regexp != nil && selector.value.regexp.MatchString(value.text)
   case astSelectorValueType:
     matched = selector.value.literal == astSelectorRuntimeType(value)
@@ -467,6 +464,19 @@ func astSelectorMatchesAttribute(node *shimast.Node, selector *astSelector) bool
 }
 
 func astSelectorCompare(value astSelectorRuntimeValue, expected astSelectorValue, operator string) bool {
+  if value.kind == astSelectorRuntimeString && expected.number == nil {
+    switch operator {
+    case ">":
+      return value.text > expected.literal
+    case ">=":
+      return value.text >= expected.literal
+    case "<":
+      return value.text < expected.literal
+    case "<=":
+      return value.text <= expected.literal
+    }
+    return false
+  }
   left, leftNumber := astSelectorRuntimeNumberValue(value)
   right := 0.0
   rightNumber := false
@@ -499,9 +509,11 @@ func astSelectorRuntimeType(value astSelectorRuntimeValue) string {
     return "string"
   case astSelectorRuntimeNumber:
     return "number"
+  case astSelectorRuntimeBigInt:
+    return "bigint"
   case astSelectorRuntimeBoolean:
     return "boolean"
-  case astSelectorRuntimeNode, astSelectorRuntimeNodes, astSelectorRuntimeNull:
+  case astSelectorRuntimeObject, astSelectorRuntimeNode, astSelectorRuntimeNodes, astSelectorRuntimeNull:
     return "object"
   default:
     return "undefined"
@@ -514,12 +526,19 @@ func astSelectorRuntimeStringValue(value astSelectorRuntimeValue) string {
     return value.text
   case astSelectorRuntimeNumber:
     return strconv.FormatFloat(value.number, 'g', -1, 64)
+  case astSelectorRuntimeBigInt:
+    return value.text
   case astSelectorRuntimeBoolean:
     return strconv.FormatBool(value.boolean)
   case astSelectorRuntimeNull:
     return "null"
   case astSelectorRuntimeMissing:
     return "undefined"
+  case astSelectorRuntimeNodes:
+    if len(value.nodes) == 0 {
+      return ""
+    }
+    return strings.TrimSuffix(strings.Repeat("[object Object],", len(value.nodes)), ",")
   }
   return "[object Object]"
 }
@@ -536,6 +555,8 @@ func astSelectorRuntimeNumberValue(value astSelectorRuntimeValue) (float64, bool
       return 1, true
     }
     return 0, true
+  case astSelectorRuntimeNull:
+    return 0, true
   }
   return 0, false
 }
@@ -547,10 +568,15 @@ func astSelectorPathValue(value astSelectorRuntimeValue, path []string) astSelec
     case astSelectorRuntimeNode:
       current = astSelectorNodeProperty(current.node, field)
     case astSelectorRuntimeNodes:
-      if field != "length" {
+      if field == "length" {
+        current = astSelectorRuntimeValue{kind: astSelectorRuntimeNumber, number: float64(len(current.nodes))}
+        continue
+      }
+      index, err := strconv.Atoi(field)
+      if err != nil || index < 0 || index >= len(current.nodes) {
         return astSelectorRuntimeValue{}
       }
-      current = astSelectorRuntimeValue{kind: astSelectorRuntimeNumber, number: float64(len(current.nodes))}
+      current = astSelectorNode(current.nodes[index])
     case astSelectorRuntimeString:
       if field != "length" {
         return astSelectorRuntimeValue{}
@@ -605,21 +631,36 @@ func astSelectorNodeProperty(node *shimast.Node, field string) astSelectorRuntim
     if name := identifierText(node); name != "" {
       return astSelectorString(name)
     }
-    if name := identifierText(node.Name()); name != "" {
+    if node.Kind == shimast.KindPrivateIdentifier {
+      return astSelectorString(node.AsPrivateIdentifier().Text)
+    }
+    nameNode := node.Name()
+    if name := identifierText(nameNode); name != "" {
       return astSelectorString(name)
     }
-    return astSelectorRuntimeValue{kind: astSelectorRuntimeNull}
-  case "value", "raw":
-    if text := literalText(node); text != "" || node.Kind == shimast.KindStringLiteral || node.Kind == shimast.KindNoSubstitutionTemplateLiteral {
-      return astSelectorString(text)
+    if nameNode != nil && nameNode.Kind == shimast.KindPrivateIdentifier {
+      return astSelectorString(nameNode.AsPrivateIdentifier().Text)
     }
-    switch node.Kind {
-    case shimast.KindTrueKeyword:
-      return astSelectorBoolean(true)
-    case shimast.KindFalseKeyword:
-      return astSelectorBoolean(false)
-    case shimast.KindNullKeyword:
-      return astSelectorRuntimeValue{kind: astSelectorRuntimeNull}
+    if value := astSelectorLiteralValue(nameNode); value.kind != astSelectorRuntimeMissing {
+      return value
+    }
+    return astSelectorRuntimeValue{kind: astSelectorRuntimeNull}
+  case "value":
+    if node.Kind == shimast.KindPropertyAssignment {
+      return astSelectorNode(node.AsPropertyAssignment().Initializer)
+    }
+    if node.Kind == shimast.KindShorthandPropertyAssignment {
+      return astSelectorNode(node.AsShorthandPropertyAssignment().Name())
+    }
+    if node.Kind == shimast.KindBindingElement {
+      return astSelectorNode(node.Name())
+    }
+    return astSelectorLiteralValue(node)
+  case "raw":
+    if astSelectorIsLiteral(node) {
+      if file := shimast.GetSourceFileOfNode(node); file != nil {
+        return astSelectorString(nodeText(file, node))
+      }
     }
     return astSelectorRuntimeValue{}
   case "operator":
@@ -633,28 +674,65 @@ func astSelectorNodeProperty(node *shimast.Node, field string) astSelectorRuntim
     }
     return astSelectorRuntimeValue{}
   case "async":
+    if node.FunctionLikeData() == nil {
+      return astSelectorRuntimeValue{}
+    }
     return astSelectorBoolean(hasModifier(node, shimast.KindAsyncKeyword))
   case "generator":
+    if node.FunctionLikeData() == nil {
+      return astSelectorRuntimeValue{}
+    }
     return astSelectorBoolean(astSelectorIsGenerator(node))
   case "static":
+    if !astSelectorSupportsStatic(node) {
+      return astSelectorRuntimeValue{}
+    }
+    if node.Kind == shimast.KindClassStaticBlockDeclaration {
+      return astSelectorBoolean(true)
+    }
     return astSelectorBoolean(hasModifier(node, shimast.KindStaticKeyword))
   case "readonly":
+    if !astSelectorSupportsReadonly(node) {
+      return astSelectorRuntimeValue{}
+    }
     return astSelectorBoolean(hasModifier(node, shimast.KindReadonlyKeyword))
   case "declare":
+    if !astSelectorIsDeclaration(node) {
+      return astSelectorRuntimeValue{}
+    }
     return astSelectorBoolean(hasModifier(node, shimast.KindDeclareKeyword))
   case "optional":
-    return astSelectorBoolean(astSelectorIsOptional(node))
+    optional, applicable := astSelectorIsOptional(node)
+    if !applicable {
+      return astSelectorRuntimeValue{}
+    }
+    return astSelectorBoolean(optional)
   case "computed":
-    return astSelectorBoolean(node.Kind == shimast.KindElementAccessExpression || node.Kind == shimast.KindComputedPropertyName)
+    computed, applicable := astSelectorIsComputed(node)
+    if !applicable {
+      return astSelectorRuntimeValue{}
+    }
+    return astSelectorBoolean(computed)
+  case "prefix":
+    switch node.Kind {
+    case shimast.KindPrefixUnaryExpression,
+      shimast.KindDeleteExpression,
+      shimast.KindTypeOfExpression,
+      shimast.KindVoidExpression:
+      return astSelectorBoolean(true)
+    case shimast.KindPostfixUnaryExpression:
+      return astSelectorBoolean(false)
+    }
+    return astSelectorRuntimeValue{}
   case "id":
     return astSelectorNode(node.Name())
   case "params":
-    if isFunctionLikeKind(node) {
-      return astSelectorNodes(node.Parameters())
+    if function := node.FunctionLikeData(); function != nil && function.Parameters != nil {
+      return astSelectorNodes(function.Parameters.Nodes)
     }
   case "body":
-    if isFunctionLikeKind(node) {
-      return astSelectorNode(node.Body())
+    if body := node.Body(); body != nil {
+      return astSelectorNode(body)
     }
     return astSelectorStatementBody(node)
   case "callee":
@@ -720,6 +798,12 @@ func astSelectorNodeProperty(node *shimast.Node, field string) astSelectorRuntim
     if node.Kind == shimast.KindConditionalExpression {
       return astSelectorNode(node.AsConditionalExpression().WhenTrue)
     }
+    if node.Kind == shimast.KindCaseClause || node.Kind == shimast.KindDefaultClause {
+      clause := node.AsCaseOrDefaultClause()
+      if clause != nil && clause.Statements != nil {
+        return astSelectorNodes(clause.Statements.Nodes)
+      }
+    }
   case "alternate":
     if node.Kind == shimast.KindIfStatement {
       return astSelectorNode(node.AsIfStatement().ElseStatement)
@@ -774,6 +858,12 @@ func astSelectorNodeProperty(node *shimast.Node, field string) astSelectorRuntim
         return astSelectorNodes(expression.Properties.Nodes)
       }
     }
+    if node.Kind == shimast.KindObjectBindingPattern {
+      pattern := node.AsBindingPattern()
+      if pattern != nil && pattern.Elements != nil {
+        return astSelectorNodes(pattern.Elements.Nodes)
+      }
+    }
   case "key":
     return astSelectorPropertyKey(node)
   case "source":
@@ -795,6 +885,44 @@ func astSelectorString(value string) astSelectorRuntimeValue {
 
 func astSelectorBoolean(value bool) astSelectorRuntimeValue {
   return astSelectorRuntimeValue{kind: astSelectorRuntimeBoolean, boolean: value}
+}
+
+func astSelectorLiteralValue(node *shimast.Node) astSelectorRuntimeValue {
+  if node == nil {
+    return astSelectorRuntimeValue{kind: astSelectorRuntimeNull}
+  }
+  switch node.Kind {
+  case shimast.KindStringLiteral, shimast.KindNoSubstitutionTemplateLiteral:
+    if data := node.LiteralLikeData(); data != nil {
+      return astSelectorString(data.Text)
+    }
+  case shimast.KindRegularExpressionLiteral:
+    return astSelectorRuntimeValue{kind: astSelectorRuntimeObject}
+  case shimast.KindNumericLiteral:
+    if data := node.LiteralLikeData(); data != nil {
+      text := strings.ReplaceAll(data.Text, "_", "")
+      if number, err := strconv.ParseFloat(text, 64); err == nil {
+        return astSelectorRuntimeValue{kind: astSelectorRuntimeNumber, number: number}
+      }
+      if number, err := strconv.ParseUint(text, 0, 64); err == nil {
+        return astSelectorRuntimeValue{kind: astSelectorRuntimeNumber, number: float64(number)}
+      }
+    }
+  case shimast.KindBigIntLiteral:
+    if data := node.LiteralLikeData(); data != nil {
+      return astSelectorRuntimeValue{
+        kind: astSelectorRuntimeBigInt,
+        text: strings.TrimSuffix(strings.ReplaceAll(data.Text, "_", ""), "n"),
+      }
+    }
+  case shimast.KindTrueKeyword:
+    return astSelectorBoolean(true)
+  case shimast.KindFalseKeyword:
+    return astSelectorBoolean(false)
+  case shimast.KindNullKeyword:
+    return astSelectorRuntimeValue{kind: astSelectorRuntimeNull}
+  }
+  return astSelectorRuntimeValue{}
 }
 
 func astSelectorNode(node *shimast.Node) astSelectorRuntimeValue {
@@ -836,54 +964,7 @@ func astSelectorNodeOperator(node *shimast.Node) string {
 }
 
 func astSelectorOperatorText(kind shimast.Kind) string {
-  operators := map[shimast.Kind]string{
-    shimast.KindEqualsToken:                       "=",
-    shimast.KindPlusToken:                         "+",
-    shimast.KindMinusToken:                        "-",
-    shimast.KindAsteriskToken:                     "*",
-    shimast.KindAsteriskAsteriskToken:             "**",
-    shimast.KindSlashToken:                        "/",
-    shimast.KindPercentToken:                      "%",
-    shimast.KindPlusPlusToken:                     "++",
-    shimast.KindMinusMinusToken:                   "--",
-    shimast.KindLessThanToken:                     "<",
-    shimast.KindLessThanEqualsToken:               "<=",
-    shimast.KindGreaterThanToken:                  ">",
-    shimast.KindGreaterThanEqualsToken:            ">=",
-    shimast.KindEqualsEqualsToken:                 "==",
-    shimast.KindExclamationEqualsToken:            "!=",
-    shimast.KindEqualsEqualsEqualsToken:           "===",
-    shimast.KindExclamationEqualsEqualsToken:      "!==",
-    shimast.KindLessThanLessThanToken:              "<<",
-    shimast.KindGreaterThanGreaterThanToken:        ">>",
-    shimast.KindGreaterThanGreaterThanGreaterThanToken: ">>>",
-    shimast.KindAmpersandToken:                    "&",
-    shimast.KindBarToken:                          "|",
-    shimast.KindCaretToken:                        "^",
-    shimast.KindExclamationToken:                  "!",
-    shimast.KindTildeToken:                        "~",
-    shimast.KindAmpersandAmpersandToken:           "&&",
-    shimast.KindBarBarToken:                       "||",
-    shimast.KindQuestionQuestionToken:             "??",
-    shimast.KindInKeyword:                         "in",
-    shimast.KindInstanceOfKeyword:                 "instanceof",
-    shimast.KindPlusEqualsToken:                   "+=",
-    shimast.KindMinusEqualsToken:                  "-=",
-    shimast.KindAsteriskEqualsToken:               "*=",
-    shimast.KindAsteriskAsteriskEqualsToken:       "**=",
-    shimast.KindSlashEqualsToken:                  "/=",
-    shimast.KindPercentEqualsToken:                "%=",
-    shimast.KindLessThanLessThanEqualsToken:       "<<=",
-    shimast.KindGreaterThanGreaterThanEqualsToken: ">>=",
-    shimast.KindGreaterThanGreaterThanGreaterThanEqualsToken: ">>>=",
-    shimast.KindAmpersandEqualsToken:              "&=",
-    shimast.KindBarEqualsToken:                    "|=",
-    shimast.KindCaretEqualsToken:                  "^=",
-    shimast.KindBarBarEqualsToken:                 "||=",
-    shimast.KindAmpersandAmpersandEqualsToken:     "&&=",
-    shimast.KindQuestionQuestionEqualsToken:       "??=",
-  }
-  return operators[kind]
+  return shimscanner.TokenToString(kind)
 }
 
 func astSelectorVariableKind(node *shimast.Node) string {
@@ -926,19 +1007,91 @@ func astSelectorIsGenerator(node *shimast.Node) bool {
   return body != nil && body.AsteriskToken != nil
 }
 
-func astSelectorIsOptional(node *shimast.Node) bool {
+func astSelectorIsOptional(node *shimast.Node) (bool, bool) {
+  if node == nil {
+    return false, false
+  }
+  switch node.Kind {
+  case shimast.KindPropertyAccessExpression:
+    return node.AsPropertyAccessExpression().QuestionDotToken != nil, true
+  case shimast.KindElementAccessExpression:
+    return node.AsElementAccessExpression().QuestionDotToken != nil, true
+  case shimast.KindCallExpression:
+    return node.AsCallExpression().QuestionDotToken != nil, true
+  case shimast.KindTaggedTemplateExpression:
+    return node.AsTaggedTemplateExpression().QuestionDotToken != nil, true
+  case shimast.KindParameter,
+    shimast.KindNamedTupleMember,
+    shimast.KindMethodDeclaration,
+    shimast.KindShorthandPropertyAssignment,
+    shimast.KindMethodSignature,
+    shimast.KindPropertySignature,
+    shimast.KindPropertyAssignment,
+    shimast.KindPropertyDeclaration,
+    shimast.KindEnumMember,
+    shimast.KindGetAccessor,
+    shimast.KindSetAccessor:
+    return node.QuestionToken() != nil, true
+  }
+  return false, false
+}
+
+func astSelectorSupportsStatic(node *shimast.Node) bool {
   if node == nil {
     return false
   }
   switch node.Kind {
-  case shimast.KindPropertyAccessExpression:
-    return node.AsPropertyAccessExpression().QuestionDotToken != nil
-  case shimast.KindElementAccessExpression:
-    return node.AsElementAccessExpression().QuestionDotToken != nil
-  case shimast.KindCallExpression:
-    return node.AsCallExpression().QuestionDotToken != nil
+  case shimast.KindClassStaticBlockDeclaration:
+    return true
+  case shimast.KindPropertyDeclaration,
+    shimast.KindMethodDeclaration,
+    shimast.KindGetAccessor,
+    shimast.KindSetAccessor:
+    return node.Parent != nil &&
+      (node.Parent.Kind == shimast.KindClassDeclaration || node.Parent.Kind == shimast.KindClassExpression)
   }
   return false
+}
+
+func astSelectorSupportsReadonly(node *shimast.Node) bool {
+  if node == nil {
+    return false
+  }
+  switch node.Kind {
+  case shimast.KindParameter,
+    shimast.KindPropertyDeclaration,
+    shimast.KindPropertySignature,
+    shimast.KindIndexSignature:
+    return true
+  }
+  return false
+}
+
+func astSelectorIsComputed(node *shimast.Node) (bool, bool) {
+  if node == nil {
+    return false, false
+  }
+  switch node.Kind {
+  case shimast.KindElementAccessExpression, shimast.KindComputedPropertyName:
+    return true, true
+  case shimast.KindPropertyAccessExpression:
+    return false, true
+  case shimast.KindBindingElement:
+    element := node.AsBindingElement()
+    return element != nil && element.PropertyName != nil && element.PropertyName.Kind == shimast.KindComputedPropertyName, true
+  case shimast.KindPropertyAssignment,
+    shimast.KindShorthandPropertyAssignment,
+    shimast.KindMethodDeclaration,
+    shimast.KindMethodSignature,
+    shimast.KindGetAccessor,
+    shimast.KindSetAccessor,
+    shimast.KindPropertyDeclaration,
+    shimast.KindPropertySignature,
+    shimast.KindEnumMember:
+    name := node.Name()
+    return name != nil && name.Kind == shimast.KindComputedPropertyName, true
+  }
+  return false, false
 }
 
 func astSelectorStatementBody(node *shimast.Node) astSelectorRuntimeValue {
@@ -946,6 +1099,21 @@ func astSelectorStatementBody(node *shimast.Node) astSelectorRuntimeValue {
     return astSelectorRuntimeValue{}
   }
   switch node.Kind {
+  case shimast.KindSourceFile:
+    file := node.AsSourceFile()
+    if file != nil && file.Statements != nil {
+      return astSelectorNodes(file.Statements.Nodes)
+    }
+  case shimast.KindBlock:
+    block := node.AsBlock()
+    if block != nil && block.Statements != nil {
+      return astSelectorNodes(block.Statements.Nodes)
+    }
+  case shimast.KindModuleBlock:
+    block := node.AsModuleBlock()
+    if block != nil && block.Statements != nil {
+      return astSelectorNodes(block.Statements.Nodes)
+    }
   case shimast.KindIfStatement:
     return astSelectorNode(node.AsIfStatement().ThenStatement)
   case shimast.KindWhileStatement:
@@ -973,6 +1141,14 @@ func astSelectorUnaryArgument(node *shimast.Node) astSelectorRuntimeValue {
     return astSelectorNode(node.AsPostfixUnaryExpression().Operand)
   case shimast.KindDeleteExpression:
     return astSelectorNode(node.AsDeleteExpression().Expression)
+  case shimast.KindTypeOfExpression:
+    return astSelectorNode(node.AsTypeOfExpression().Expression)
+  case shimast.KindVoidExpression:
+    return astSelectorNode(node.AsVoidExpression().Expression)
+  case shimast.KindAwaitExpression:
+    return astSelectorNode(node.AsAwaitExpression().Expression)
+  case shimast.KindYieldExpression:
+    return astSelectorNode(node.AsYieldExpression().Expression)
   case shimast.KindReturnStatement:
     return astSelectorNode(node.AsReturnStatement().Expression)
   case shimast.KindThrowStatement:
@@ -981,6 +1157,11 @@ func astSelectorUnaryArgument(node *shimast.Node) astSelectorRuntimeValue {
     return astSelectorNode(node.AsSpreadElement().Expression)
   case shimast.KindSpreadAssignment:
     return astSelectorNode(node.AsSpreadAssignment().Expression)
+  case shimast.KindBindingElement:
+    element := node.AsBindingElement()
+    if element != nil && element.DotDotDotToken != nil {
+      return astSelectorNode(element.Name())
+    }
   }
   return astSelectorRuntimeValue{}
 }
@@ -1075,11 +1256,4 @@ func astSelectorStatements(node *shimast.Node) astSelectorRuntimeValue {
     }
   }
   return astSelectorRuntimeValue{}
-}
-
-func (selector *astSelector) String() string {
-  if selector == nil {
-    return "<nil>"
-  }
-  return fmt.Sprintf("astSelector(kind=%d,name=%q)", selector.kind, selector.name)
 }

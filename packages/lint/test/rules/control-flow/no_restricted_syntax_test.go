@@ -81,6 +81,22 @@ func TestNoRestrictedSyntaxAppliesEveryConfiguredEntryAndCustomMessage(t *testin
   )
 }
 
+func TestNoRestrictedSyntaxUsesTheLastMessageForARepeatedSelector(t *testing.T) {
+  source := `debugger;
+`
+  options := json.RawMessage(`[
+    {"selector":"DebuggerStatement","message":"Superseded message."},
+    "DebuggerStatement",
+    {"selector":"DebuggerStatement","message":"Final message."}
+  ]`)
+  runNoRestrictedSyntax(
+    t,
+    source,
+    options,
+    noRestrictedSyntaxExpectation{target: "debugger;", message: "Final message."},
+  )
+}
+
 func TestNoRestrictedSyntaxMatchesAttributesNestedPathsRegexTypesAndLengths(t *testing.T) {
   source := `declare function DANGER(first: number, second: number): void;
 const target = { key: true };
@@ -102,6 +118,93 @@ JSON.stringify(present);
     source,
     json.RawMessage(`"`+binarySelector+`"`),
     noRestrictedSyntaxExpectation{target: `"key" in target`, message: noRestrictedDefaultMessage(binarySelector)},
+  )
+}
+
+func TestNoRestrictedSyntaxMatchesIndexedPathsLiteralTypesAndPrefix(t *testing.T) {
+  source := `declare function choose(first: string, second: number): void;
+let count = 0;
+++count;
+count++;
+choose("x", count);
+`
+  indexedSelector := `FunctionDeclaration[params.0.name='first']`
+  runNoRestrictedSyntax(
+    t,
+    source,
+    json.RawMessage(`"`+indexedSelector+`"`),
+    noRestrictedSyntaxExpectation{
+      target:  "declare function choose(first: string, second: number): void;",
+      message: noRestrictedDefaultMessage(indexedSelector),
+    },
+  )
+
+  numberSelector := `NumericLiteral[value=type(number)][value=0]`
+  runNoRestrictedSyntax(
+    t,
+    source,
+    json.RawMessage(`"`+numberSelector+`"`),
+    noRestrictedSyntaxExpectation{target: "0", message: noRestrictedDefaultMessage(numberSelector)},
+  )
+
+  prefixSelector := `UpdateExpression[prefix=true]`
+  runNoRestrictedSyntax(
+    t,
+    source,
+    json.RawMessage(`"`+prefixSelector+`"`),
+    noRestrictedSyntaxExpectation{target: "++count", message: noRestrictedDefaultMessage(prefixSelector)},
+  )
+
+  bodySelector := `Program[body.length=5]`
+  runNoRestrictedSyntax(
+    t,
+    source,
+    json.RawMessage(`"`+bodySelector+`"`),
+    noRestrictedSyntaxExpectation{target: source, message: noRestrictedDefaultMessage(bodySelector)},
+  )
+}
+
+func TestNoRestrictedSyntaxLimitsBooleanPropertiesAndESTreeAliases(t *testing.T) {
+  source := `let count = 0;
+++count;
+void count;
+class Box { classMethod(): number { return 1; } }
+const record = { objectMethod(): number { return 2; } };
+JSON.stringify([Box, record]);
+`
+  runNoRestrictedSyntax(t, source, json.RawMessage(`"Identifier[async=false]"`))
+
+  unarySelector := `UnaryExpression`
+  runNoRestrictedSyntax(
+    t,
+    source,
+    json.RawMessage(`"`+unarySelector+`"`),
+    noRestrictedSyntaxExpectation{target: "void count", message: noRestrictedDefaultMessage(unarySelector)},
+  )
+
+  propertySelector := `Property`
+  runNoRestrictedSyntax(
+    t,
+    source,
+    json.RawMessage(`"`+propertySelector+`"`),
+    noRestrictedSyntaxExpectation{
+      target:  "objectMethod(): number { return 2; }",
+      message: noRestrictedDefaultMessage(propertySelector),
+    },
+  )
+}
+
+func TestNoRestrictedSyntaxExposesComputedKeysAndPropertyValuePaths(t *testing.T) {
+  source := `const key = "answer";
+const record = { [key]: () => 42, plain: () => 0 };
+JSON.stringify(record);
+`
+  selector := `PropertyAssignment[computed=true][value.type='ArrowFunction']`
+  runNoRestrictedSyntax(
+    t,
+    source,
+    json.RawMessage(`"`+selector+`"`),
+    noRestrictedSyntaxExpectation{target: "[key]: () => 42", message: noRestrictedDefaultMessage(selector)},
   )
 }
 
@@ -178,7 +281,7 @@ JSON.stringify([satisfied, returns]);
     noRestrictedSyntaxExpectation{target: "input satisfies unknown", message: noRestrictedDefaultMessage(selector)},
   )
 
-  classSelector := `:function:has(ReturnStatement)`
+  classSelector := `:FUNCTION:has(ReturnStatement)`
   runNoRestrictedSyntax(
     t,
     source,
@@ -210,6 +313,7 @@ func TestNoRestrictedSyntaxRejectsInvalidConfigurationBeforeDispatch(t *testing.
     {name: "duplicate", options: json.RawMessage(`["Identifier","Identifier"]`), want: "duplicates an earlier option"},
     {name: "unterminated attribute", options: json.RawMessage(`"Identifier[name='x'"`), want: "expected ']'"},
     {name: "invalid regexp", options: json.RawMessage(`"Identifier[name=/(/]"`), want: "invalid regular expression"},
+    {name: "empty regexp", options: json.RawMessage(`"Identifier[name=//]"`), want: "regular expression must not be empty"},
     {name: "unknown class", options: json.RawMessage(`":mystery"`), want: "unknown AST class"},
   }
   for _, tc := range cases {

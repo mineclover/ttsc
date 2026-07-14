@@ -29,7 +29,6 @@ type noRestrictedSyntaxOption struct {
 }
 
 type compiledNoRestrictedSyntaxOption struct {
-  source   string
   selector *astSelector
   message  string
 }
@@ -70,6 +69,7 @@ func compileNoRestrictedSyntaxOptions(raw json.RawMessage) ([]compiledNoRestrict
     return nil, err
   }
   compiled := make([]compiledNoRestrictedSyntaxOption, 0, len(options))
+  selectorIndexes := make(map[string]int, len(options))
   for index, option := range options {
     selector, err := parseASTSelector(option.selector)
     if err != nil {
@@ -79,11 +79,18 @@ func compileNoRestrictedSyntaxOptions(raw json.RawMessage) ([]compiledNoRestrict
     if option.messageSet && option.message != "" {
       message = option.message
     }
-    compiled = append(compiled, compiledNoRestrictedSyntaxOption{
-      source:   option.selector,
+    entry := compiledNoRestrictedSyntaxOption{
       selector: selector,
       message:  message,
-    })
+    }
+    if previous, exists := selectorIndexes[option.selector]; exists {
+      // ESLint registers selector listeners in an object. Reusing a selector
+      // therefore replaces its listener/message rather than reporting twice.
+      compiled[previous] = entry
+      continue
+    }
+    selectorIndexes[option.selector] = len(compiled)
+    compiled = append(compiled, entry)
   }
   return compiled, nil
 }

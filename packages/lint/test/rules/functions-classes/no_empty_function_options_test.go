@@ -150,6 +150,11 @@ class Example extends Base {
       want:   1,
     },
     {
+      name:   "async function expression reports by default",
+      source: `const empty = async function () {};`,
+      want:   1,
+    },
+    {
       name:   "async function expressions use async function category",
       source: `const empty = async function () {};`,
       allow:  []string{"asyncFunctions"},

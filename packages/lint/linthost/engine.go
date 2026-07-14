@@ -102,10 +102,11 @@ func validateRuleOptions(r Rule, options json.RawMessage) error {
 
 // Context is the per-(file, rule) handle the engine passes to `Check`.
 //
-// `Options` is the raw JSON payload from the rule configuration. One option
-// slot preserves its scalar or object shape; multiple positional options are
-// an array. It is nil for a bare severity. Rules decode the payload according
-// to their public option type and fall back to defaults on nil.
+// `Options` is the raw JSON payload resolved for this source file from the
+// same config entries as Severity. One option slot preserves its scalar or
+// object shape; multiple positional options are an array. It is nil for a
+// bare severity. Rules decode the payload according to their public option
+// type and fall back to defaults on nil.
 type Context struct {
   File             *shimast.SourceFile
   Checker          *shimchecker.Checker
@@ -466,11 +467,23 @@ func NewEngineWithResolver(config RuleResolver) *Engine {
       eng.unknown = append(eng.unknown, name)
       continue
     }
-    if err := validateRuleOptions(rule, config.RuleOptions(name)); err != nil {
-      eng.configError = errors.Join(
-        eng.configError,
-        fmt.Errorf("@ttsc/lint: invalid options for rule %q: %w", name, err),
-      )
+    optionsValid := true
+    seenOptions := make(map[string]struct{})
+    for _, options := range resolvedRuleOptionsVariants(config, name) {
+      key := string(options)
+      if _, duplicate := seenOptions[key]; duplicate {
+        continue
+      }
+      seenOptions[key] = struct{}{}
+      if err := validateRuleOptions(rule, options); err != nil {
+        eng.configError = errors.Join(
+          eng.configError,
+          fmt.Errorf("@ttsc/lint: invalid options for rule %q: %w", name, err),
+        )
+        optionsValid = false
+      }
+    }
+    if !optionsValid {
       continue
     }
     if ruleNeedsTypeChecker(rule) {
@@ -758,12 +771,19 @@ func (e *Engine) runFile(
       ctx, built := ctxByRule[name]
       if !built {
         if severity := fileRules.Severity(name); severity != SeverityOff {
+          options := resolved.RuleOptions(name)
+          if len(options) == 0 && !resolved.OptionsResolved {
+            // Compatibility for custom RuleResolver implementations compiled
+            // against the original contract: until they opt into per-file
+            // options, their file-agnostic RuleOptions method remains active.
+            options = e.config.RuleOptions(name)
+          }
           ctx = &Context{
             File:             file,
             Checker:          checker,
             CurrentDirectory: currentDirectory,
             Severity:         severity,
-            Options:          e.config.RuleOptions(name),
+            Options:          options,
             rule:             rule,
             isFormat:         isFormatRule(rule),
             collect:          collect,

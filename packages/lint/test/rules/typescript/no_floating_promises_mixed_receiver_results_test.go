@@ -196,6 +196,9 @@ interface PartialDefaultGenericThen {
 interface DependentDefaultGenericThen {
   then<T, U = T>(value: U, factory: () => T): T;
 }
+interface DependentConstraintGenericThen {
+  then<U extends number, T extends U, R>(value: T, factory: () => R): R;
+}
 interface NonGenericCallbackCatch {
   catch(onRejected: (reason: unknown) => void): undefined;
 }
@@ -238,6 +241,7 @@ declare const partialDefaultValid: Promise<void> | PartialDefaultGenericThen;
 declare const partialDefaultMismatch: Promise<void> | PartialDefaultGenericThen;
 declare const dependentDefaultValid: Promise<void> | DependentDefaultGenericThen;
 declare const dependentDefaultMismatch: Promise<void> | DependentDefaultGenericThen;
+declare const dependentConstraintMismatch: Promise<void> | DependentConstraintGenericThen;
 declare const nonGenericCallbackValid: Promise<void> | NonGenericCallbackCatch;
 declare const nonGenericCallbackMismatch: Promise<void> | NonGenericCallbackCatch;
 declare const taggedValid: Promise<void> | TaggedGenericCatch;
@@ -265,6 +269,7 @@ partialDefaultValid.then<undefined>(1, () => undefined);
 partialDefaultMismatch.then<undefined>("not a number", () => undefined);
 dependentDefaultValid.then<undefined>(undefined, () => undefined);
 dependentDefaultMismatch.then<undefined>(Promise.resolve(), () => undefined);
+dependentConstraintMismatch.then<1, 2, undefined>(2, () => undefined);
 nonGenericCallbackValid.catch((reason: unknown) => undefined);
 nonGenericCallbackMismatch.catch((reason: string) => undefined);
 taggedValid.catch(taggedFactory);
@@ -301,6 +306,7 @@ function checkUncertainArray<U>(
     "explicitMismatch.catch",
     "partialDefaultMismatch.then",
     "dependentDefaultMismatch.then",
+    "dependentConstraintMismatch.then",
     "nonGenericCallbackMismatch.catch",
     "taggedMismatch.catch",
     "uncertainOverload.catch",

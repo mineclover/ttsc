@@ -1510,7 +1510,7 @@ func floatingPromiseTypeParameterCandidateApplicability(
   if checker == nil || typeParameter == nil || candidate == nil {
     return floatingPromiseCallUncertain
   }
-  constraint := checker.GetBaseConstraintOfType(typeParameter)
+  constraint := checker.GetConstraintOfTypeParameter(typeParameter)
   if constraint == nil || constraint == typeParameter {
     return floatingPromiseCallApplicable
   }
@@ -1875,7 +1875,7 @@ func floatingPromiseTypeParameterAccepts(
   if checker == nil || typeParameter == nil || inferred == nil {
     return false
   }
-  constraint := checker.GetBaseConstraintOfType(typeParameter)
+  constraint := checker.GetConstraintOfTypeParameter(typeParameter)
   return constraint == nil || constraint == typeParameter || checker.IsTypeAssignableTo(inferred, constraint)
 }
 

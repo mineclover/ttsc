@@ -174,6 +174,7 @@ function mutate(target: any, ignored: any, regexName: any, condition: boolean): 
   ({ ...target.objectRest } = {});
   for (target.loop in {});
   for (target.item of []);
+  // @ts-ignore -- JavaScript accepts a destructuring for-in target, while TypeScript reports TS2491.
   for ({ value: target.pattern } in {});
   for ([target.element] of []);
   target.get().value = 1;
@@ -210,12 +211,12 @@ function mutate(target: any, ignored: any, regexName: any, condition: boolean): 
     property(10),
     property(11),
     property(12),
-    property(13),
     property(14),
     property(15),
     property(16),
-    noParamReassignFinding{line: 25, message: "Assignment to function parameter 'ignored'."},
-    noParamReassignFinding{line: 26, message: "Assignment to function parameter 'regexName'."},
+    property(17),
+    noParamReassignFinding{line: 26, message: "Assignment to function parameter 'ignored'."},
+    noParamReassignFinding{line: 27, message: "Assignment to function parameter 'regexName'."},
   )
 }
 

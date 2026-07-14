@@ -761,3 +761,32 @@ func TestCommandFixUnicornPreventAbbreviationsReparsesAndIsIdempotent(t *testing
     t.Fatalf("fixed source mismatch:\nwant %q\ngot  %q", want, string(got))
   }
 }
+
+func TestCommandFixUnicornPreventAbbreviationsKeepsCrossFileMergesDiagnosticOnly(t *testing.T) {
+  const mainSource = "interface Ctx { first: string }\n"
+  const otherSource = "interface Ctx { second: string }\n"
+  root := seedLintProject(t, mainSource)
+  otherPath := filepath.Join(root, "src", "other.ts")
+  writeFile(t, otherPath, otherSource)
+  writeFile(t, filepath.Join(root, "tsconfig.json"), `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "strict": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "files": ["src/main.ts", "src/other.ts"]
+}
+`)
+  seedLintRules(t, root, map[string]string{unicornPreventAbbreviationsRuleName: "error"})
+
+  code, stdout, stderr := captureCommandOutput(t, func() int {
+    return run([]string{"fix", "--cwd", root, "--plugins-json", lintManifest(t)})
+  })
+  if code != 2 || stdout != "" || !strings.Contains(stderr, "["+unicornPreventAbbreviationsRuleName+"]") {
+    t.Fatalf("cross-file fix mismatch: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+  }
+  assertFileText(t, filepath.Join(root, "src", "main.ts"), mainSource)
+  assertFileText(t, otherPath, otherSource)
+}

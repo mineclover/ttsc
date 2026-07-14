@@ -19,6 +19,7 @@ package linthost
 
 import (
   "encoding/json"
+  "errors"
   "fmt"
   "os"
   "runtime"
@@ -72,6 +73,14 @@ type typeAwareRule interface {
   NeedsTypeChecker() bool
 }
 
+// ruleOptionsValidator is an optional rule capability for rejecting malformed
+// configuration before the rule enters the dispatch table. The exported method
+// lets rule implementations opt in without coupling the engine to specific rule
+// names; a nil payload represents the rule's default options.
+type ruleOptionsValidator interface {
+  ValidateOptions(json.RawMessage) error
+}
+
 // isFormatRule reports whether `r` opts into the format category.
 func isFormatRule(r Rule) bool {
   fr, ok := r.(FormatRule)
@@ -81,6 +90,14 @@ func isFormatRule(r Rule) bool {
 func ruleNeedsTypeChecker(r Rule) bool {
   tr, ok := r.(typeAwareRule)
   return ok && tr.NeedsTypeChecker()
+}
+
+func validateRuleOptions(r Rule, options json.RawMessage) error {
+  validator, ok := r.(ruleOptionsValidator)
+  if !ok {
+    return nil
+  }
+  return validator.ValidateOptions(options)
 }
 
 // Context is the per-(file, rule) handle the engine passes to `Check`.
@@ -404,6 +421,13 @@ func NewEngineWithResolver(config RuleResolver) *Engine {
       eng.unknown = append(eng.unknown, name)
       continue
     }
+    if err := validateRuleOptions(rule, config.RuleOptions(name)); err != nil {
+      eng.configError = errors.Join(
+        eng.configError,
+        fmt.Errorf("@ttsc/lint: invalid options for rule %q: %w", name, err),
+      )
+      continue
+    }
     if ruleNeedsTypeChecker(rule) {
       eng.needsTypeChecker = true
     }
@@ -507,8 +531,8 @@ func (e *Engine) NeedsTypeChecker() bool {
   return e != nil && e.needsTypeChecker
 }
 
-// ConfigError reports an invalid project-rule declaration discovered while
-// binding the resolver.
+// ConfigError reports an invalid project-rule declaration or rule option
+// payload discovered while binding the resolver.
 func (e *Engine) ConfigError() error {
   if e == nil {
     return nil

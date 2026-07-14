@@ -51,6 +51,10 @@ func runFix(opts *subcommandOpts) int {
   // no format block populates no format options, so nothing extra is enabled
   // and fix stays a pure lint pass.
   engine := NewEngineWithResolver(formatCommandResolver{inner: rules})
+  if err := engine.ConfigError(); err != nil {
+    fmt.Fprintln(os.Stderr, err)
+    return 2
+  }
   engine.SetSerial(opts.singleThreaded)
   needsRuleChecker := engine.NeedsTypeChecker()
 

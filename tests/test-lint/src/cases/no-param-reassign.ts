@@ -29,7 +29,7 @@ function localOk(x: number): number {
   return total;
 }
 
-// Property mutation is left alone by the conservative baseline.
+// Property mutation is left alone unless the `props` option is enabled.
 function propertyOk(obj: { count: number }): number {
   obj.count = 5;
   return obj.count;

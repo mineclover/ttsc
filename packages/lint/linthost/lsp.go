@@ -343,6 +343,10 @@ func lspFindings(opts *lspCommandOptions, includeFormatDefaults bool) ([]*Findin
     return nil, nil, nil, 2
   }
   engine := NewEngineWithResolver(rules)
+  if err := engine.ConfigError(); err != nil {
+    fmt.Fprintln(os.Stderr, err)
+    return nil, nil, nil, 2
+  }
   prog, parseDiags, err := loadProgram(opts.cwd, opts.tsconfig, loadProgramOptions{
     forceNoEmit:      true,
     needsRuleChecker: engine.NeedsTypeChecker(),
@@ -761,6 +765,10 @@ func lspWorkspaceEditForSeededCommand(
     return nil, 2
   }
   engine := NewEngineWithResolver(rules)
+  if err := engine.ConfigError(); err != nil {
+    fmt.Fprintln(os.Stderr, err)
+    return nil, 2
+  }
   needsRuleChecker := engine.NeedsTypeChecker()
   maxPasses := maxFixPasses
   if opts.command == commandFormatDocument {
@@ -862,6 +870,10 @@ func lspFormatBuffer(content string, opts *lspCommandOptions) (*lspWorkspaceEdit
     return nil, 2
   }
   engine := NewEngineWithResolver(resolver)
+  if err := engine.ConfigError(); err != nil {
+    fmt.Fprintln(os.Stderr, err)
+    return nil, 2
+  }
   if engine.NeedsTypeChecker() {
     // Contributor format rules conservatively require a checker. Seed the
     // dirty text into the temporary project so the checker, findings, fix

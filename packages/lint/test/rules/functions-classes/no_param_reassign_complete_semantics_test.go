@@ -135,6 +135,14 @@ function mergedVar(value: any): void {
   var value;
   value = 6;
 }
+class FunctionKinds {
+  constructor(public value: any) { value = 7; }
+  method(value: any): void { value = 8; }
+  set property(value: any) { value = 9; }
+}
+const arrowKind = (value: any): void => { value = 10; };
+const expressionKind = function (value: any): void { value = 11; };
+JSON.stringify([FunctionKinds, arrowKind, expressionKind]);
 `
   got := runNoParamReassign(t, source, nil)
   assertNoParamReassignFindings(
@@ -143,8 +151,13 @@ function mergedVar(value: any): void {
     noParamReassignFinding{line: 10, message: "Assignment to function parameter 'value'."},
     noParamReassignFinding{line: 12, message: "Assignment to function parameter 'value'."},
     noParamReassignFinding{line: 13, message: "Assignment to function parameter 'value'."},
-    noParamReassignFinding{line: 21, message: "Assignment to function parameter 'value'."},
-    noParamReassignFinding{line: 26, message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 20, message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 25, message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 28, message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 29, message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 30, message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 32, message: "Assignment to function parameter 'value'."},
+    noParamReassignFinding{line: 33, message: "Assignment to function parameter 'value'."},
   )
 }
 
@@ -169,6 +182,8 @@ function mutate(target: any, ignored: any, regexName: any, condition: boolean): 
   sink(target.value).result = 1;
   (target ? {} : {}).untouched = 1;
   ({ [target.value]: ignored } = {});
+  const alias = target;
+  alias.value = 1;
   ignored.value = 1;
   regexName.value = 1;
   ignored = {};
@@ -199,8 +214,8 @@ function mutate(target: any, ignored: any, regexName: any, condition: boolean): 
     property(14),
     property(15),
     property(16),
-    noParamReassignFinding{line: 23, message: "Assignment to function parameter 'ignored'."},
-    noParamReassignFinding{line: 24, message: "Assignment to function parameter 'regexName'."},
+    noParamReassignFinding{line: 25, message: "Assignment to function parameter 'ignored'."},
+    noParamReassignFinding{line: 26, message: "Assignment to function parameter 'regexName'."},
   )
 }
 

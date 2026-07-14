@@ -190,7 +190,7 @@ export const test_lib_index_d_ts_rule_options_autocomplete_per_rule = () => {
   };
   const noParamReassignIgnoreWithoutProps: ITtscLintConfig = {
     rules: {
-      // @ts-expect-error —property ignore lists require `props: true` in the official schema.
+      // @ts-expect-error — property ignore lists require `props: true` in the official schema.
       "no-param-reassign": [
         "error",
         { props: false, ignorePropertyModificationsFor: ["draft"] },
@@ -203,8 +203,20 @@ export const test_lib_index_d_ts_rule_options_autocomplete_per_rule = () => {
         "error",
         {
           props: true,
-          // @ts-expect-error —property ignore entries are regular-expression strings.
+          // @ts-expect-error — property ignore entries are regular-expression strings.
           ignorePropertyModificationsForRegex: [42],
+        },
+      ],
+    },
+  };
+  const noParamReassignOptionKeyTypo: ITtscLintConfig = {
+    rules: {
+      "no-param-reassign": [
+        "error",
+        {
+          props: true,
+          // @ts-expect-error — the official key is `ignorePropertyModificationsFor`.
+          ignorePropertyModificationFor: ["draft"],
         },
       ],
     },
@@ -261,6 +273,7 @@ export const test_lib_index_d_ts_rule_options_autocomplete_per_rule = () => {
   assert.ok(noInnerDeclarationsBlockModeTypo);
   assert.ok(noParamReassignIgnoreWithoutProps);
   assert.ok(noParamReassignInvalidIgnoreEntry);
+  assert.ok(noParamReassignOptionKeyTypo);
   assert.ok(preferConstOptionValue);
   assert.ok(crossRuleShape);
   assert.ok(lintRuleWithOptions);

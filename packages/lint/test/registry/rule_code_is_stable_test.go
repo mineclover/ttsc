@@ -1,41 +1,84 @@
 package linthost
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 
 	"github.com/samchon/ttsc/packages/lint/internal/rulecode"
 )
 
-// This fixture records only collisions present when the ledger was introduced.
-// Future collisions must rely on the append-only ledger instead of being added
-// here, because a later name may sort before the historical incumbent.
-var initialRuleCodeMigrationCollisions = [21]struct {
-	incumbent     string
-	displaced     string
-	displacedCode int32
-}{
-	{"react/no-direct-mutation-state", "regexp/require-unicode-regexp", 9037},
-	{"no-loss-of-precision", "playwright/no-hooks", 9082},
-	{"typescript/no-unnecessary-type-constraint", "unicorn/no-typeof-undefined", 9275},
-	{"getter-return", "vitest/no-conditional-tests", 9584},
-	{"complexity", "vars-on-top", 10346},
-	{"jsdoc/check-values", "no-bitwise", 10529},
-	{"no-obj-calls", "react/jsx-no-script-url", 11455},
-	{"format/declaration-header", "unicorn/prefer-array-some", 11818},
-	{"no-var", "typescript/no-this-alias", 11967},
-	{"solid/prefer-for", "unicorn/no-useless-undefined", 12738},
-	{"regexp/no-useless-escape", "vitest/no-done-callback", 13468},
-	{"jsx-a11y/label-has-associated-control", "no-useless-rename", 13516},
-	{"no-alert", "no-unreachable", 13730},
-	{"no-sequences", "typescript/await-thenable", 14106},
-	{"testing-library/no-wait-for-snapshot", "unicorn/prefer-dom-node-text-content", 14576},
-	{"playwright/no-wait-for-navigation", "unicorn/no-useless-error-capture-stack-trace", 14878},
-	{"react/no-danger-with-children", "unicorn/prefer-string-replace-all", 14980},
-	{"jsx-a11y/no-distracting-elements", "unicorn/prefer-math-trunc", 14993},
-	{"regexp/no-dupe-characters-character-class", "security/detect-non-literal-regexp", 16372},
-	{"functional/no-mixed-types", "object-shorthand", 16865},
-	{"jsx-a11y/heading-has-content", "solid/jsx-no-duplicate-props", 17486},
+func validateInitialRuleCodeAssignments(current map[string]int32) error {
+	if len(initialRuleCodeAssignments) != 743 {
+		return fmt.Errorf("initial rule-code manifest has %d entries, want 743", len(initialRuleCodeAssignments))
+	}
+	for name, want := range initialRuleCodeAssignments {
+		got, exists := current[name]
+		if !exists {
+			return fmt.Errorf("initial rule %q is missing from the append-only ledger", name)
+		}
+		if got != want {
+			return fmt.Errorf("initial rule %q changed diagnostic code from %d to %d", name, want, got)
+		}
+	}
+	return nil
+}
+
+// TestInitialRuleCodeAssignmentsRemainFrozen verifies the complete
+// ledger-introduction snapshot while allowing later names to be appended.
+func TestInitialRuleCodeAssignmentsRemainFrozen(t *testing.T) {
+	if err := validateInitialRuleCodeAssignments(builtInRuleCodes); err != nil {
+		t.Fatal(err)
+	}
+
+	legacyGroups := make(map[int32][]string, len(initialRuleCodeAssignments))
+	for name := range initialRuleCodeAssignments {
+		legacy := rulecode.Legacy(name)
+		legacyGroups[legacy] = append(legacyGroups[legacy], name)
+	}
+	collisionGroups := 0
+	for legacy, names := range legacyGroups {
+		sort.Strings(names)
+		if code := initialRuleCodeAssignments[names[0]]; code != legacy {
+			t.Fatalf("initial migration incumbent %q moved from %d to %d", names[0], legacy, code)
+		}
+		if len(names) == 1 {
+			continue
+		}
+		collisionGroups++
+		for _, name := range names[1:] {
+			if code := initialRuleCodeAssignments[name]; code == legacy {
+				t.Fatalf("initial migration collision loser %q retained incumbent code %d", name, legacy)
+			}
+		}
+	}
+	if collisionGroups != 21 {
+		t.Fatalf("initial migration has %d collision groups, want 21", collisionGroups)
+	}
+}
+
+// TestInitialRuleCodeAssignmentShieldRejectsMutation proves a free renumber of
+// an initially noncolliding rule cannot be blessed by current-ledger uniqueness.
+func TestInitialRuleCodeAssignmentShieldRejectsMutation(t *testing.T) {
+	legacyCounts := make(map[int32]int, len(initialRuleCodeAssignments))
+	for name := range initialRuleCodeAssignments {
+		legacyCounts[rulecode.Legacy(name)]++
+	}
+	mutated := make(map[string]int32, len(builtInRuleCodes))
+	for name, code := range builtInRuleCodes {
+		mutated[name] = code
+	}
+	for name, code := range initialRuleCodeAssignments {
+		if legacyCounts[rulecode.Legacy(name)] != 1 {
+			continue
+		}
+		mutated[name] = code + 1
+		if err := validateInitialRuleCodeAssignments(mutated); err == nil {
+			t.Fatalf("initial noncollision mutation for %q was accepted", name)
+		}
+		return
+	}
+	t.Fatal("initial manifest contains no noncolliding assignment to mutate")
 }
 
 // TestRuleCodesAreUniqueAcrossCompleteRegistry verifies the frozen built-in
@@ -43,12 +86,12 @@ var initialRuleCodeMigrationCollisions = [21]struct {
 //
 // The ledger is the compatibility contract: existing entries, including
 // tombstones for removed rules, must remain unique and in the TS-style band.
-// The initial migration collisions are frozen separately so future rules may
-// join a legacy collision group without redefining its original incumbent.
+// The separate initial snapshot freezes published assignments without treating
+// future appended rules as members of the one-time migration.
 //
 //  1. Require every active built-in to exist in the ledger.
 //  2. Assert ledger and complete loaded registry codes are unique and in range.
-//  3. Pin the initial migration incumbents and every pair reported in #492.
+//  3. Pin every pair reported in #492 after the full snapshot check above.
 func TestRuleCodesAreUniqueAcrossCompleteRegistry(t *testing.T) {
 	ledgerCodes := make(map[int32]string, len(builtInRuleCodes))
 	for name, code := range builtInRuleCodes {
@@ -60,19 +103,6 @@ func TestRuleCodesAreUniqueAcrossCompleteRegistry(t *testing.T) {
 		}
 		ledgerCodes[code] = name
 	}
-	for _, collision := range initialRuleCodeMigrationCollisions {
-		legacy := rulecode.Legacy(collision.incumbent)
-		if displacedLegacy := rulecode.Legacy(collision.displaced); displacedLegacy != legacy {
-			t.Fatalf("invalid initial migration fixture %q/%q: %d != %d", collision.incumbent, collision.displaced, legacy, displacedLegacy)
-		}
-		if code, exists := builtInRuleCodes[collision.incumbent]; !exists || code != legacy {
-			t.Fatalf("initial migration incumbent %q changed from %d to %d (exists=%t)", collision.incumbent, legacy, code, exists)
-		}
-		if code, exists := builtInRuleCodes[collision.displaced]; !exists || code != collision.displacedCode {
-			t.Fatalf("initial migration collision loser %q changed from %d to %d (exists=%t)", collision.displaced, collision.displacedCode, code, exists)
-		}
-	}
-
 	fileRuleNames := AllRuleNames()
 	for _, name := range fileRuleNames {
 		if _, frozen := builtInRuleCodes[name]; frozen {

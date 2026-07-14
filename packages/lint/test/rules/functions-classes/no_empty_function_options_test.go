@@ -179,6 +179,66 @@ class Example extends Base {
       source: `const object = { method() {} };`,
       allow:  []string{"methods"},
     },
+    {
+      name: "decorated method family reports by default",
+      source: `declare function decorate(...args: unknown[]): unknown;
+class Example {
+  @decorate method() {}
+  @decorate *generatorMethod() {}
+  @decorate async asyncMethod() {}
+  @decorate get first() {}
+  @decorate set second(_value: unknown) {}
+}`,
+      want: 5,
+    },
+    {
+      name: "decorated option includes methods and accessors",
+      source: `declare function decorate(...args: unknown[]): unknown;
+class Example {
+  @decorate method() {}
+  @decorate *generatorMethod() {}
+  @decorate async asyncMethod() {}
+  @decorate get first() {}
+  @decorate set second(_value: unknown) {}
+}`,
+      allow: []string{"decoratedFunctions"},
+    },
+    {
+      name: "override method family reports by default",
+      source: `class Base {
+  method() { return; }
+  *generatorMethod() { yield 1; }
+  async asyncMethod() { return; }
+  get first() { return 1; }
+  set second(_value: unknown) { return; }
+}
+class Example extends Base {
+  override method() {}
+  override *generatorMethod() {}
+  override async asyncMethod() {}
+  override get first() {}
+  override set second(_value: unknown) {}
+}`,
+      want: 5,
+    },
+    {
+      name: "override option includes methods and accessors",
+      source: `class Base {
+  method() { return; }
+  *generatorMethod() { yield 1; }
+  async asyncMethod() { return; }
+  get first() { return 1; }
+  set second(_value: unknown) { return; }
+}
+class Example extends Base {
+  override method() {}
+  override *generatorMethod() {}
+  override async asyncMethod() {}
+  override get first() {}
+  override set second(_value: unknown) {}
+}`,
+      allow: []string{"overrideMethods"},
+    },
   }
 
   for _, test := range tests {

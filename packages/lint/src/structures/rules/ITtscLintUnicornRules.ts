@@ -602,8 +602,8 @@ export interface ITtscLintUnicornRules {
   "unicorn/no-zero-fractions"?: TtscLintRuleSetting;
 
   /**
-   * Enforce one consistent case for the prefix and digits of hex / binary /
-   * octal literals (`0xFF` over `0xff`).
+   * Enforce one consistent case for a numeric literal's radix prefix, hex
+   * digits, and exponent (`0xFF` over `0xff`, `1e10` over `1E10`).
    *
    * @reference https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/number-literal-case.md
    */

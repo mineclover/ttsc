@@ -1,6 +1,7 @@
 package linthost
 
 import (
+  "regexp"
   "strings"
 
   shimast "github.com/microsoft/typescript-go/shim/ast"
@@ -24,6 +25,36 @@ func nodeText(file *shimast.SourceFile, node *shimast.Node) string {
     return ""
   }
   return strings.TrimRight(src[pos:end], " \t\r\n")
+}
+
+// templateRawNewlinePattern is acorn's TemplateElement raw normalization
+// (`raw.replace(/\r\n?/g, "\n")` in parseTemplateElement).
+var templateRawNewlinePattern = regexp.MustCompile(`\r\n?`)
+
+// normalizeTemplateRaw reproduces the raw value ESLint sees for a template
+// quasi: acorn materializes `TemplateElement.value.raw` with CR / CRLF
+// collapsed to LF, so upstream rules both match patterns against and rewrite
+// from the LF-normalized text. TypeScript's scanner performs the same
+// collapse while cooking a template token (ECMA-262 normalizes <CR> and
+// <CRLF> to <LF> in template values), so a raw payload sliced straight out of
+// a CRLF source file must be normalized before it is compared with, or
+// substituted back into, a cooked value.
+func normalizeTemplateRaw(raw string) string {
+  return templateRawNewlinePattern.ReplaceAllString(raw, "\n")
+}
+
+// isTaggedTemplateQuasi reports whether `node` is the template argument of a
+// TaggedTemplateExpression — the position whose RAW text the tag function
+// observes, and therefore the one where escape spelling is meaningful.
+// A literal that merely appears somewhere inside a tagged template (e.g.
+// within a substitution) or that sits in the tag slot is not the quasi and
+// stays checked, mirroring upstream's isTaggedTemplateLiteral.
+func isTaggedTemplateQuasi(node *shimast.Node) bool {
+  if node == nil || node.Parent == nil || node.Parent.Kind != shimast.KindTaggedTemplateExpression {
+    return false
+  }
+  tagged := node.Parent.AsTaggedTemplateExpression()
+  return tagged != nil && tagged.Template == node
 }
 
 // keywordStart returns the source offset of a declaration keyword such as

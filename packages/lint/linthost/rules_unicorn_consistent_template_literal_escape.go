@@ -46,12 +46,12 @@ func (unicornConsistentTemplateLiteralEscape) Check(ctx *Context, node *shimast.
   source := ctx.File.Text()
   switch node.Kind {
   case shimast.KindNoSubstitutionTemplateLiteral:
-    if unicornConsistentTemplateLiteralEscapeIsTagged(node) {
+    if isTaggedTemplateQuasi(node) {
       return
     }
     unicornConsistentTemplateLiteralEscapeCheckElement(ctx, source, node)
   case shimast.KindTemplateExpression:
-    if unicornConsistentTemplateLiteralEscapeIsTagged(node) {
+    if isTaggedTemplateQuasi(node) {
       return
     }
     expression := node.AsTemplateExpression()
@@ -80,20 +80,6 @@ func (unicornConsistentTemplateLiteralEscape) Check(ctx *Context, node *shimast.
       unicornConsistentTemplateLiteralEscapeCheckElement(ctx, source, span.Literal)
     }
   }
-}
-
-// unicornConsistentTemplateLiteralEscapeIsTagged reports whether `template`
-// is the quasi of a TaggedTemplateExpression. A template that merely
-// appears somewhere inside a tagged template (e.g. within a substitution)
-// is not tagged itself and stays checked, mirroring upstream's
-// isTaggedTemplateLiteral.
-func unicornConsistentTemplateLiteralEscapeIsTagged(template *shimast.Node) bool {
-  parent := template.Parent
-  if parent == nil || parent.Kind != shimast.KindTaggedTemplateExpression {
-    return false
-  }
-  tagged := parent.AsTaggedTemplateExpression()
-  return tagged != nil && tagged.Template == template
 }
 
 // unicornConsistentTemplateLiteralEscapeCheckElement slices one template

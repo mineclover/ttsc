@@ -892,7 +892,7 @@ func preferConstAssignmentCanInitialize(
     return false
   }
   for _, target := range targets {
-    symbol := preferConstValueSymbol(ctx, target)
+    symbol := valueSymbolAtIdentifier(ctx, target)
     grouped := bySymbol[symbol]
     if symbol == nil || !preferConstSymbolIsLocalToScope(symbol, candidate.scope) ||
       (grouped != nil && grouped.invalid) {

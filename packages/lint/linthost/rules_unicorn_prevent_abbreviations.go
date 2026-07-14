@@ -273,15 +273,27 @@ func decodeUnicornPreventAbbreviationsOptions(raw json.RawMessage) (unicornPreve
   if err := json.Unmarshal(trimmed, &rawFields); err != nil {
     return options, fmt.Errorf("options must be an object: %w", err)
   }
-  for _, name := range []string{
-    "checkProperties",
-    "checkVariables",
-    "checkShorthandProperties",
-    "checkFilenames",
-    "extendDefaultReplacements",
-    "extendDefaultAllowList",
-  } {
-    if value, present := rawFields[name]; present && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+  // The value marks boolean fields, whose pointer-backed decoding would
+  // otherwise make an explicit null indistinguishable from omission.
+  knownFields := map[string]bool{
+    "checkProperties":                  true,
+    "checkVariables":                   true,
+    "checkDefaultAndNamespaceImports": false,
+    "checkShorthandImports":            false,
+    "checkShorthandProperties":         true,
+    "checkFilenames":                   true,
+    "extendDefaultReplacements":        true,
+    "replacements":                     false,
+    "extendDefaultAllowList":           true,
+    "allowList":                        false,
+    "ignore":                           false,
+  }
+  for name, value := range rawFields {
+    boolean, known := knownFields[name]
+    if !known {
+      return options, fmt.Errorf("unknown option %q", name)
+    }
+    if boolean && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
       return options, fmt.Errorf("option %q must be a boolean", name)
     }
   }

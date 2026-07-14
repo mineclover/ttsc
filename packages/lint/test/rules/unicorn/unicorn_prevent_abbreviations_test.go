@@ -647,6 +647,7 @@ func TestUnicornPreventAbbreviationsRejectsMalformedOptions(t *testing.T) {
     `[]`,
     `null`,
     `{"unknown":true}`,
+    `{"CheckVariables":false}`,
     `{"checkVariables":null}`,
     `{"checkShorthandImports":"external"}`,
     `{"replacements":{"err":true}}`,

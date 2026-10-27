@@ -1,0 +1,22 @@
+{
+  "name": "@ttsc/effect-checker-port-fixtures",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "scripts": {
+    "check:ttsc": "ttsc check -p tsconfig.ttsc.json",
+    "check:effect": "effect-tsgo diagnostics --project tsconfig.effect.json --format json",
+    "build:ttsc": "ttsc -p tsconfig.ttsc.json",
+    "test:runtime": "npm run build:ttsc && node --test test/runtime.test.mjs",
+    "probe": "node ../scripts/probe-compat.mjs --root . --ttsc ./node_modules/.bin/ttsc --effect-tsgo ./node_modules/.bin/effect-tsgo --ttsc-config tsconfig.ttsc.json --effect-config tsconfig.effect.json --expect-rule floatingEffect"
+  },
+  "dependencies": {
+    "effect": "4.0.6"
+  },
+  "devDependencies": {
+    "@effect/tsgo": "0.59.0",
+    "@ttsc/lint": "0.33.1",
+    "ttsc": "0.33.1",
+    "typescript": "7.0.2"
+  }
+}

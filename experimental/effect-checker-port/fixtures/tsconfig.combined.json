@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "plugins": [
+      {
+        "transform": "@ttsc/lint",
+        "configFile": "./lint.config.json"
+      },
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "floatingEffect": "error"
+        }
+      }
+    ]
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}

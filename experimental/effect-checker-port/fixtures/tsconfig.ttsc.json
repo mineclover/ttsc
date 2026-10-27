@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "declaration": false,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "plugins": [
+      {
+        "transform": "@ttsc/lint",
+        "configFile": "./lint.config.json"
+      }
+    ]
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}

@@ -87,6 +87,24 @@ export namespace ProjectPluginEntries {
    *
    * @evidenceExclude contracts/performance.md#bound-retention-and-release-resources The output and Set indexes are invocation-owned and acquire no persistent resource or collection.
    */
+  /**
+   * TypeScript language-service plugins are named entries, not ttsc native
+   * transformer descriptors. Keep their configuration in the TypeScript
+   * project while excluding them only from ttsc's native plugin loader.
+   *
+   * An explicitly present but malformed transform field is not skipped: it
+   * still fails validation instead of silently disabling a native plugin.
+   */
+  export function isLanguageServiceOnly(
+    config: ITtscProjectPluginConfig,
+  ): boolean {
+    return (
+      typeof config.name === "string" &&
+      config.name.trim().length > 0 &&
+      !Object.prototype.hasOwnProperty.call(config, "transform")
+    );
+  }
+
   export function resolvePluginEntries(
     project: ITtscParsedProjectConfig,
     entries?: readonly ITtscProjectPluginConfig[],
@@ -94,10 +112,9 @@ export namespace ProjectPluginEntries {
   ): ProjectPluginEntry[] {
     const consumerDir = resolvePluginBaseDir(project, pluginConfigDir);
     if (entries !== undefined) {
-      return entries.map((config) => ({
-        baseDir: consumerDir,
-        config,
-      }));
+      return entries
+        .filter((config) => !isLanguageServiceOnly(config))
+        .map((config) => ({ baseDir: consumerDir, config }));
     }
     const configured = project.compilerOptions.plugins.map((config, index) => {
       // A bare package specifier resolves from the consumer's dependencies,
@@ -114,7 +131,7 @@ export namespace ProjectPluginEntries {
           ? declaringDir
           : consumerDir;
       return { baseDir, config };
-    });
+    }).filter((entry) => !isLanguageServiceOnly(entry.config));
     return [
       ...configured,
       ...discoverPackagePluginEntries(consumerDir, configured),
